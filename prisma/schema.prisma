@@ -1,0 +1,218 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+enum Rol {
+  ADMIN
+  COLABORADOR
+}
+
+enum EstadoProducto {
+  ACTIVO
+  INACTIVO
+}
+
+enum EstadoCompra {
+  BORRADOR
+  ORDENADO
+  RECIBIDO
+  CANCELADO
+}
+
+enum TipoMovimientoInventario {
+  COMPRA
+  VENTA
+  AJUSTE
+  DEVOLUCION
+}
+
+model Usuario {
+  id        String   @id @default(cuid())
+  correo    String   @unique
+  clave     String
+  rol       Rol      @default(COLABORADOR)
+  creadoEn  DateTime @default(now())
+}
+
+model Categoria {
+  id        String    @id @default(cuid())
+  nombre    String
+  slug      String    @unique
+  productos Producto[]
+}
+
+model Producto {
+  id           String        @id @default(cuid())
+  nombre       String
+  slug         String        @unique
+  descripcion  String?
+  precio       Decimal       @db.Decimal(10,2) // PRECIO ÚNICO
+  estado       EstadoProducto @default(ACTIVO)
+  destacado    Boolean       @default(false)
+
+  categoriaId  String?
+  categoria    Categoria?    @relation(fields: [categoriaId], references: [id])
+
+  imagenes     ImagenProducto[]
+  variantes    Variante[]
+
+  creadoEn     DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+}
+
+model ImagenProducto {
+  id         String   @id @default(cuid())
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  url        String
+  esPortada  Boolean  @default(false)
+  orden      Int      @default(0)
+}
+
+model Talla {
+  id        String    @id @default(cuid())
+  nombre    String    @unique // XS, S, M, L...
+  orden     Int       @default(0)
+  variantes Variante[]
+}
+
+model Color {
+  id        String    @id @default(cuid())
+  nombre    String    @unique // Negro, Blanco...
+  hex       String?
+  variantes Variante[]
+}
+
+model Variante {
+  id           String   @id @default(cuid())
+  productoId   String
+  producto     Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  tallaId      String
+  talla        Talla    @relation(fields: [tallaId], references: [id])
+
+  colorId      String
+  color        Color    @relation(fields: [colorId], references: [id])
+
+  sku          String?  @unique
+  activa       Boolean  @default(true)
+
+  stockActual  Int      @default(0)
+
+  movimientos     MovimientoInventario[]
+  itemsCompra     ItemCompra[]
+  itemsVenta      ItemVenta[]
+
+  @@unique([productoId, tallaId, colorId]) // evita duplicados de variante
+}
+
+model MovimientoInventario {
+  id             String                  @id @default(cuid())
+  varianteId     String
+  variante       Variante                @relation(fields: [varianteId], references: [id], onDelete: Cascade)
+
+  tipo           TipoMovimientoInventario
+  cambioCantidad Int                     // +10, -2, etc.
+  costoUnitario  Decimal?                @db.Decimal(10,2) // útil en compras/devoluciones
+  nota           String?
+
+  compraId       String?
+  ventaId        String?
+
+  creadoEn       DateTime                @default(now())
+}
+
+model Proveedor {
+  id        String  @id @default(cuid())
+  nombre    String
+  telefono  String?
+  correo    String?
+  ruc       String?
+  direccion String?
+
+  compras   Compra[]
+}
+
+model Compra {
+  id           String      @id @default(cuid())
+  proveedorId  String?
+  proveedor    Proveedor?  @relation(fields: [proveedorId], references: [id])
+
+  estado       EstadoCompra @default(BORRADOR)
+  fechaCompra  DateTime     @default(now())
+
+  costoEnvio   Decimal?     @db.Decimal(10,2)
+  otrosCostos  Decimal?     @db.Decimal(10,2)
+  notas        String?
+
+  items        ItemCompra[]
+  creadoEn     DateTime @default(now())
+}
+
+model ItemCompra {
+  id         String   @id @default(cuid())
+  compraId   String
+  compra     Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+
+  varianteId String
+  variante   Variante @relation(fields: [varianteId], references: [id])
+
+  cantidad   Int
+  costoUnitario Decimal @db.Decimal(10,2)
+}
+
+model Venta {
+  id            String   @id @default(cuid())
+  canal         String   @default("WhatsApp") // WhatsApp, Tienda, etc.
+  clienteNombre String?
+  notas         String?
+  fechaVenta    DateTime @default(now())
+
+  items         ItemVenta[]
+  empaques      UsoEmpaque[]
+  creadoEn      DateTime @default(now())
+}
+
+model ItemVenta {
+  id         String   @id @default(cuid())
+  ventaId    String
+  venta      Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+
+  varianteId String
+  variante   Variante @relation(fields: [varianteId], references: [id])
+
+  cantidad   Int
+}
+
+model TipoEmpaque {
+  id          String   @id @default(cuid())
+  nombre      String   @unique // Bolsa chica, Caja, Etiqueta...
+  costoUnitario Decimal @db.Decimal(10,2)
+  activo      Boolean  @default(true)
+
+  usos        UsoEmpaque[]
+}
+
+model UsoEmpaque {
+  id            String      @id @default(cuid())
+  ventaId        String
+  venta          Venta       @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+
+  tipoEmpaqueId  String
+  tipoEmpaque    TipoEmpaque @relation(fields: [tipoEmpaqueId], references: [id])
+
+  cantidad      Int
+  costoTotal    Decimal     @db.Decimal(10,2)
+  creadoEn      DateTime    @default(now())
+}
