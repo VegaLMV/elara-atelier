@@ -69,7 +69,7 @@ export async function POST(
 
     const { error: upErr } = await supabase.storage.from(bucket).upload(ruta, bytes, {
       contentType: mime || "image/jpeg",
-      upsert: true, // <-- más robusto
+      upsert: true, 
       cacheControl: "3600",
     });
 
