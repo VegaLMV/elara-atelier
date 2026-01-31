@@ -15,7 +15,9 @@ export default function FiltrosProductos({
     categoria: string;
     estado: string;
     stock: string;
+    descuento: string;
     orden: string;
+    vista: string;
   };
 }) {
   const router = useRouter();
@@ -26,19 +28,21 @@ export default function FiltrosProductos({
   const [categoria, setCategoria] = useState(initial.categoria);
   const [estado, setEstado] = useState(initial.estado);
   const [stock, setStock] = useState(initial.stock);
+  const [descuento, setDescuento] = useState(initial.descuento);
   const [orden, setOrden] = useState(initial.orden);
+  const [vista, setVista] = useState(initial.vista);
 
-  // Si navegas con back/forward, sincroniza el estado con la URL
   useEffect(() => {
     setQ(sp.get("q") ?? "");
     setCategoria(sp.get("categoria") ?? "");
     setEstado(sp.get("estado") ?? "");
     setStock(sp.get("stock") ?? "todas");
+    setDescuento(sp.get("descuento") ?? "todas");
     setOrden(sp.get("orden") ?? "recientes");
+    setVista(sp.get("vista") ?? "tabla");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp.toString()]);
 
-  // Aplica cambios automáticamente (debounce)
   useEffect(() => {
     const t = setTimeout(() => {
       const params = new URLSearchParams();
@@ -48,18 +52,20 @@ export default function FiltrosProductos({
       if (categoria) params.set("categoria", categoria);
       if (estado) params.set("estado", estado);
       if (stock && stock !== "todas") params.set("stock", stock);
+      if (descuento && descuento !== "todas") params.set("descuento", descuento);
       if (orden && orden !== "recientes") params.set("orden", orden);
+      if (vista && vista !== "tabla") params.set("vista", vista);
 
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     }, 300);
 
     return () => clearTimeout(t);
-  }, [q, categoria, estado, stock, orden, router, pathname]);
+  }, [q, categoria, estado, stock, descuento, orden, vista, router, pathname]);
 
   return (
     <div className="border rounded-xl p-4 space-y-3">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
         <div className="space-y-1 md:col-span-2">
           <label className="text-sm">Buscar</label>
           <input
@@ -111,9 +117,22 @@ export default function FiltrosProductos({
             <option value="sin">Sin stock</option>
           </select>
         </div>
+
+        <div className="space-y-1">
+          <label className="text-sm">Descuento</label>
+          <select
+            value={descuento}
+            onChange={(e) => setDescuento(e.target.value)}
+            className="w-full border rounded-md px-3 py-2"
+          >
+            <option value="todas">Todos</option>
+            <option value="con">Con descuento</option>
+            <option value="sin">Sin descuento</option>
+          </select>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
         <div className="space-y-1 md:col-span-2">
           <label className="text-sm">Orden</label>
           <select
@@ -130,6 +149,18 @@ export default function FiltrosProductos({
           </select>
         </div>
 
+        <div className="space-y-1">
+          <label className="text-sm">Vista</label>
+          <select
+            value={vista}
+            onChange={(e) => setVista(e.target.value)}
+            className="w-full border rounded-md px-3 py-2"
+          >
+            <option value="tabla">Tabla</option>
+            <option value="portada">Portada</option>
+          </select>
+        </div>
+
         <div className="flex gap-3 md:col-span-3">
           <button
             type="button"
@@ -138,7 +169,6 @@ export default function FiltrosProductos({
           >
             Limpiar
           </button>
-
         </div>
       </div>
     </div>

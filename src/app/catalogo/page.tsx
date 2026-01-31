@@ -6,11 +6,10 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { Metadata } from "next";
 
-
 type SP = {
   q?: string;
   categoria?: string;
-  stock?: "todas" | "con"; // "con" = solo disponibles (opcional)
+  stock?: "todas" | "con";
   page?: string;
 };
 
@@ -18,6 +17,33 @@ function soles(v: any) {
   const n = Number(v?.toString?.() ?? v);
   if (Number.isNaN(n)) return `S/ ${String(v)}`;
   return `S/ ${n.toFixed(2)}`;
+}
+function n(v: any) {
+  const x = Number(v?.toString?.() ?? v);
+  return Number.isFinite(x) ? x : 0;
+}
+
+function descuentoVigente(p: {
+  descuentoActivo: boolean;
+  descuentoTipo: "PORCENTAJE" | "MONTO" | null;
+  descuentoValor: any | null;
+  descuentoInicio: Date | null;
+  descuentoFin: Date | null;
+}, now: Date) {
+  if (!p.descuentoActivo) return false;
+  if (!p.descuentoTipo) return false;
+  if (p.descuentoValor == null) return false;
+
+  if (p.descuentoInicio && now < p.descuentoInicio) return false;
+  if (p.descuentoFin && now > p.descuentoFin) return false;
+  return true;
+}
+
+function calcPrecioFinal(precio: number, tipo: "PORCENTAJE" | "MONTO", valor: number) {
+  let fin = precio;
+  if (tipo === "PORCENTAJE") fin = precio * (1 - valor / 100);
+  if (tipo === "MONTO") fin = precio - valor;
+  return Math.max(0, fin);
 }
 
 export const metadata: Metadata = {
@@ -30,20 +56,17 @@ export const metadata: Metadata = {
   },
 };
 
-
 export default async function Page({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = (await searchParams) ?? {};
   const q = (sp.q ?? "").trim();
   const categoriaId = (sp.categoria ?? "").trim();
-  const stock = (sp.stock ?? "todas") as SP["stock"]; // ✅ por defecto mixto
+  const stock = (sp.stock ?? "todas") as SP["stock"];
   const page = Math.max(1, Number(sp.page ?? "1") || 1);
 
   const take = 24;
   const skip = (page - 1) * take;
 
-  const where: Prisma.ProductoWhereInput = {
-    estado: "ACTIVO",
-  };
+  const where: Prisma.ProductoWhereInput = { estado: "ACTIVO" };
 
   if (q) {
     where.OR = [
@@ -53,7 +76,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   }
   if (categoriaId) where.categoriaId = categoriaId;
 
-  // opcional: solo disponibles
   if (stock === "con") {
     where.variantes = { some: { activa: true, stockActual: { gt: 0 } } };
   }
@@ -65,7 +87,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     }),
     prisma.producto.findMany({
       where,
-      orderBy: { creadoEn: "desc" }, // orden base (luego refinamos con stock)
+      orderBy: { creadoEn: "desc" },
       select: {
         id: true,
         nombre: true,
@@ -73,7 +95,20 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         precio: true,
         creadoEn: true,
         categoria: { select: { nombre: true } },
-        imagenes: { select: { url: true, esPortada: true, orden: true } },
+
+        // ✅ descuentos
+        descuentoActivo: true,
+        descuentoTipo: true,
+        descuentoValor: true,
+        descuentoInicio: true,
+        descuentoFin: true,
+
+        // ✅ portada en 1 query (más rápido)
+        imagenes: {
+          select: { url: true },
+          orderBy: [{ esPortada: "desc" }, { orden: "asc" }],
+          take: 1,
+        },
       },
       take,
       skip,
@@ -83,7 +118,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   const ids = productosBase.map((p) => p.id);
 
-  // Stock total activo por producto (solo variantes activas)
   const stockSum = ids.length
     ? await prisma.variante.groupBy({
         by: ["productoId"],
@@ -95,22 +129,56 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const mapStock = new Map<string, number>();
   for (const r of stockSum) mapStock.set(r.productoId, r._sum.stockActual ?? 0);
 
+  const now = new Date();
+
   const productos = productosBase
     .map((p) => {
       const stockTotal = mapStock.get(p.id) ?? 0;
-      const portada =
-        p.imagenes
-          .slice()
-          .sort((a, b) => Number(b.esPortada) - Number(a.esPortada) || a.orden - b.orden)[0]?.url ?? "";
+      const disponible = stockTotal > 0;
+
+      const portada = p.imagenes?.[0]?.url ?? "";
+
+      const tieneDesc = descuentoVigente(
+        {
+          descuentoActivo: p.descuentoActivo,
+          descuentoTipo: (p.descuentoTipo as any) ?? null,
+          descuentoValor: p.descuentoValor,
+          descuentoInicio: p.descuentoInicio,
+          descuentoFin: p.descuentoFin,
+        },
+        now
+      );
+
+      const precioNum = n(p.precio);
+      const valorNum = n(p.descuentoValor);
+
+      const precioFinal =
+        tieneDesc && p.descuentoTipo
+          ? calcPrecioFinal(precioNum, p.descuentoTipo as any, valorNum)
+          : null;
+
+      const badge =
+        tieneDesc && p.descuentoTipo
+          ? p.descuentoTipo === "PORCENTAJE"
+            ? `-${valorNum}%`
+            : `-S/ ${valorNum.toFixed(2)}`
+          : "";
 
       return {
-        ...p,
+        id: p.id,
+        nombre: p.nombre,
+        slug: p.slug,
+        precio: p.precio,
+        categoria: p.categoria,
+        creadoEn: p.creadoEn,
         stockTotal,
+        disponible,
         portada,
-        disponible: stockTotal > 0,
+        tieneDesc,
+        precioFinal,
+        badge,
       };
     })
-    // ✅ MIXTO: disponibles primero, luego agotados
     .sort((a, b) => Number(b.disponible) - Number(a.disponible) || +b.creadoEn - +a.creadoEn);
 
   const totalPages = Math.max(1, Math.ceil(total / take));
@@ -122,16 +190,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         <p className="text-sm opacity-80">Catálogo</p>
       </div>
 
-      {/* Filtros */}
       <form method="GET" className="border rounded-xl p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="space-y-1 md:col-span-2">
           <label className="text-sm">Buscar</label>
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Nombre..."
-            className="w-full border rounded-md px-3 py-2"
-          />
+          <input name="q" defaultValue={q} placeholder="Nombre..." className="w-full border rounded-md px-3 py-2" />
         </div>
 
         <div className="space-y-1">
@@ -162,10 +224,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         </div>
       </form>
 
-      {/* Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {productos.map((p) => (
-          <Link key={p.id} href={`/catalogo/${p.slug}`} className="border rounded-xl overflow-hidden hover:opacity-90 transition">
+          <Link
+            key={p.id}
+            href={`/catalogo/${p.slug}`}
+            className="border rounded-xl overflow-hidden hover:opacity-90 transition"
+          >
             <div className="relative aspect-square bg-black">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {p.portada ? <img src={p.portada} alt={p.nombre} className="w-full h-full object-cover" /> : null}
@@ -175,12 +240,26 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
                   Agotado
                 </div>
               )}
+
+              {p.tieneDesc && (
+                <div className="absolute top-3 left-3 z-10 bg-red-600 text-white text-xs font-bold px-4 py-1 rounded-none shadow">
+                  {p.badge ?? "OFERTA"}
+                </div>
+              )}
             </div>
 
             <div className="p-3 space-y-1">
               <div className="font-medium">{p.nombre}</div>
               <div className="text-sm opacity-80">{p.categoria?.nombre ?? "-"}</div>
-              <div className="text-sm">{soles(p.precio)}</div>
+
+              {p.tieneDesc && p.precioFinal != null ? (
+                <div className="text-sm">
+                  <span className="line-through opacity-60 mr-2">{soles(p.precio)}</span>
+                  <span className="font-semibold">{soles(p.precioFinal)}</span>
+                </div>
+              ) : (
+                <div className="text-sm">{soles(p.precio)}</div>
+              )}
             </div>
           </Link>
         ))}
@@ -188,7 +267,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
       {productos.length === 0 && <p className="text-sm opacity-80">No hay resultados.</p>}
 
-      {/* Paginación */}
       <div className="flex gap-3 items-center">
         {page > 1 && (
           <Link

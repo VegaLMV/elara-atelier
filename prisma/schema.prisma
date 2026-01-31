@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -36,12 +33,27 @@ enum TipoMovimientoInventario {
   DEVOLUCION
 }
 
+enum TipoDescuentoProducto {
+  PORCENTAJE
+  MONTO
+}
+
+enum EstadoDescuentoProducto {
+  PROGRAMADO
+  ACTIVO
+  FINALIZADO
+  CANCELADO
+}
+
 model Usuario {
   id        String   @id @default(cuid())
   correo    String   @unique
   clave     String
   rol       Rol      @default(COLABORADOR)
   creadoEn  DateTime @default(now())
+
+  // ✅ opcional: auditoría de descuentos creados por el usuario
+  descuentosCreados DescuentoProducto[] @relation("DescuentoCreadoPor")
 }
 
 model Categoria {
@@ -52,22 +64,63 @@ model Categoria {
 }
 
 model Producto {
-  id           String        @id @default(cuid())
+  id           String         @id @default(cuid())
   nombre       String
-  slug         String        @unique
+  slug         String         @unique
   descripcion  String?
-  precio       Decimal       @db.Decimal(10,2) // PRECIO ÚNICO
+  precio       Decimal        @db.Decimal(10,2) // PRECIO ÚNICO
   estado       EstadoProducto @default(ACTIVO)
-  destacado    Boolean       @default(false)
+  destacado    Boolean        @default(false)
+
+  descuentoActivo Boolean                @default(false)
+  descuentoTipo   TipoDescuentoProducto?
+  descuentoValor  Decimal?               @db.Decimal(10,2)
+  descuentoInicio DateTime?
+  descuentoFin    DateTime?
+
+  descuentos DescuentoProducto[] @relation("ProductoDescuentos")
+
+  descuentoActualId String?
+  descuentoActual   DescuentoProducto? @relation(
+    "ProductoDescuentoActual",
+    fields: [descuentoActualId],
+    references: [id]
+  )
 
   categoriaId  String?
-  categoria    Categoria?    @relation(fields: [categoriaId], references: [id])
+  categoria    Categoria?     @relation(fields: [categoriaId], references: [id])
 
   imagenes     ImagenProducto[]
   variantes    Variante[]
 
-  creadoEn     DateTime @default(now())
+  creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
+
+  imagenesColor ImagenProductoColor[]
+}
+
+model DescuentoProducto {
+  id         String   @id @default(cuid())
+
+  productoId String
+  producto   Producto @relation("ProductoDescuentos", fields: [productoId], references: [id], onDelete: Cascade)
+
+  tipo       TipoDescuentoProducto
+  valor      Decimal  @db.Decimal(10,2)
+
+  startsAt   DateTime
+  endsAt     DateTime
+
+  estado     EstadoDescuentoProducto @default(PROGRAMADO)
+
+  creadoPorId String?
+  creadoPor   Usuario? @relation("DescuentoCreadoPor", fields: [creadoPorId], references: [id])
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([productoId, estado, startsAt, endsAt])
+  @@index([startsAt, endsAt])
 }
 
 model ImagenProducto {
@@ -78,6 +131,22 @@ model ImagenProducto {
   url        String
   esPortada  Boolean  @default(false)
   orden      Int      @default(0)
+}
+
+model ImagenProductoColor {
+  id         String   @id @default(cuid())
+
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  colorId    String
+  color      Color    @relation(fields: [colorId], references: [id])
+
+  url        String
+  creadoEn   DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([productoId, colorId])
 }
 
 model Talla {
@@ -92,6 +161,8 @@ model Color {
   nombre    String    @unique // Negro, Blanco...
   hex       String?
   variantes Variante[]
+
+  imagenesProducto ImagenProductoColor[]
 }
 
 model Variante {
@@ -123,8 +194,8 @@ model MovimientoInventario {
   variante       Variante                @relation(fields: [varianteId], references: [id], onDelete: Cascade)
 
   tipo           TipoMovimientoInventario
-  cambioCantidad Int                     // +10, -2, etc.
-  costoUnitario  Decimal?                @db.Decimal(10,2) // útil en compras/devoluciones
+  cambioCantidad Int
+  costoUnitario  Decimal?                @db.Decimal(10,2)
   nota           String?
 
   compraId       String?
@@ -174,7 +245,7 @@ model ItemCompra {
 
 model Venta {
   id            String   @id @default(cuid())
-  canal         String   @default("WhatsApp") // WhatsApp, Tienda, etc.
+  canal         String   @default("WhatsApp")
   clienteNombre String?
   notas         String?
   fechaVenta    DateTime @default(now())
@@ -197,7 +268,7 @@ model ItemVenta {
 
 model TipoEmpaque {
   id          String   @id @default(cuid())
-  nombre      String   @unique // Bolsa chica, Caja, Etiqueta...
+  nombre      String   @unique
   costoUnitario Decimal @db.Decimal(10,2)
   activo      Boolean  @default(true)
 
