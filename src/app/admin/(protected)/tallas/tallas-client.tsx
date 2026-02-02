@@ -13,10 +13,17 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
   const [orden, setOrden] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const canCreate = useMemo(() => nombre.trim().length > 0, [nombre]);
 
-  async function crear() {
+  const showSuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(null), 3000);
+  };
+
+  async function crear(e: React.FormEvent) {
+    e.preventDefault();
     setError(null);
     if (!canCreate) return;
 
@@ -39,33 +46,33 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
 
     setNombre("");
     setOrden("0");
+    showSuccess("Talla creada correctamente");
 
-    // refresca lista desde server (y sincroniza)
     router.refresh();
   }
 
   async function actualizar(id: string, patch: { nombre: string; orden: number }) {
     setError(null);
-    setBusy(true);
+    // setBusy(true); // No bloqueamos todo para edición inline
     const r = await fetch(`/api/admin/tallas/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
-    setBusy(false);
+    // setBusy(false);
 
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       setError(d?.error ?? "Error actualizando talla");
       return;
     }
-
+    showSuccess("Talla actualizada");
     router.refresh();
   }
 
   async function eliminar(id: string) {
     setError(null);
-    if (!confirm("¿Eliminar talla? Si está usada por variantes, no se podrá.")) return;
+    if (!confirm("¿Estás seguro de eliminar esta talla? Si está en uso, podría fallar.")) return;
 
     setBusy(true);
     const r = await fetch(`/api/admin/tallas/${id}`, { method: "DELETE" });
@@ -73,87 +80,92 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
 
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
-      setError(d?.error ?? "Error eliminando talla");
+      setError(d?.error ?? "Error eliminando talla (puede estar en uso)");
       return;
     }
 
+    showSuccess("Talla eliminada");
     router.refresh();
   }
 
-  // si el server refresca, no tenemos hook acá: hacemos sync simple por reload visual
-  // (router.refresh() recarga server component y reinicia initialRows)
-  // Turbopack suele re-renderizar; igual dejamos rows local solo para editar.
-  // Puedes quitar rows/setRows si prefieres full refresh.
-
   return (
-    <div className="space-y-4">
-      {error && <p className="text-sm text-red-600">{error}</p>}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start relative">
+      
+      {/* TOAST NOTIFICATION */}
+      {successMsg && (
+         <div className="fixed bottom-5 right-5 bg-slate-900 text-white px-6 py-3 rounded-lg shadow-xl z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
+            ✅ {successMsg}
+         </div>
+      )}
 
-      <div className="border rounded-xl p-4 space-y-3">
-        <h2 className="text-lg font-semibold">Nueva talla</h2>
+      {/* FORMULARIO DE CREACIÓN */}
+      <div className="lg:col-span-1">
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm sticky top-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-4 border-b pb-2">Agregar Nueva Talla</h2>
+          
+          <form onSubmit={crear} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Etiqueta</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all placeholder:text-gray-300"
+                placeholder="Ej. XL, 42, Standar"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                autoFocus
+              />
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-          <div className="space-y-1">
-            <label className="text-sm">Nombre</label>
-            <input
-              className="w-full border rounded-md px-3 py-2"
-              placeholder="XS"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-            />
-          </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Orden de visualización</label>
+              <input
+                type="number"
+                step={1}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+                value={orden}
+                onChange={(e) => setOrden(e.target.value)}
+              />
+              <p className="text-[10px] text-gray-400">Menor número aparece primero (1, 2, 3...)</p>
+            </div>
 
-          <div className="space-y-1">
-            <label className="text-sm">Orden</label>
-            <input
-              type="number"
-              step={1}
-              className="w-full border rounded-md px-3 py-2"
-              value={orden}
-              onChange={(e) => setOrden(e.target.value)}
-            />
-          </div>
+            {error && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">{error}</div>}
 
-          <button
-            type="button"
-            className="bg-black text-white rounded-md px-4 py-2 disabled:opacity-60"
-            onClick={crear}
-            disabled={busy || !canCreate}
-          >
-            {busy ? "Guardando..." : "Crear"}
-          </button>
+            <button
+              type="submit"
+              className="w-full bg-slate-900 text-white rounded-lg px-4 py-3 font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md active:scale-[0.98]"
+              disabled={busy || !canCreate}
+            >
+              {busy ? "Guardando..." : "Guardar Talla"}
+            </button>
+          </form>
         </div>
       </div>
 
-      <div className="border rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-black text-white">
-            <tr>
-              <th className="text-left p-3">Nombre</th>
-              <th className="text-left p-3">Orden</th>
-              <th className="text-left p-3">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            {initialRows.map((r) => (
-              <Fila
-                key={r.id}
-                row={r}
-                disabled={busy}
-                onSave={(patch) => actualizar(r.id, patch)}
-                onDelete={() => eliminar(r.id)}
-              />
-            ))}
-
-            {initialRows.length === 0 && (
-              <tr>
-                <td className="p-3" colSpan={3}>
-                  No hay tallas registradas.
-                </td>
-              </tr>
+      {/* LISTA DE TALLAS */}
+      <div className="lg:col-span-2">
+         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
+               <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Listado Actual</span>
+            </div>
+            
+            {initialRows.length === 0 ? (
+               <div className="p-12 text-center text-gray-400 flex flex-col items-center">
+                  <span className="text-4xl mb-2">📏</span>
+                  <p>No hay tallas registradas aún.</p>
+               </div>
+            ) : (
+               <div className="divide-y divide-gray-100">
+                  {initialRows.map((r) => (
+                    <Fila
+                      key={r.id}
+                      row={r}
+                      disabled={busy}
+                      onSave={(patch) => actualizar(r.id, patch)}
+                      onDelete={() => eliminar(r.id)}
+                    />
+                  ))}
+               </div>
             )}
-          </tbody>
-        </table>
+         </div>
       </div>
     </div>
   );
@@ -176,38 +188,55 @@ function Fila({
   const changed = nombre.trim() !== row.nombre || Number(orden || 0) !== row.orden;
 
   return (
-    <tr className="border-t">
-      <td className="p-3">
-        <input
-          className="w-full border rounded-md px-2 py-1"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-        />
-      </td>
-      <td className="p-3">
-        <input
-          type="number"
-          step={1}
-          className="w-24 border rounded-md px-2 py-1"
-          value={orden}
-          onChange={(e) => setOrden(e.target.value)}
-        />
-      </td>
-      <td className="p-3">
-        <div className="flex gap-3">
-          <button
-            type="button"
-            className="underline disabled:opacity-60"
-            disabled={disabled || !changed || !nombre.trim()}
-            onClick={() => onSave({ nombre: nombre.trim(), orden: Number.parseInt(orden || "0", 10) || 0 })}
+    <div className="group flex items-center justify-between p-4 hover:bg-gray-50 transition-colors gap-4">
+       <div className="flex-1 grid grid-cols-2 gap-4 items-center">
+          
+          <div className="flex items-center gap-3">
+             <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-mono font-bold text-gray-500 border border-gray-200">
+                {row.orden}
+             </div>
+             <input
+               className="w-full bg-transparent border-b border-transparent hover:border-gray-300 focus:border-black focus:ring-0 outline-none px-2 py-1 font-medium text-gray-900 transition-colors"
+               value={nombre}
+               onChange={(e) => setNombre(e.target.value)}
+               placeholder="Nombre"
+             />
+          </div>
+
+          <div className="flex items-center gap-2">
+             <span className="text-xs text-gray-400 uppercase">Orden:</span>
+             <input
+               type="number"
+               step={1}
+               className="w-20 bg-transparent border border-transparent hover:border-gray-300 focus:border-black rounded px-2 py-1 text-sm text-gray-700 text-center transition-all"
+               value={orden}
+               onChange={(e) => setOrden(e.target.value)}
+             />
+          </div>
+       </div>
+
+       <div className="flex items-center gap-2 opacity-30 group-hover:opacity-100 transition-opacity">
+          {changed && (
+             <button
+               type="button"
+               className="bg-green-600 text-white text-xs px-3 py-1.5 rounded-full font-medium hover:bg-green-700 transition-colors shadow-sm animate-in zoom-in"
+               disabled={disabled || !nombre.trim()}
+               onClick={() => onSave({ nombre: nombre.trim(), orden: Number.parseInt(orden || "0", 10) || 0 })}
+             >
+               Guardar
+             </button>
+          )}
+          
+          <button 
+             type="button" 
+             className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-colors" 
+             disabled={disabled} 
+             onClick={onDelete}
+             title="Eliminar talla"
           >
-            Guardar
+             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
           </button>
-          <button type="button" className="underline disabled:opacity-60" disabled={disabled} onClick={onDelete}>
-            Eliminar
-          </button>
-        </div>
-      </td>
-    </tr>
+       </div>
+    </div>
   );
 }

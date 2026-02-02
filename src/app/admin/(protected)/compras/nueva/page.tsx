@@ -18,7 +18,7 @@ export default async function Page() {
 
   const variantes = await prisma.variante.findMany({
     include: {
-      producto: { select: { id: true, nombre: true, precio: true } }, // ✅ TRAER PRECIO
+      producto: { select: { id: true, nombre: true, precio: true } },
       talla: { select: { nombre: true, orden: true } },
       color: { select: { nombre: true } },
     },

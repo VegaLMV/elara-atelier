@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-type TipoKardex = "TODOS" | "COMPRA" | "AJUSTE" | "DEVOLUCION";
+type TipoKardex = "TODOS" | "COMPRA" | "VENTA" | "AJUSTE" | "DEVOLUCION";
 
 export default function FiltrosKardex({
   initial,
@@ -30,7 +30,7 @@ export default function FiltrosKardex({
     if (from) sp.set("from", from);
     if (to) sp.set("to", to);
 
-    // ✅ reset paginación al filtrar
+    // reset paginación al filtrar
     sp.set("page", "1");
 
     const qs = sp.toString();
@@ -38,52 +38,92 @@ export default function FiltrosKardex({
   }
 
   function limpiar() {
+    setQ("");
+    setTipo("TODOS");
+    setFrom("");
+    setTo("");
     router.push("/admin/kardex");
   }
 
   return (
-    <div className="border rounded-xl p-4 space-y-3">
-      <h2 className="text-lg font-semibold">Filtros</h2>
+    <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
+      <div className="flex items-center justify-between mb-2">
+         <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+            <span>🔍</span> Filtros de Búsqueda
+         </h2>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div className="space-y-1 md:col-span-2">
-          <label className="text-sm">Buscar</label>
-          <input
-            className="w-full border rounded-md px-3 py-2"
-            placeholder="Producto / Talla / Color / SKU / Nota"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+        {/* Buscador Textual */}
+        <div className="md:col-span-4 space-y-1.5">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Buscar</label>
+          <div className="relative">
+             <input
+               className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all placeholder:text-gray-400"
+               placeholder="Producto / SKU / Nota..."
+               value={q}
+               onChange={(e) => setQ(e.target.value)}
+             />
+             <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          </div>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-sm">Tipo</label>
-          <select className="w-full border rounded-md px-3 py-2" value={tipo} onChange={(e) => setTipo(e.target.value as any)}>
-            <option value="TODOS">TODOS</option>
-            <option value="COMPRA">COMPRA</option>
-            <option value="AJUSTE">AJUSTE</option>
-            <option value="DEVOLUCION">DEVOLUCIÓN</option>
+        {/* Tipo Movimiento */}
+        <div className="md:col-span-2 space-y-1.5">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipo</label>
+          <select 
+             className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer" 
+             value={tipo} 
+             onChange={(e) => setTipo(e.target.value as any)}
+          >
+            <option value="TODOS">Todos</option>
+            <option value="COMPRA">Compras</option>
+            <option value="VENTA">Ventas</option>
+            <option value="AJUSTE">Ajustes</option>
+            <option value="DEVOLUCION">Devoluciones</option>
           </select>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-sm">Desde</label>
-          <input className="w-full border rounded-md px-3 py-2" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        {/* Fechas */}
+        <div className="md:col-span-4 grid grid-cols-2 gap-3">
+           <div className="space-y-1.5">
+             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Desde</label>
+             <input 
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
+                type="date" 
+                value={from} 
+                onChange={(e) => setFrom(e.target.value)} 
+             />
+           </div>
+           <div className="space-y-1.5">
+             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Hasta</label>
+             <input 
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
+                type="date" 
+                value={to} 
+                onChange={(e) => setTo(e.target.value)} 
+             />
+           </div>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-sm">Hasta</label>
-          <input className="w-full border rounded-md px-3 py-2" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        {/* Botones */}
+        <div className="md:col-span-2 flex items-end gap-2">
+          <button 
+             type="button" 
+             className="flex-1 bg-slate-900 text-white rounded-lg px-4 py-2.5 font-bold text-sm hover:bg-slate-800 transition-all shadow-md active:scale-[0.98]" 
+             onClick={aplicar}
+          >
+            Filtrar
+          </button>
+          <button 
+             type="button" 
+             className="px-3 py-2.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors" 
+             onClick={limpiar}
+             title="Limpiar filtros"
+          >
+            ↺
+          </button>
         </div>
-      </div>
-
-      <div className="flex gap-3">
-        <button type="button" className="bg-black text-white rounded-md px-4 py-2" onClick={aplicar}>
-          Aplicar
-        </button>
-        <button type="button" className="border rounded-md px-4 py-2" onClick={limpiar}>
-          Limpiar
-        </button>
       </div>
     </div>
   );

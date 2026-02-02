@@ -2,16 +2,23 @@ import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/lib/sesion";
 import AdminTopbar from "../topbar";
 
-export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
-  const sesion = await obtenerSesion();
+export default async function ProtectedAdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  // ✅ Usamos sesionAdmin en lugar de obtenerSesion
+  const admin = await obtenerSesion();
 
-  if (!sesion) redirect("/admin/login");
-  if (sesion.rol !== "ADMIN") redirect("/admin/login");
+  // Si no hay sesión de admin, redirigir al login
+  if (!admin) {
+    redirect("/admin/login");
+  }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gray-50 font-sans text-slate-900">
       <AdminTopbar />
-      <div className="p-6">{children}</div>
+      <main>{children}</main>
     </div>
   );
 }

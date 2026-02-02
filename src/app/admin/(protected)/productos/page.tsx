@@ -6,9 +6,10 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { obtenerSesion } from "@/lib/sesion";
+import { sesionAdmin } from "@/lib/sesion";
 
 import FiltrosProductos from "./filtros-productos";
+import ProductoImageClient from "./producto-image-client"; 
 
 function soles(v: any) {
   const n = Number(v?.toString?.() ?? v);
@@ -21,21 +22,39 @@ function num(v: any) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function descuentoVigente(p: {
+// ✅ Lógica mejorada: Considera "ACTIVO" si empieza hoy mismo, sin importar la hora UTC
+function getEstadoDescuento(p: {
   descuentoActivo: boolean;
-  descuentoTipo: any;
-  descuentoValor: any;
   descuentoInicio: Date | null;
   descuentoFin: Date | null;
-}) {
-  if (!p.descuentoActivo) return false;
-  if (!p.descuentoTipo) return false;
-  if (p.descuentoValor === null || p.descuentoValor === undefined) return false;
+}): "ACTIVO" | "PROGRAMADO" | null {
+  if (!p.descuentoActivo) return null;
 
   const ahora = new Date();
-  if (p.descuentoInicio && p.descuentoInicio > ahora) return false;
-  if (p.descuentoFin && p.descuentoFin < ahora) return false;
-  return true;
+
+  // Validación de Inicio
+  if (p.descuentoInicio) {
+    if (p.descuentoInicio > ahora) {
+      const inicioStr = p.descuentoInicio.toISOString().split('T')[0];
+      const ahoraStr = ahora.toISOString().split('T')[0];
+      
+      if (inicioStr !== ahoraStr) {
+        return "PROGRAMADO";
+      }
+    }
+  }
+
+  // Validación de Fin
+  if (p.descuentoFin) {
+    const fin = new Date(p.descuentoFin);
+    fin.setHours(23, 59, 59, 999);
+    
+    if (fin < ahora) {
+      return null; // Expirado
+    }
+  }
+
+  return "ACTIVO";
 }
 
 function etiquetaDescuento(tipo: any, valor: any) {
@@ -43,7 +62,7 @@ function etiquetaDescuento(tipo: any, valor: any) {
   if (!Number.isFinite(n)) return null;
 
   if (tipo === "PORCENTAJE") return `-${Number.isInteger(n) ? n : n.toFixed(2)}%`;
-  return `-S/ ${n.toFixed(2)}`; // MONTO
+  return `-S/ ${n.toFixed(2)}`;
 }
 
 function calcularPrecioFinal(precio: any, tipo: any, valor: any) {
@@ -53,15 +72,11 @@ function calcularPrecioFinal(precio: any, tipo: any, valor: any) {
   if (!tipo || v <= 0) return { final: p, ahorro: 0 };
 
   let final = p;
-
   if (tipo === "PORCENTAJE") {
-    // asume 10 => 10%
     final = p * (1 - v / 100);
   } else {
-    // MONTO
     final = p - v;
   }
-
   if (final < 0) final = 0;
 
   const ahorro = p - final;
@@ -79,9 +94,8 @@ type SP = {
 };
 
 export default async function Page({ searchParams }: { searchParams: Promise<SP> }) {
-  const sesion = await obtenerSesion();
-  if (!sesion) redirect("/admin/login");
-  if (sesion.rol !== "ADMIN") redirect("/admin/login");
+  const admin = await sesionAdmin();
+  if (!admin) redirect("/admin/login");
 
   const sp = (await searchParams) ?? {};
 
@@ -106,7 +120,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   if (categoriaId) where.categoriaId = categoriaId;
   if (estado === "ACTIVO" || estado === "INACTIVO") where.estado = estado;
 
-  // stock: con / sin (solo cuenta variantes activas con stock > 0)
   if (stock === "con") {
     AND.push({ variantes: { some: { activa: true, stockActual: { gt: 0 } } } });
   }
@@ -114,7 +127,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     AND.push({ NOT: { variantes: { some: { activa: true, stockActual: { gt: 0 } } } } });
   }
 
-  // filtro descuento: vigente
   const ahora = new Date();
   const filtroDescuentoVigente: Prisma.ProductoWhereInput = {
     descuentoActivo: true,
@@ -156,6 +168,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         id: true,
         nombre: true,
         precio: true,
+        estado: true,
+        destacado: true,
         categoria: { select: { nombre: true } },
 
         descuentoActivo: true,
@@ -167,72 +181,69 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         imagenes: {
           select: { url: true },
           orderBy: [{ esPortada: "desc" }, { orden: "asc" }],
-          take: 1,
+          take: 200, // Increased just in case, logic was fine
+        },
+        variantes: {
+          select: { stockActual: true, activa: true },
         },
       },
       take: 200,
     }),
   ]);
 
-  const ids = productosBase.map((p) => p.id);
-
-  const variantesCount = ids.length
-    ? await prisma.variante.groupBy({
-        by: ["productoId"],
-        where: { productoId: { in: ids } },
-        _count: { _all: true },
-      })
-    : [];
-
-  const stockSum = ids.length
-    ? await prisma.variante.groupBy({
-        by: ["productoId"],
-        where: { productoId: { in: ids }, activa: true },
-        _sum: { stockActual: true },
-      })
-    : [];
-
-  const mapVar = new Map<string, number>();
-  for (const r of variantesCount) mapVar.set(r.productoId, r._count._all);
-
-  const mapStock = new Map<string, number>();
-  for (const r of stockSum) mapStock.set(r.productoId, r._sum.stockActual ?? 0);
-
   const productos = productosBase.map((p) => {
-    const vigente = descuentoVigente(p);
-    const tag = vigente ? etiquetaDescuento(p.descuentoTipo, p.descuentoValor) : null;
+    const estadoDescuento = getEstadoDescuento({
+      descuentoActivo: p.descuentoActivo,
+      descuentoInicio: p.descuentoInicio,
+      descuentoFin: p.descuentoFin,
+    });
 
-    const { final } = vigente
+    const esVigente = estadoDescuento === "ACTIVO";
+    const tag = (esVigente || estadoDescuento === "PROGRAMADO") 
+      ? etiquetaDescuento(p.descuentoTipo, p.descuentoValor) 
+      : null;
+
+    const { final } = esVigente
       ? calcularPrecioFinal(p.precio, p.descuentoTipo, p.descuentoValor)
       : { final: num(p.precio) };
+
+    const stockTotal = p.variantes.reduce((acc, v) => acc + (v.activa ? v.stockActual : 0), 0);
+    const variantesCount = p.variantes.length;
+
+    const precioDisplay = esVigente ? soles(final) : soles(p.precio);
 
     return {
       id: p.id,
       nombre: p.nombre,
       precio: p.precio,
       categoria: p.categoria,
-      portadaUrl: p.imagenes?.[0]?.url ?? "",
-      variantes: mapVar.get(p.id) ?? 0,
-      stock: mapStock.get(p.id) ?? 0,
+      portadaUrl: p.imagenes?.[0]?.url ?? null,
+      variantes: variantesCount,
+      stock: stockTotal,
+      estado: p.estado,
+      destacado: p.destacado,
 
-      descuentoVigente: vigente,
+      estadoDescuento,
       descuentoTag: tag,
       precioFinal: final,
+      precioDisplay,
     };
   });
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-start justify-between gap-4">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Productos</h1>
-          <p className="text-sm opacity-80">
-            Mostrando <b>{productos.length}</b>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Productos</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Gestión de catálogo ({productos.length})
           </p>
         </div>
-
-        <Link className="underline" href="/admin/productos/nuevo">
-          Nuevo producto
+        <Link
+          href="/admin/productos/nuevo"
+          className="bg-slate-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 transition shadow-sm"
+        >
+          + Nuevo Producto
         </Link>
       </div>
 
@@ -251,160 +262,161 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
       {/* VISTA PORTADA */}
       {vista === "portada" ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {productos.map((p) => (
             <div
               key={p.id}
-              className={`border rounded-xl overflow-hidden ${
-                p.descuentoVigente ? "ring-2 ring-green-600" : ""
+              className={`bg-white border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group relative flex flex-col ${
+                p.estadoDescuento === 'ACTIVO' ? "ring-1 ring-green-500/50" : ""
               }`}
             >
-              <div className="relative aspect-square bg-black">
-                {p.descuentoVigente && p.descuentoTag ? (
-                  <div className="absolute top-2 left-2 z-10">
-                    <span className="inline-flex items-center rounded-full bg-green-600 text-white px-2 py-0.5 text-[11px] font-semibold">
-                      {p.descuentoTag}
+              <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 pointer-events-none">
+                 {p.estadoDescuento === 'ACTIVO' && (
+                    <span className="inline-flex items-center bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                       🔥 {p.descuentoTag} OFF
                     </span>
-                  </div>
-                ) : null}
-
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {p.portadaUrl ? (
-                  <img src={p.portadaUrl} alt={p.nombre} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs text-white/80">
-                    Sin portada
-                  </div>
-                )}
+                 )}
+                 {p.estadoDescuento === 'PROGRAMADO' && (
+                    <span className="inline-flex items-center bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                       ⏳ Programado
+                    </span>
+                 )}
+                 {p.destacado && (
+                    <span className="inline-flex items-center bg-yellow-400 text-yellow-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm w-fit">
+                       ★
+                    </span>
+                 )}
               </div>
 
-              <div className="p-3 space-y-1">
-                <div className="text-sm font-medium line-clamp-2">{p.nombre}</div>
+              <div className="relative aspect-square bg-gray-100 overflow-hidden">
+                <ProductoImageClient 
+                  id={p.id}
+                  nombre={p.nombre}
+                  src={p.portadaUrl}
+                  precioDisplay={p.precioDisplay}
+                  stock={p.stock}
+                />
+              </div>
 
-                {/* ✅ Precio + precio final */}
-                {p.descuentoVigente && p.descuentoTag ? (
-                  <div className="text-xs">
-                    <span className="line-through opacity-70 mr-2">{soles(p.precio)}</span>
-                    <span className="font-semibold">{soles(p.precioFinal)}</span>
-                  </div>
-                ) : (
-                  <div className="text-xs opacity-90">{soles(p.precio)}</div>
-                )}
+              <div className="p-3 flex-1 flex flex-col">
+                <div className="text-xs text-gray-500 mb-1">{p.categoria?.nombre || "Sin categoría"}</div>
+                <h3 className="text-sm font-medium text-gray-900 line-clamp-2 mb-2 flex-1" title={p.nombre}>{p.nombre}</h3>
 
-                <div className="pt-1 flex gap-3 text-xs">
-                  <Link className="underline" href={`/admin/productos/${p.id}/ver`}>
-                    Ver
-                  </Link>
-                  <Link className="underline" href={`/admin/productos/${p.id}`}>
-                    Editar
-                  </Link>
+                <div className="flex items-end justify-between mt-auto pt-2 border-t border-gray-50">
+                   <div className="flex flex-col">
+                      {p.estadoDescuento === 'ACTIVO' ? (
+                         <>
+                           <span className="text-[10px] text-gray-400 line-through">{soles(p.precio)}</span>
+                           <span className="text-sm font-bold text-green-700">{soles(p.precioFinal)}</span>
+                         </>
+                      ) : (
+                         <span className="text-sm font-bold text-gray-900">{soles(p.precio)}</span>
+                      )}
+                   </div>
+                   <div className={`text-[10px] px-1.5 py-0.5 rounded border ${p.stock > 0 ? 'bg-gray-50 text-gray-600 border-gray-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                      Stock: {p.stock}
+                   </div>
                 </div>
               </div>
             </div>
           ))}
 
           {productos.length === 0 && (
-            <div className="border rounded-xl p-4 text-sm opacity-80 col-span-full">
+            <div className="border rounded-xl p-4 text-sm opacity-80 col-span-full text-center">
               No hay resultados con esos filtros.
             </div>
           )}
         </div>
       ) : (
         /* VISTA TABLA */
-        <div className="border rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-black text-white">
+        <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-gray-50 text-gray-500 font-medium border-b text-xs uppercase tracking-wider">
               <tr>
-                <th className="text-left p-3">Portada</th>
-                <th className="text-left p-3">Nombre</th>
-                <th className="text-left p-3">Categoría</th>
-                <th className="text-left p-3">Precio</th>
-                <th className="text-left p-3">Precio final</th>
-                <th className="text-left p-3">Descuento</th>
-                <th className="text-left p-3">Variantes</th>
-                <th className="text-left p-3">Stock</th>
-                <th className="text-left p-3">Acción</th>
+                <th className="px-4 py-3 w-16">Img</th>
+                <th className="px-4 py-3">Producto</th>
+                <th className="px-4 py-3">Categoría</th>
+                <th className="px-4 py-3 text-right">Precio Base</th>
+                <th className="px-4 py-3 text-center">Descuento</th>
+                <th className="px-4 py-3 text-right">Precio Final</th>
+                <th className="px-4 py-3 text-center">Stock</th>
+                <th className="px-4 py-3 text-center">Estado</th>
+                <th className="px-4 py-3 text-right">Acción</th>
               </tr>
             </thead>
 
-            <tbody>
+            <tbody className="divide-y divide-gray-100">
               {productos.map((p) => (
-                <tr
-                  key={p.id}
-                  className={`border-t ${
-                    p.descuentoVigente ? "bg-green-50/40 border-l-4 border-l-green-600" : ""
-                  }`}
-                >
-                  <td className="p-3">
-                    <div className="w-12 h-12 rounded-md overflow-hidden bg-black">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {p.portadaUrl ? (
-                        <img src={p.portadaUrl} alt={p.nombre} className="w-full h-full object-cover" />
-                      ) : null}
+                <tr key={p.id} className="hover:bg-gray-50 transition-colors group">
+                  <td className="px-4 py-3">
+                    <div className="w-10 h-10 rounded-md overflow-hidden bg-gray-100 border relative">
+                       <ProductoImageClient 
+                          id={p.id}
+                          nombre={p.nombre}
+                          src={p.portadaUrl}
+                          precioDisplay={p.precioDisplay}
+                          stock={p.stock}
+                       />
                     </div>
                   </td>
 
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      <span>{p.nombre}</span>
-                      {p.descuentoVigente && p.descuentoTag ? (
-                        <span className="inline-flex items-center rounded-full bg-green-600 text-white px-2 py-0.5 text-[11px] font-semibold">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-gray-900 line-clamp-1 max-w-[200px]" title={p.nombre}>{p.nombre}</div>
+                    {p.destacado && <span className="text-[10px] text-yellow-600 bg-yellow-50 px-1 rounded border border-yellow-100 inline-block mt-0.5">Destacado</span>}
+                  </td>
+
+                  <td className="px-4 py-3 text-gray-500">{p.categoria?.nombre ?? "—"}</td>
+
+                  <td className="px-4 py-3 text-right text-gray-600 font-mono">
+                     {p.estadoDescuento === 'ACTIVO' ? <span className="line-through opacity-60 text-xs">{soles(p.precio)}</span> : soles(p.precio)}
+                  </td>
+
+                  <td className="px-4 py-3 text-center">
+                    {p.estadoDescuento === 'ACTIVO' && (
+                       <span className="inline-flex items-center bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200">
                           {p.descuentoTag}
-                        </span>
-                      ) : null}
-                    </div>
-                  </td>
-
-                  <td className="p-3">{p.categoria?.nombre ?? "-"}</td>
-
-                  {/* precio original */}
-                  <td className="p-3">
-                    {p.descuentoVigente ? (
-                      <span className="line-through opacity-70">{soles(p.precio)}</span>
-                    ) : (
-                      soles(p.precio)
+                       </span>
                     )}
-                  </td>
-
-                  {/* precio final */}
-                  <td className="p-3">
-                    {p.descuentoVigente ? (
-                      <span className="font-semibold">{soles(p.precioFinal)}</span>
-                    ) : (
-                      <span className="opacity-60">—</span>
+                    {p.estadoDescuento === 'PROGRAMADO' && (
+                       <span className="inline-flex items-center bg-blue-50 text-blue-700 text-[10px] font-medium px-2 py-0.5 rounded-full border border-blue-100" title="Próximamente">
+                          ⏳ {p.descuentoTag}
+                       </span>
                     )}
+                    {!p.estadoDescuento && <span className="text-gray-300 text-xs">—</span>}
                   </td>
 
-                  <td className="p-3">
-                    {p.descuentoVigente && p.descuentoTag ? (
-                      <span className="inline-flex items-center rounded-full bg-green-600 text-white px-2 py-0.5 text-[11px] font-semibold">
-                        {p.descuentoTag}
-                      </span>
-                    ) : (
-                      <span className="opacity-60">—</span>
-                    )}
+                  <td className="px-4 py-3 text-right font-semibold text-gray-900 font-mono">
+                     {p.estadoDescuento === 'ACTIVO' ? (
+                        <span className="text-green-700">{soles(p.precioFinal)}</span>
+                     ) : (
+                        <span className="text-gray-400 opacity-50">—</span>
+                     )}
                   </td>
 
-                  <td className="p-3">{p.variantes}</td>
-                  <td className="p-3">{p.stock}</td>
+                  <td className="px-4 py-3 text-center">
+                     <span className={`font-medium ${p.stock === 0 ? 'text-red-500 bg-red-50 px-2 py-0.5 rounded-full text-xs' : 'text-gray-700'}`}>
+                        {p.stock}
+                     </span>
+                  </td>
 
-                  <td className="p-3">
-                    <div className="flex gap-3">
-                      <Link className="underline" href={`/admin/productos/${p.id}/ver`}>
-                        Ver
-                      </Link>
-                      <Link className="underline" href={`/admin/productos/${p.id}`}>
-                        Editar
-                      </Link>
-                    </div>
+                  <td className="px-4 py-3 text-center">
+                     <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${p.estado === 'ACTIVO' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                        {p.estado}
+                     </span>
+                  </td>
+
+                  <td className="px-4 py-3 text-right">
+                    <Link className="text-blue-600 hover:text-blue-800 text-xs font-medium hover:underline" href={`/admin/productos/${p.id}`}>
+                      Editar
+                    </Link>
                   </td>
                 </tr>
               ))}
 
               {productos.length === 0 && (
                 <tr>
-                  <td className="p-3" colSpan={9}>
-                    No hay resultados con esos filtros.
+                  <td className="p-8 text-center text-gray-500 italic" colSpan={9}>
+                    No se encontraron productos con los filtros seleccionados.
                   </td>
                 </tr>
               )}

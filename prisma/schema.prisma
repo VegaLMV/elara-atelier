@@ -1,12 +1,9 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
 }
 
 enum Rol {
@@ -46,72 +43,74 @@ enum EstadoDescuentoProducto {
 }
 
 model Usuario {
-  id        String   @id @default(cuid())
-  correo    String   @unique
-  clave     String
-  rol       Rol      @default(COLABORADOR)
-  creadoEn  DateTime @default(now())
+  id       String   @id @default(cuid())
+  correo   String   @unique
+  clave    String
+  rol      Rol      @default(COLABORADOR)
+  creadoEn DateTime @default(now())
 
-  // ✅ opcional: auditoría de descuentos creados por el usuario
   descuentosCreados DescuentoProducto[] @relation("DescuentoCreadoPor")
 }
 
 model Categoria {
-  id        String    @id @default(cuid())
+  id        String     @id @default(cuid())
   nombre    String
-  slug      String    @unique
+  slug      String     @unique
   productos Producto[]
 }
 
 model Producto {
-  id           String         @id @default(cuid())
-  nombre       String
-  slug         String         @unique
-  descripcion  String?
-  precio       Decimal        @db.Decimal(10,2) // PRECIO ÚNICO
-  estado       EstadoProducto @default(ACTIVO)
-  destacado    Boolean        @default(false)
+  id          String         @id @default(cuid())
+  nombre      String
+  slug        String         @unique
+  descripcion String?
+  precio      Decimal        @db.Decimal(10, 2)
+  estado      EstadoProducto @default(ACTIVO)
+  destacado   Boolean        @default(false)
 
+  // --- DESCUENTOS ---
   descuentoActivo Boolean                @default(false)
   descuentoTipo   TipoDescuentoProducto?
-  descuentoValor  Decimal?               @db.Decimal(10,2)
+  descuentoValor  Decimal?               @db.Decimal(10, 2)
   descuentoInicio DateTime?
   descuentoFin    DateTime?
 
   descuentos DescuentoProducto[] @relation("ProductoDescuentos")
 
   descuentoActualId String?
-  descuentoActual   DescuentoProducto? @relation(
-    "ProductoDescuentoActual",
-    fields: [descuentoActualId],
-    references: [id]
-  )
+  descuentoActual   DescuentoProducto? @relation("ProductoDescuentoActual", fields: [descuentoActualId], references: [id])
 
-  categoriaId  String?
-  categoria    Categoria?     @relation(fields: [categoriaId], references: [id])
+  // --- RELACIONES ---
+  categoriaId String?
+  categoria   Categoria? @relation(fields: [categoriaId], references: [id])
 
-  imagenes     ImagenProducto[]
-  variantes    Variante[]
+  imagenes      ImagenProducto[]
+  variantes     Variante[]
+  imagenesColor ImagenProductoColor[]
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
-
-  imagenesColor ImagenProductoColor[]
 }
 
 model DescuentoProducto {
-  id         String   @id @default(cuid())
+  id String @id @default(cuid())
 
   productoId String
   producto   Producto @relation("ProductoDescuentos", fields: [productoId], references: [id], onDelete: Cascade)
 
-  tipo       TipoDescuentoProducto
-  valor      Decimal  @db.Decimal(10,2)
+  // Relación inversa necesaria para "descuentoActual" en Producto
+  productosQueLoUsanComoActual Producto[] @relation("ProductoDescuentoActual")
 
-  startsAt   DateTime
-  endsAt     DateTime
+  nombreCampana String?  // Ej: "Black Friday 2026"
+  descripcion   String?  // Ej: "Descuento masivo para liquidación"
 
-  estado     EstadoDescuentoProducto @default(PROGRAMADO)
+  tipo  TipoDescuentoProducto
+  valor Decimal               @db.Decimal(10, 2)
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  estado EstadoDescuentoProducto @default(PROGRAMADO)
 
   creadoPorId String?
   creadoPor   Usuario? @relation("DescuentoCreadoPor", fields: [creadoPorId], references: [id])
@@ -128,37 +127,37 @@ model ImagenProducto {
   productoId String
   producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
 
-  url        String
-  esPortada  Boolean  @default(false)
-  orden      Int      @default(0)
+  url       String
+  esPortada Boolean @default(false)
+  orden     Int     @default(0)
 }
 
 model ImagenProductoColor {
-  id         String   @id @default(cuid())
+  id String @id @default(cuid())
 
   productoId String
   producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
 
-  colorId    String
-  color      Color    @relation(fields: [colorId], references: [id])
+  colorId String
+  color   Color  @relation(fields: [colorId], references: [id])
 
-  url        String
-  creadoEn   DateTime @default(now())
+  url           String
+  creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
   @@unique([productoId, colorId])
 }
 
 model Talla {
-  id        String    @id @default(cuid())
-  nombre    String    @unique // XS, S, M, L...
-  orden     Int       @default(0)
+  id        String     @id @default(cuid())
+  nombre    String     @unique
+  orden     Int        @default(0)
   variantes Variante[]
 }
 
 model Color {
-  id        String    @id @default(cuid())
-  nombre    String    @unique // Negro, Blanco...
+  id        String     @id @default(cuid())
+  nombre    String     @unique
   hex       String?
   variantes Variante[]
 
@@ -166,42 +165,42 @@ model Color {
 }
 
 model Variante {
-  id           String   @id @default(cuid())
-  productoId   String
-  producto     Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
 
-  tallaId      String
-  talla        Talla    @relation(fields: [tallaId], references: [id])
+  tallaId String
+  talla   Talla  @relation(fields: [tallaId], references: [id])
 
-  colorId      String
-  color        Color    @relation(fields: [colorId], references: [id])
+  colorId String
+  color   Color  @relation(fields: [colorId], references: [id])
 
-  sku          String?  @unique
-  activa       Boolean  @default(true)
+  sku    String? @unique
+  activa Boolean @default(true)
 
-  stockActual  Int      @default(0)
+  stockActual Int @default(0)
 
-  movimientos     MovimientoInventario[]
-  itemsCompra     ItemCompra[]
-  itemsVenta      ItemVenta[]
+  movimientos MovimientoInventario[]
+  itemsCompra ItemCompra[]
+  itemsVenta  ItemVenta[]
 
-  @@unique([productoId, tallaId, colorId]) // evita duplicados de variante
+  @@unique([productoId, tallaId, colorId])
 }
 
 model MovimientoInventario {
-  id             String                  @id @default(cuid())
-  varianteId     String
-  variante       Variante                @relation(fields: [varianteId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  varianteId String
+  variante   Variante @relation(fields: [varianteId], references: [id], onDelete: Cascade)
 
   tipo           TipoMovimientoInventario
   cambioCantidad Int
-  costoUnitario  Decimal?                @db.Decimal(10,2)
+  costoUnitario  Decimal?                 @db.Decimal(10, 2)
   nota           String?
 
-  compraId       String?
-  ventaId        String?
+  compraId String?
+  ventaId  String?
 
-  creadoEn       DateTime                @default(now())
+  creadoEn DateTime @default(now())
 }
 
 model Proveedor {
@@ -212,35 +211,35 @@ model Proveedor {
   ruc       String?
   direccion String?
 
-  compras   Compra[]
+  compras Compra[]
 }
 
 model Compra {
-  id           String      @id @default(cuid())
-  proveedorId  String?
-  proveedor    Proveedor?  @relation(fields: [proveedorId], references: [id])
+  id          String     @id @default(cuid())
+  proveedorId String?
+  proveedor   Proveedor? @relation(fields: [proveedorId], references: [id])
 
-  estado       EstadoCompra @default(BORRADOR)
-  fechaCompra  DateTime     @default(now())
+  estado      EstadoCompra @default(BORRADOR)
+  fechaCompra DateTime     @default(now())
 
-  costoEnvio   Decimal?     @db.Decimal(10,2)
-  otrosCostos  Decimal?     @db.Decimal(10,2)
-  notas        String?
+  costoEnvio  Decimal? @db.Decimal(10, 2)
+  otrosCostos Decimal? @db.Decimal(10, 2)
+  notas       String?
 
-  items        ItemCompra[]
-  creadoEn     DateTime @default(now())
+  items    ItemCompra[]
+  creadoEn DateTime     @default(now())
 }
 
 model ItemCompra {
-  id         String   @id @default(cuid())
-  compraId   String
-  compra     Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  compraId String
+  compra   Compra @relation(fields: [compraId], references: [id], onDelete: Cascade)
 
   varianteId String
   variante   Variante @relation(fields: [varianteId], references: [id])
 
-  cantidad   Int
-  costoUnitario Decimal @db.Decimal(10,2)
+  cantidad      Int
+  costoUnitario Decimal @db.Decimal(10, 2)
 }
 
 model Venta {
@@ -250,40 +249,40 @@ model Venta {
   notas         String?
   fechaVenta    DateTime @default(now())
 
-  items         ItemVenta[]
-  empaques      UsoEmpaque[]
-  creadoEn      DateTime @default(now())
+  items    ItemVenta[]
+  empaques UsoEmpaque[]
+  creadoEn DateTime     @default(now())
 }
 
 model ItemVenta {
-  id         String   @id @default(cuid())
-  ventaId    String
-  venta      Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  ventaId String
+  venta   Venta  @relation(fields: [ventaId], references: [id], onDelete: Cascade)
 
   varianteId String
   variante   Variante @relation(fields: [varianteId], references: [id])
 
-  cantidad   Int
+  cantidad Int
 }
 
 model TipoEmpaque {
-  id          String   @id @default(cuid())
-  nombre      String   @unique
-  costoUnitario Decimal @db.Decimal(10,2)
-  activo      Boolean  @default(true)
+  id            String  @id @default(cuid())
+  nombre        String  @unique
+  costoUnitario Decimal @db.Decimal(10, 2)
+  activo        Boolean @default(true)
 
-  usos        UsoEmpaque[]
+  usos UsoEmpaque[]
 }
 
 model UsoEmpaque {
-  id            String      @id @default(cuid())
-  ventaId        String
-  venta          Venta       @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  ventaId String
+  venta   Venta  @relation(fields: [ventaId], references: [id], onDelete: Cascade)
 
-  tipoEmpaqueId  String
-  tipoEmpaque    TipoEmpaque @relation(fields: [tipoEmpaqueId], references: [id])
+  tipoEmpaqueId String
+  tipoEmpaque   TipoEmpaque @relation(fields: [tipoEmpaqueId], references: [id])
 
-  cantidad      Int
-  costoTotal    Decimal     @db.Decimal(10,2)
-  creadoEn      DateTime    @default(now())
+  cantidad   Int
+  costoTotal Decimal  @db.Decimal(10, 2)
+  creadoEn   DateTime @default(now())
 }
