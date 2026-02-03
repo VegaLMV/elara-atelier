@@ -1,235 +1,268 @@
 "use client";
 
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
+import { Loader2, Trash2, MapPin, Building2, Phone, Mail, FileText } from "lucide-react";
 
-type Proveedor = {
-  id: string;
-  nombre: string;
-  ruc: string | null;
-  telefono: string | null;
-  correo: string | null;
-  direccion: string | null;
-  // --- NUEVOS CAMPOS ---
-  ciudad: string | null;
-  provincia: string | null;
-};
-
-export default function ProveedorForm({ initialData }: { initialData: Proveedor | null }) {
-  const router = useRouter();
-
-  const [nombre, setNombre] = useState(initialData?.nombre ?? "");
-  const [ruc, setRuc] = useState(initialData?.ruc ?? "");
-  const [telefono, setTelefono] = useState(initialData?.telefono ?? "");
-  const [correo, setCorreo] = useState(initialData?.correo ?? "");
-  const [direccion, setDireccion] = useState(initialData?.direccion ?? "");
+// 1. Schema de validación
+const formSchema = z.object({
+  nombre: z.string().min(1, "El nombre comercial es obligatorio"),
+  razonSocial: z.string().optional(),
+  ruc: z.string().optional(),
+  telefono: z.string().optional(),
+  correo: z.string().email("Correo inválido").optional().or(z.literal("")),
   
-  // Estados para los nuevos campos
-  const [ciudad, setCiudad] = useState(initialData?.ciudad ?? "");
-  const [provincia, setProvincia] = useState(initialData?.provincia ?? "");
+  // Ubicación
+  departamento: z.string().optional(),
+  provincia: z.string().optional(),
+  distrito: z.string().optional(),
+  direccion: z.string().optional(),
+});
 
-  const [error, setError] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
-  const [borrando, setBorrando] = useState(false);
+type FormValues = z.infer<typeof formSchema>;
 
-  async function guardar(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
+interface Props {
+  initialData?: any; 
+}
 
-    if (!nombre.trim()) {
-      setError("El nombre es obligatorio.");
-      return;
+export default function ProveedorForm({ initialData }: Props) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  // Inicialización del formulario
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      nombre: initialData?.nombre || "",
+      razonSocial: initialData?.razonSocial || "",
+      ruc: initialData?.ruc || "",
+      telefono: initialData?.telefono || "",
+      correo: initialData?.correo || "",
+      departamento: initialData?.departamento || "",
+      provincia: initialData?.provincia || "",
+      distrito: initialData?.distrito || "",
+      direccion: initialData?.direccion || "",
+    },
+  });
+
+  const onSubmit = async (data: FormValues) => {
+    try {
+      setLoading(true);
+      const url = initialData
+        ? `/api/admin/proveedores/${initialData.id}`
+        : `/api/admin/proveedores`;
+      
+      const method = initialData ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      toast.success(initialData ? "Proveedor actualizado" : "Proveedor creado");
+      router.refresh();
+      router.push("/admin/proveedores");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setGuardando(true);
-
-    const body = {
-      nombre: nombre.trim(),
-      ruc: ruc.trim() || null,
-      telefono: telefono.trim() || null,
-      correo: correo.trim() || null,
-      direccion: direccion.trim() || null,
-      // Incluimos los nuevos campos en el payload
-      ciudad: ciudad.trim() || null,
-      provincia: provincia.trim() || null,
-    };
-
-    const url = initialData ? `/api/admin/proveedores/${initialData.id}` : `/api/admin/proveedores`;
-    const method = initialData ? "PUT" : "POST";
-
-    const r = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (!r.ok) {
-      const d = await r.json().catch(() => ({}));
-      setError(d?.error ?? "Error guardando proveedor");
-      setGuardando(false);
-      return;
+  const onDelete = async () => {
+    if (!confirm("¿Eliminar este proveedor?")) return;
+    try {
+      setLoading(true);
+      await fetch(`/api/admin/proveedores/${initialData.id}`, {
+        method: "DELETE",
+      });
+      toast.success("Proveedor eliminado");
+      router.refresh();
+      router.push("/admin/proveedores");
+    } catch (error) {
+      toast.error("Error al eliminar");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // Éxito: redirigir
-    router.push("/admin/proveedores");
-    router.refresh();
-  }
-
-  async function eliminar() {
-    if (!initialData) return;
-    if (!confirm("¿Eliminar este proveedor?\n\n⚠️ Si tiene historial de compras, no se podrá eliminar.")) return;
-
-    setError(null);
-    setBorrando(true);
-
-    const r = await fetch(`/api/admin/proveedores/${initialData.id}`, { method: "DELETE" });
-
-    if (!r.ok) {
-      const d = await r.json().catch(() => ({}));
-      setError(d?.error ?? "No se pudo eliminar (probablemente tiene compras asociadas)");
-      setBorrando(false);
-      return;
-    }
-
-    router.push("/admin/proveedores");
-    router.refresh();
-  }
+  // Clases CSS reutilizables para mantener el diseño limpio sin componentes externos
+  const inputClass = "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black disabled:cursor-not-allowed disabled:opacity-50";
+  const labelClass = "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 mb-2 block";
+  const cardClass = "rounded-xl border border-gray-200 bg-white text-gray-950 shadow-sm";
 
   return (
-    <div className="p-6 md:p-8 max-w-3xl mx-auto bg-gray-50 min-h-screen">
-      
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 mb-8">
+    <div className="max-w-4xl mx-auto p-4">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-            {initialData ? "Editar Proveedor" : "Registrar Proveedor"}
+          <h1 className="text-2xl font-bold tracking-tight">
+            {initialData ? "Editar Proveedor" : "Nuevo Proveedor"}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Información de contacto y facturación.</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Información fiscal y de contacto del proveedor.
+          </p>
         </div>
-
-        <button 
-            className="text-gray-600 hover:text-gray-900 px-4 py-2 text-sm font-medium hover:bg-white hover:shadow-sm rounded-lg transition-all border border-transparent hover:border-gray-200"
-            type="button" 
-            onClick={() => router.push("/admin/proveedores")}
-        >
-          Cancelar
-        </button>
+        {initialData && (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={loading}
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-red-600 text-white hover:bg-red-700 h-9 px-3"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Eliminar
+          </button>
+        )}
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm mb-6 flex items-center gap-2 animate-in slide-in-from-top-2">
-            ⚠️ {error}
-        </div>
-      )}
-
-      <form onSubmit={guardar} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         
-        {/* Card Principal */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
-            <h2 className="text-lg font-semibold text-gray-800 border-b pb-4 mb-4">Datos Generales</h2>
+        {/* Datos Principales */}
+        <div className={cardClass}>
+          <div className="flex flex-col space-y-1.5 p-6 pb-4">
+            <h3 className="font-semibold leading-none tracking-tight flex items-center gap-2">
+              <Building2 className="w-4 h-4" /> Datos Generales
+            </h3>
+          </div>
+          <div className="p-6 pt-0 grid md:grid-cols-2 gap-4">
             
-            <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Nombre / Razón Social <span className="text-red-500">*</span></label>
-                <input 
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all placeholder:text-gray-400"
-                    placeholder="Ej: Distribuidora Textil S.A.C."
-                    value={nombre} 
-                    onChange={(e) => setNombre(e.target.value)} 
-                    autoFocus
+            <div className="col-span-2">
+              <label className={labelClass}>Nombre Proveedor</label>
+              <input
+                {...register("nombre")}
+                placeholder="Ej. Distribuidora Lima"
+                className={inputClass}
+              />
+              {errors.nombre && <p className="text-sm text-red-500 mt-1">{errors.nombre.message}</p>}
+            </div>
+
+            <div>
+              <label className={labelClass}>RUC</label>
+              <div className="relative">
+                <FileText className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                <input
+                  {...register("ruc")}
+                  placeholder="20123456789"
+                  className={`${inputClass} pl-9`}
                 />
+              </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">RUC</label>
-                    <input 
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all font-mono"
-                        placeholder="20123456789"
-                        value={ruc} 
-                        onChange={(e) => setRuc(e.target.value)} 
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Teléfono</label>
-                    <input 
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                        placeholder="999 888 777"
-                        value={telefono} 
-                        onChange={(e) => setTelefono(e.target.value)} 
-                    />
-                </div>
-            </div>
-        </div>
-
-        {/* Card Ubicación y Contacto */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
-            <h2 className="text-lg font-semibold text-gray-800 border-b pb-4 mb-4">Ubicación y Contacto</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Correo Electrónico</label>
-                    <input 
-                        type="email"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                        placeholder="contacto@empresa.com"
-                        value={correo} 
-                        onChange={(e) => setCorreo(e.target.value)} 
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Dirección</label>
-                    <input 
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                        placeholder="Av. Principal 123"
-                        value={direccion} 
-                        onChange={(e) => setDireccion(e.target.value)} 
-                    />
-                </div>
-
-                {/* --- NUEVOS CAMPOS --- */}
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Ciudad</label>
-                    <input 
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                        placeholder="Ej: Lima"
-                        value={ciudad} 
-                        onChange={(e) => setCiudad(e.target.value)} 
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Provincia / Región</label>
-                    <input 
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                        placeholder="Ej: Lima"
-                        value={provincia} 
-                        onChange={(e) => setProvincia(e.target.value)} 
-                    />
-                </div>
+            <div>
+              <label className={labelClass}>Razón Social</label>
+              <input
+                {...register("razonSocial")}
+                placeholder="Ej. Inversiones Generales S.A.C."
+                className={inputClass}
+              />
             </div>
+
+            <div>
+              <label className={labelClass}>Teléfono</label>
+              <div className="relative">
+                <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                <input
+                  {...register("telefono")}
+                  placeholder="999 999 999"
+                  className={`${inputClass} pl-9`}
+                />
+              </div>
+            </div>
+
+            <div className="col-span-2">
+              <label className={labelClass}>Correo Electrónico</label>
+              <div className="relative">
+                <Mail className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                <input
+                  {...register("correo")}
+                  placeholder="contacto@empresa.com"
+                  className={`${inputClass} pl-9`}
+                />
+              </div>
+              {errors.correo && <p className="text-sm text-red-500 mt-1">{errors.correo.message}</p>}
+            </div>
+
+          </div>
         </div>
 
-        {/* Botones de Acción */}
-        <div className="flex items-center justify-between pt-4">
-          <button 
-            disabled={guardando} 
-            className="bg-slate-900 text-white rounded-lg px-8 py-3 font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md active:scale-[0.98]"
-          >
-            {guardando ? "Guardando..." : "Guardar Proveedor"}
-          </button>
+        {/* Sección de Ubicación */}
+        <div className={cardClass}>
+          <div className="flex flex-col space-y-1.5 p-6 pb-4">
+            <h3 className="font-semibold leading-none tracking-tight flex items-center gap-2">
+              <MapPin className="w-4 h-4" /> Ubicación
+            </h3>
+          </div>
+          <div className="p-6 pt-0 grid md:grid-cols-3 gap-4">
+            
+            <div>
+              <label className={labelClass}>Departamento</label>
+              <input
+                {...register("departamento")}
+                placeholder="Ej. Lima"
+                className={inputClass}
+              />
+            </div>
 
-          {initialData && (
-            <button
-              type="button"
-              disabled={borrando}
-              className="text-red-600 hover:text-red-800 px-4 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium"
-              onClick={eliminar}
-            >
-              {borrando ? "Eliminando..." : "Eliminar Proveedor"}
-            </button>
-          )}
+            <div>
+              <label className={labelClass}>Provincia</label>
+              <input
+                {...register("provincia")}
+                placeholder="Ej. Lima"
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>Distrito</label>
+              <input
+                {...register("distrito")}
+                placeholder="Ej. Miraflores"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="col-span-3">
+              <label className={labelClass}>Dirección Fiscal / Referencia</label>
+              <input
+                {...register("direccion")}
+                placeholder="Av. Larco 123, Of. 405"
+                className={inputClass}
+              />
+            </div>
+
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-4">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 disabled:opacity-50 border border-gray-200 bg-white hover:bg-gray-100 hover:text-gray-900 h-10 px-4 py-2"
+          >
+            Cancelar
+          </button>
+          
+          <button
+            type="submit"
+            disabled={loading}
+            className="inline-flex items-center justify-center rounded-md text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black disabled:opacity-50 bg-slate-900 text-white hover:bg-slate-800 h-10 px-4 py-2"
+          >
+            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Guardar Cambios
+          </button>
         </div>
 
       </form>

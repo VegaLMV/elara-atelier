@@ -217,9 +217,11 @@ model Proveedor {
   telefono  String?
   correo    String?
   ruc       String?
+  razonSocial String?
+  departamento String?
+  provincia    String?
+  distrito     String?
   direccion String?
-  ciudad    String?
-  provincia String?
 
   compras Compra[]
 }

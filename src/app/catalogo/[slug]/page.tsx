@@ -1,192 +1,117 @@
 export const runtime = "nodejs";
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
-import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import ProductoDetalle from "./producto-detalle";
-import { absolutizeUrl, baseUrl } from "@/lib/site";
+import Link from "next/link";
 
-function ymd(d: Date) {
-  return d.toISOString().slice(0, 10);
+// Cálculo del precio con descuento (idéntico al catálogo para consistencia)
+function calcularPrecioFinal(precio: number, tipo: string | null, valor: number | null) {
+  if (!tipo || !valor) return precio;
+  if (tipo === "PORCENTAJE") return precio * (1 - valor / 100);
+  return Math.max(0, precio - valor);
 }
 
-function calcDescuento(p: {
-  precio: any; // Decimal
-  descuentoActivo: boolean;
-  descuentoTipo: "PORCENTAJE" | "MONTO" | null;
-  descuentoValor: any | null; // Decimal
-  descuentoInicio: Date | null;
-  descuentoFin: Date | null;
-}) {
-  const precio = Number(p.precio?.toString?.() ?? p.precio);
-  const valor = Number(p.descuentoValor?.toString?.() ?? p.descuentoValor ?? 0);
-
-  if (!p.descuentoActivo) return { activo: false, precioFinal: null as number | null, label: "" };
-  if (!Number.isFinite(precio) || precio <= 0) return { activo: false, precioFinal: null, label: "" };
-  if (!Number.isFinite(valor) || valor <= 0) return { activo: false, precioFinal: null, label: "" };
-
-  // validar vigencia por fecha (comparación YYYY-MM-DD)
-  const hoy = ymd(new Date());
-  const ini = p.descuentoInicio ? ymd(p.descuentoInicio) : "";
-  const fin = p.descuentoFin ? ymd(p.descuentoFin) : "";
-
-  if (ini && hoy < ini) return { activo: false, precioFinal: null, label: "" };
-  if (fin && hoy > fin) return { activo: false, precioFinal: null, label: "" };
-
-  let final = precio;
-  let label = "";
-
-  if (p.descuentoTipo === "PORCENTAJE") {
-    final = precio * (1 - valor / 100);
-    label = `-${valor}%`;
-  } else if (p.descuentoTipo === "MONTO") {
-    final = precio - valor;
-    label = `-S/ ${valor.toFixed(2)}`;
-  } else {
-    return { activo: false, precioFinal: null, label: "" };
-  }
-
-  final = Math.max(0, final);
-  return { activo: true, precioFinal: final, label };
-}
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
+export default async function ProductoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const p = await prisma.producto.findUnique({
-    where: { slug },
-    select: {
-      nombre: true,
-      descripcion: true,
-      estado: true,
-      slug: true,
-      imagenes: { select: { url: true, esPortada: true, orden: true } },
-    },
-  });
-
-  if (!p || p.estado !== "ACTIVO") {
-    return { title: "Producto no encontrado | Elara Atelier", robots: { index: false, follow: false } };
-  }
-
-  const portada =
-    p.imagenes
-      .slice()
-      .sort((a, b) => Number(b.esPortada) - Number(a.esPortada) || a.orden - b.orden)[0]?.url ?? "/og-default.jpg";
-
-  const url = new URL(`/catalogo/${p.slug}`, baseUrl()).toString();
-  const title = p.nombre;
-  const desc =
-    (p.descripcion ?? "").trim().slice(0, 160) ||
-    `Descubre ${p.nombre} en el catálogo de Elara Atelier.`;
-
-  return {
-    title,
-    description: desc,
-    alternates: { canonical: url },
-    openGraph: {
-      type: "website",
-      url,
-      title,
-      description: desc,
-      images: [{ url: absolutizeUrl(portada), width: 1200, height: 630, alt: title }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description: desc,
-      images: [absolutizeUrl(portada)],
-    },
-  };
-}
-
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-
+  // 1. Cargar producto con todas sus relaciones necesarias para el cliente
   const producto = await prisma.producto.findUnique({
     where: { slug },
     include: {
       categoria: true,
-      imagenes: true,
-      imagenesColor: { include: { color: true } },
-      variantes: { include: { talla: true, color: true } },
+      imagenes: { orderBy: [{ esPortada: "desc" }, { orden: "asc" }] },
+      variantes: {
+        where: { activa: true },
+        include: { talla: true, color: true },
+      },
     },
   });
 
-  if (!producto || producto.estado !== "ACTIVO") return notFound();
+  if (!producto || producto.estado === "INACTIVO") return notFound();
 
-  // variantes vendibles (solo activas y stock > 0)
-  const variantesConStock = producto.variantes
-    .filter((v) => v.activa && v.stockActual > 0)
-    .sort((a, b) => a.talla.orden - b.talla.orden || a.color.nombre.localeCompare(b.color.nombre));
+  // 2. Procesar descuento vigente
+  const ahora = new Date();
+  const tieneDescuento = 
+    producto.descuentoActivo && 
+    (!producto.descuentoInicio || producto.descuentoInicio <= ahora) && 
+    (!producto.descuentoFin || producto.descuentoFin >= ahora);
 
-  const hayStock = variantesConStock.length > 0;
+  const precioOriginal = Number(producto.precio);
+  const precioFinal = tieneDescuento 
+    ? calcularPrecioFinal(precioOriginal, producto.descuentoTipo, Number(producto.descuentoValor))
+    : precioOriginal;
 
-  const imagenes = producto.imagenes
-    .slice()
-    .sort((a, b) => Number(b.esPortada) - Number(a.esPortada) || a.orden - b.orden)
-    .map((i) => ({ id: i.id, url: i.url, esPortada: i.esPortada, orden: i.orden }));
-
-  const imagenesColor = producto.imagenesColor
-    .slice()
-    .sort((a, b) => a.color.nombre.localeCompare(b.color.nombre))
-    .map((x) => ({
-      id: x.id,
-      colorId: x.colorId,
-      color: x.color.nombre,
-      hex: x.color.hex,
-      url: x.url,
-    }));
-
-  const wa = process.env.WHATSAPP_NUMERO ?? "";
-
-  const desc = calcDescuento({
-    precio: producto.precio,
-    descuentoActivo: producto.descuentoActivo,
-    descuentoTipo: producto.descuentoTipo as any,
-    descuentoValor: producto.descuentoValor,
-    descuentoInicio: producto.descuentoInicio,
-    descuentoFin: producto.descuentoFin,
-  });
+  // 3. Preparar datos para el Componente de Cliente
+  const data = {
+    id: producto.id,
+    nombre: producto.nombre,
+    descripcion: producto.descripcion,
+    categoria: producto.categoria?.nombre || "Colección",
+    categoriaSlug: producto.categoria?.slug,
+    precioOriginal,
+    precioFinal,
+    tieneDescuento,
+    descuentoTag: producto.descuentoTipo === 'PORCENTAJE' ? `-${producto.descuentoValor}%` : 'OFERTA',
+    imagenes: producto.imagenes.map(img => img.url),
+    variantes: producto.variantes.map(v => ({
+      id: v.id,
+      talla: v.talla.nombre,
+      color: v.color.nombre,
+      hex: v.color.hex,
+      stock: v.stockActual
+    }))
+  };
 
   return (
-    <ProductoDetalle
-      producto={{
-        id: producto.id,
-        nombre: producto.nombre,
-        descripcion: producto.descripcion ?? "",
-        precio: producto.precio.toString(),
-        categoria: producto.categoria?.nombre ?? "",
-        // ✅ descuento
-        descuentoActivo: desc.activo,
-        descuentoLabel: desc.label,
-        precioFinal: desc.precioFinal === null ? null : desc.precioFinal.toFixed(2),
-      }}
-      imagenes={imagenes}
-      imagenesColor={imagenesColor}
-      variantes={
-        hayStock
-          ? variantesConStock.map((v) => ({
-              id: v.id,
-              talla: v.talla.nombre,
-              tallaOrden: v.talla.orden,
-              colorId: v.colorId,
-              color: v.color.nombre,
-              colorHex: v.color.hex,
-              stock: v.stockActual,
-            }))
-          : []
-      }
-      whatsappNumero={wa}
-      agotado={!hayStock}
-    />
+    <div className="bg-white min-h-screen">
+      {/* Breadcrumbs minimalistas */}
+      <nav className="max-w-7xl mx-auto px-6 py-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-400">
+        <Link href="/" className="hover:text-slate-900 transition-colors">Inicio</Link>
+        <span>/</span>
+        <Link href="/catalogo" className="hover:text-slate-900 transition-colors">Catálogo</Link>
+        {data.categoriaSlug && (
+          <>
+            <span>/</span>
+            <Link href={`/catalogo?categoria=${data.categoriaSlug}`} className="hover:text-slate-900 transition-colors">
+              {data.categoria}
+            </Link>
+          </>
+        )}
+        <span className="hidden md:inline">/</span>
+        <span className="text-slate-900 font-bold hidden md:inline truncate max-w-[200px]">{data.nombre}</span>
+      </nav>
+
+      {/* Componente Interactivo */}
+      <ProductoDetalle producto={data} />
+
+      {/* Sección de Compromiso Elara */}
+      <section className="max-w-7xl mx-auto px-6 py-20 border-t border-slate-50">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
+          <div className="space-y-3">
+             <div className="text-2xl">✨</div>
+             <h4 className="text-sm font-serif italic text-slate-900">Diseño Exclusivo</h4>
+             <p className="text-xs text-slate-400 font-light leading-relaxed px-10">
+               Cada prenda de Elara Atelier es confeccionada bajo estándares de alta costura.
+             </p>
+          </div>
+          <div className="space-y-3">
+             <div className="text-2xl">🌿</div>
+             <h4 className="text-sm font-serif italic text-slate-900">Materiales Premium</h4>
+             <p className="text-xs text-slate-400 font-light leading-relaxed px-10">
+               Seleccionamos las mejores fibras para asegurar durabilidad y confort excepcional.
+             </p>
+          </div>
+          <div className="space-y-3">
+             <div className="text-2xl">🤝</div>
+             <h4 className="text-sm font-serif italic text-slate-900">Atención Personalizada</h4>
+             <p className="text-xs text-slate-400 font-light leading-relaxed px-10">
+               Nuestras asesoras te acompañarán en cada paso de tu compra.
+             </p>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }

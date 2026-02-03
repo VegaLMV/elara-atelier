@@ -699,6 +699,7 @@ export default function CompraForm({ proveedores, productos: productosRaw, empaq
                    </tbody>
                </table>
            </div>
+           
        </div>
     </div>
   );

@@ -1,305 +1,234 @@
 export const runtime = "nodejs";
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import type { Metadata } from "next";
+import { Prisma } from "@prisma/client";
 
-type SP = {
-  q?: string;
-  categoria?: string;
-  stock?: "todas" | "con";
-  page?: string;
-};
-
+// Formateador de moneda local
 function soles(v: any) {
   const n = Number(v?.toString?.() ?? v);
   if (Number.isNaN(n)) return `S/ ${String(v)}`;
   return `S/ ${n.toFixed(2)}`;
 }
-function n(v: any) {
-  const x = Number(v?.toString?.() ?? v);
-  return Number.isFinite(x) ? x : 0;
+
+// Cálculo del precio con descuento
+function calcularPrecioFinal(precio: number, tipo: string | null, valor: number | null) {
+  if (!tipo || !valor) return precio;
+  if (tipo === "PORCENTAJE") return precio * (1 - valor / 100);
+  return Math.max(0, precio - valor);
 }
 
-function descuentoVigente(p: {
-  descuentoActivo: boolean;
-  descuentoTipo: "PORCENTAJE" | "MONTO" | null;
-  descuentoValor: any | null;
-  descuentoInicio: Date | null;
-  descuentoFin: Date | null;
-}, now: Date) {
-  if (!p.descuentoActivo) return false;
-  if (!p.descuentoTipo) return false;
-  if (p.descuentoValor == null) return false;
-
-  if (p.descuentoInicio && now < p.descuentoInicio) return false;
-  if (p.descuentoFin && now > p.descuentoFin) return false;
-  return true;
-}
-
-function calcPrecioFinal(precio: number, tipo: "PORCENTAJE" | "MONTO", valor: number) {
-  let fin = precio;
-  if (tipo === "PORCENTAJE") fin = precio * (1 - valor / 100);
-  if (tipo === "MONTO") fin = precio - valor;
-  return Math.max(0, fin);
-}
-
-export const metadata: Metadata = {
-  title: "Catálogo",
-  description: "Explora el catálogo de Elara Atelier.",
-  openGraph: {
-    title: "Catálogo | Elara Atelier",
-    description: "Explora el catálogo de Elara Atelier.",
-    url: "/catalogo",
-  },
+type SP = {
+  q?: string;
+  categoria?: string;
 };
 
-export default async function Page({ searchParams }: { searchParams: Promise<SP> }) {
+export default async function CatalogoPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = (await searchParams) ?? {};
   const q = (sp.q ?? "").trim();
-  const categoriaId = (sp.categoria ?? "").trim();
-  const stock = (sp.stock ?? "todas") as SP["stock"];
-  const page = Math.max(1, Number(sp.page ?? "1") || 1);
+  const categoriaSlug = (sp.categoria ?? "").trim();
 
-  const take = 24;
-  const skip = (page - 1) * take;
-
-  const where: Prisma.ProductoWhereInput = { estado: "ACTIVO" };
+  // 1. Construir el filtro de búsqueda
+  const where: Prisma.ProductoWhereInput = {
+    estado: "ACTIVO", // Solo productos visibles
+  };
 
   if (q) {
     where.OR = [
       { nombre: { contains: q, mode: "insensitive" } },
-      { slug: { contains: q, mode: "insensitive" } },
+      { descripcion: { contains: q, mode: "insensitive" } },
     ];
   }
-  if (categoriaId) where.categoriaId = categoriaId;
 
-  if (stock === "con") {
-    where.variantes = { some: { activa: true, stockActual: { gt: 0 } } };
+  if (categoriaSlug) {
+    where.categoria = { slug: categoriaSlug };
   }
 
-  const [categorias, productosBase, total] = await prisma.$transaction([
-    prisma.categoria.findMany({
-      select: { id: true, nombre: true },
-      orderBy: { nombre: "asc" },
-    }),
+  // 2. Ejecutar consultas en paralelo (Productos y Categorías)
+  const [productosRaw, categorias] = await Promise.all([
     prisma.producto.findMany({
       where,
-      orderBy: { creadoEn: "desc" },
-      select: {
-        id: true,
-        nombre: true,
-        slug: true,
-        precio: true,
-        creadoEn: true,
-        categoria: { select: { nombre: true } },
-
-        // ✅ descuentos
-        descuentoActivo: true,
-        descuentoTipo: true,
-        descuentoValor: true,
-        descuentoInicio: true,
-        descuentoFin: true,
-
-        // ✅ portada en 1 query (más rápido)
-        imagenes: {
-          select: { url: true },
-          orderBy: [{ esPortada: "desc" }, { orden: "asc" }],
-          take: 1,
-        },
+      include: {
+        categoria: true,
+        imagenes: { orderBy: { esPortada: "desc" }, take: 1 },
       },
-      take,
-      skip,
+      orderBy: { creadoEn: "desc" },
     }),
-    prisma.producto.count({ where }),
+    prisma.categoria.findMany({
+      orderBy: { nombre: "asc" },
+      where: { productos: { some: { estado: "ACTIVO" } } } // Solo categorías con productos activos
+    }),
   ]);
 
-  const ids = productosBase.map((p) => p.id);
+  // 3. Procesar datos para la UI
+  const ahora = new Date();
+  const productos = productosRaw.map((p) => {
+    const precioOriginal = Number(p.precio);
+    
+    // Verificar si el descuento es vigente
+    const tieneDescuento = 
+      p.descuentoActivo && 
+      (!p.descuentoInicio || p.descuentoInicio <= ahora) && 
+      (!p.descuentoFin || p.descuentoFin >= ahora);
 
-  const stockSum = ids.length
-    ? await prisma.variante.groupBy({
-        by: ["productoId"],
-        where: { productoId: { in: ids }, activa: true },
-        _sum: { stockActual: true },
-      })
-    : [];
+    const precioFinal = tieneDescuento 
+      ? calcularPrecioFinal(precioOriginal, p.descuentoTipo, Number(p.descuentoValor))
+      : precioOriginal;
 
-  const mapStock = new Map<string, number>();
-  for (const r of stockSum) mapStock.set(r.productoId, r._sum.stockActual ?? 0);
-
-  const now = new Date();
-
-  const productos = productosBase
-    .map((p) => {
-      const stockTotal = mapStock.get(p.id) ?? 0;
-      const disponible = stockTotal > 0;
-
-      const portada = p.imagenes?.[0]?.url ?? "";
-
-      const tieneDesc = descuentoVigente(
-        {
-          descuentoActivo: p.descuentoActivo,
-          descuentoTipo: (p.descuentoTipo as any) ?? null,
-          descuentoValor: p.descuentoValor,
-          descuentoInicio: p.descuentoInicio,
-          descuentoFin: p.descuentoFin,
-        },
-        now
-      );
-
-      const precioNum = n(p.precio);
-      const valorNum = n(p.descuentoValor);
-
-      const precioFinal =
-        tieneDesc && p.descuentoTipo
-          ? calcPrecioFinal(precioNum, p.descuentoTipo as any, valorNum)
-          : null;
-
-      const badge =
-        tieneDesc && p.descuentoTipo
-          ? p.descuentoTipo === "PORCENTAJE"
-            ? `-${valorNum}%`
-            : `-S/ ${valorNum.toFixed(2)}`
-          : "";
-
-      return {
-        id: p.id,
-        nombre: p.nombre,
-        slug: p.slug,
-        precio: p.precio,
-        categoria: p.categoria,
-        creadoEn: p.creadoEn,
-        stockTotal,
-        disponible,
-        portada,
-        tieneDesc,
-        precioFinal,
-        badge,
-      };
-    })
-    .sort((a, b) => Number(b.disponible) - Number(a.disponible) || +b.creadoEn - +a.creadoEn);
-
-  const totalPages = Math.max(1, Math.ceil(total / take));
+    return {
+      id: p.id,
+      nombre: p.nombre,
+      slug: p.slug,
+      categoria: p.categoria?.nombre,
+      imagen: p.imagenes[0]?.url,
+      precioOriginal,
+      precioFinal,
+      tieneDescuento,
+      porcentaje: p.descuentoTipo === 'PORCENTAJE' ? Number(p.descuentoValor) : null
+    };
+  });
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">Elara Atelier</h1>
-        <p className="text-sm opacity-80">Catálogo</p>
-      </div>
-
-      <form method="GET" className="border rounded-xl p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div className="space-y-1 md:col-span-2">
-          <label className="text-sm">Buscar</label>
-          <input name="q" defaultValue={q} placeholder="Nombre..." className="w-full border rounded-md px-3 py-2" />
+    <div className="bg-white min-h-screen">
+      {/* Hero / Header del Catálogo */}
+      <section className="bg-slate-50 py-12 md:py-20 border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+          <h1 className="text-4xl md:text-5xl font-serif font-light text-slate-900 mb-4 tracking-tight">
+            Nuestra Colección
+          </h1>
+          <p className="text-slate-500 max-w-2xl mx-auto font-light text-lg">
+            Piezas exclusivas diseñadas para resaltar tu esencia. Calidad artesanal y estilo atemporal en cada detalle.
+          </p>
         </div>
+      </section>
 
-        <div className="space-y-1">
-          <label className="text-sm">Categoría</label>
-          <select name="categoria" defaultValue={categoriaId} className="w-full border rounded-md px-3 py-2">
-            <option value="">Todas</option>
-            {categorias.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-sm">Ver</label>
-          <select name="stock" defaultValue={stock} className="w-full border rounded-md px-3 py-2">
-            <option value="todas">Todos (mixto)</option>
-            <option value="con">Solo disponibles</option>
-          </select>
-        </div>
-
-        <div className="md:col-span-4 flex gap-3">
-          <button className="bg-black text-white rounded-md px-4 py-2">Buscar</button>
-          <Link className="underline self-center" href="/catalogo">
-            Limpiar
-          </Link>
-        </div>
-      </form>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {productos.map((p) => (
-          <Link
-            key={p.id}
-            href={`/catalogo/${p.slug}`}
-            className="border rounded-xl overflow-hidden hover:opacity-90 transition"
-          >
-            <div className="relative aspect-square bg-black">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {p.portada ? <img src={p.portada} alt={p.nombre} className="w-full h-full object-cover" /> : null}
-
-              {!p.disponible && (
-                <div className="absolute top-2 left-2 bg-white text-black text-xs px-2 py-1 rounded-full">
-                  Agotado
-                </div>
-              )}
-
-              {p.tieneDesc && (
-                <div className="absolute top-3 left-3 z-10 bg-red-600 text-white text-xs font-bold px-4 py-1 rounded-none shadow">
-                  {p.badge ?? "OFERTA"}
-                </div>
-              )}
+      <div className="max-w-7xl mx-auto px-6 py-10">
+        <div className="flex flex-col lg:flex-row gap-12">
+          
+          {/* Sidebar de Filtros */}
+          <aside className="lg:w-64 shrink-0 space-y-10">
+            {/* Buscador */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Buscar</h3>
+              <form action="/catalogo" className="relative">
+                <input 
+                  name="q"
+                  defaultValue={q}
+                  placeholder="¿Qué buscas hoy?"
+                  className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-slate-200 transition-all outline-none"
+                />
+                <button className="absolute right-3 top-3 text-slate-300">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                   </svg>
+                </button>
+              </form>
             </div>
 
-            <div className="p-3 space-y-1">
-              <div className="font-medium">{p.nombre}</div>
-              <div className="text-sm opacity-80">{p.categoria?.nombre ?? "-"}</div>
-
-              {p.tieneDesc && p.precioFinal != null ? (
-                <div className="text-sm">
-                  <span className="line-through opacity-60 mr-2">{soles(p.precio)}</span>
-                  <span className="font-semibold">{soles(p.precioFinal)}</span>
-                </div>
-              ) : (
-                <div className="text-sm">{soles(p.precio)}</div>
-              )}
+            {/* Categorías */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Categorías</h3>
+              <div className="flex flex-col gap-2">
+                <Link 
+                  href="/catalogo"
+                  className={`text-sm py-1 transition-colors ${!categoriaSlug ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'}`}
+                >
+                  Todas las piezas
+                </Link>
+                {categorias.map(cat => (
+                  <Link 
+                    key={cat.id}
+                    href={`/catalogo?categoria=${cat.slug}`}
+                    className={`text-sm py-1 transition-colors ${categoriaSlug === cat.slug ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    {cat.nombre}
+                  </Link>
+                ))}
+              </div>
             </div>
-          </Link>
-        ))}
+          </aside>
+
+          {/* Grilla de Productos */}
+          <main className="flex-1">
+            <div className="flex items-center justify-between mb-8">
+               <p className="text-slate-400 text-sm font-light">
+                  Mostrando <span className="text-slate-900 font-medium">{productos.length}</span> resultados
+               </p>
+            </div>
+
+            {productos.length === 0 ? (
+              <div className="py-20 text-center space-y-4">
+                 <div className="text-5xl opacity-10">✨</div>
+                 <h2 className="text-xl font-medium text-slate-800">No encontramos lo que buscas</h2>
+                 <p className="text-slate-400">Intenta ajustando los filtros o buscando otro término.</p>
+                 <Link href="/catalogo" className="inline-block text-slate-900 underline underline-offset-4 font-medium pt-4">
+                    Limpiar todos los filtros
+                 </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-12">
+                {productos.map((p) => (
+                  <Link 
+                    key={p.id} 
+                    href={`/catalogo/${p.slug}`}
+                    className="group flex flex-col h-full"
+                  >
+                    {/* Imagen con Aspect Ratio Fijo */}
+                    <div className="relative aspect-[3/4] overflow-hidden bg-slate-100 rounded-2xl mb-4 transition-all duration-500 group-hover:shadow-2xl group-hover:shadow-slate-200">
+                      {p.imagen ? (
+                        <img 
+                          src={p.imagen} 
+                          alt={p.nombre}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">Sin imagen</div>
+                      )}
+                      
+                      {/* Badges de Oferta */}
+                      {p.tieneDescuento && (
+                        <div className="absolute top-4 left-4 bg-rose-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg">
+                          OFERTA {p.porcentaje ? `-${p.porcentaje}%` : ''}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">{p.categoria}</span>
+                      <h2 className="text-slate-800 font-serif text-lg group-hover:text-slate-500 transition-colors leading-tight">
+                        {p.nombre}
+                      </h2>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-slate-900 font-bold">
+                          {soles(p.precioFinal)}
+                        </span>
+                        {p.tieneDescuento && (
+                          <span className="text-slate-300 text-sm line-through decoration-slate-300/50">
+                            {soles(p.precioOriginal)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </main>
+        </div>
       </div>
 
-      {productos.length === 0 && <p className="text-sm opacity-80">No hay resultados.</p>}
-
-      <div className="flex gap-3 items-center">
-        {page > 1 && (
-          <Link
-            className="underline"
-            href={`/catalogo?${new URLSearchParams({
-              ...(q ? { q } : {}),
-              ...(categoriaId ? { categoria: categoriaId } : {}),
-              ...(stock ? { stock } : {}),
-              page: String(page - 1),
-            }).toString()}`}
-          >
-            ← Anterior
-          </Link>
-        )}
-
-        <span className="text-sm opacity-80">
-          Página <b>{page}</b> / {totalPages}
-        </span>
-
-        {page < totalPages && (
-          <Link
-            className="underline"
-            href={`/catalogo?${new URLSearchParams({
-              ...(q ? { q } : {}),
-              ...(categoriaId ? { categoria: categoriaId } : {}),
-              ...(stock ? { stock } : {}),
-              page: String(page + 1),
-            }).toString()}`}
-          >
-            Siguiente →
-          </Link>
-        )}
-      </div>
+      {/* Footer Simple para el catálogo */}
+      <footer className="py-20 border-t border-slate-100 text-center">
+         <div className="max-w-xs mx-auto space-y-6">
+            <h4 className="text-xl font-serif text-slate-900 italic">Elara Atelier</h4>
+            <div className="h-px bg-slate-100 w-12 mx-auto"></div>
+            <p className="text-slate-400 text-sm font-light leading-relaxed">
+              Inspirando elegancia y autenticidad en cada prenda.
+            </p>
+         </div>
+      </footer>
     </div>
   );
 }

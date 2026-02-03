@@ -1,23 +1,101 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
 import { redirect } from "next/navigation";
 import FiltrosDescuentos from "./filtros-descuentos";
-import ListaCampanas from "./lista-campanas"; // <--- IMPORTAMOS EL COMPONENTE CLIENTE
+import ListaCampanas from "./lista-campanas"; 
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Campañas y Descuentos | Admin",
 };
 
-// Función auxiliar para calcular estado
+// --- NUEVO: Función de Sincronización Automática ---
+// Esta función se ejecutará cada vez que cargues la página de administración
+// para asegurar que la BD refleje el estado real de las fechas.
+async function sincronizarEstados() {
+  const now = new Date();
+  
+  try {
+    // 1. ACTIVAR: Buscar campañas "PROGRAMADAS" que ya deberían haber empezado
+    const porActivar = await prisma.descuentoProducto.findMany({
+      where: { 
+        estado: "PROGRAMADO", 
+        startsAt: { lte: now }, 
+        endsAt: { gte: now } 
+      }
+    });
+
+    for (const d of porActivar) {
+      // A. Cambiar estado a ACTIVO en la campaña
+      await prisma.descuentoProducto.update({ 
+        where: { id: d.id }, 
+        data: { estado: "ACTIVO" } 
+      });
+
+      // B. Reflejar datos en el PRODUCTO (Esto hace que aparezca la etiqueta en la tienda)
+      await prisma.producto.update({
+        where: { id: d.productoId },
+        data: {
+          descuentoActivo: true,
+          descuentoTipo: d.tipo,
+          descuentoValor: Number(d.valor),
+          descuentoInicio: d.startsAt,
+          descuentoFin: d.endsAt,
+          descuentoActualId: d.id
+        }
+      });
+    }
+
+    // 2. FINALIZAR: Buscar campañas "ACTIVAS" que ya vencieron
+    const porFinalizar = await prisma.descuentoProducto.findMany({
+      where: { 
+        estado: "ACTIVO", 
+        endsAt: { lt: now } 
+      }
+    });
+
+    for (const d of porFinalizar) {
+      // A. Cambiar estado a FINALIZADO
+      await prisma.descuentoProducto.update({ 
+        where: { id: d.id }, 
+        data: { estado: "FINALIZADO" } 
+      });
+      
+      // B. Limpiar el producto (solo si no tiene ya otra campaña más nueva superpuesta)
+      const prod = await prisma.producto.findUnique({ 
+          where: { id: d.productoId },
+          select: { descuentoActualId: true }
+      });
+      
+      // Si el producto sigue apuntando a esta campaña vieja, lo limpiamos
+      if (prod?.descuentoActualId === d.id) {
+          await prisma.producto.update({
+            where: { id: d.productoId },
+            data: {
+                descuentoActivo: false,
+                descuentoTipo: null,
+                descuentoValor: null,
+                descuentoInicio: null,
+                descuentoFin: null,
+                descuentoActualId: null
+            }
+          });
+      }
+    }
+  } catch (error) {
+    console.error("Error en sincronización automática:", error);
+    // No lanzamos error para no bloquear la carga de la página, solo logueamos
+  }
+}
+
+// Función auxiliar para calcular estado visual
 function getEstadoCampaña(start: Date, end: Date, estadoDB: string) {
   if (estadoDB === "CANCELADO") return "CANCELADO";
   
   const ahora = new Date();
-  // Ajuste de fin de día para comparación precisa (UTC-5 safe logic)
   const finAjustado = new Date(end);
   finAjustado.setHours(23, 59, 59, 999);
 
@@ -32,6 +110,10 @@ type SP = { q?: string };
 export default async function Page({ searchParams }: { searchParams: Promise<SP> }) {
   const admin = await sesionAdmin();
   if (!admin) redirect("/admin/login");
+
+  // 🔥 EJECUTAR SINCRONIZACIÓN ANTES DE CARGAR DATOS 🔥
+  // Esto arregla el problema: actualiza la BD justo antes de que veas la lista.
+  await sincronizarEstados();
 
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
@@ -61,7 +143,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const campañasMap = new Map();
 
   for (const d of descuentosRaw) {
-    // Usamos el nombre de campaña o generamos uno único basado en fechas/tipo
     const identificadorUnico = d.nombreCampana 
         ? `CAMPAÑA::${d.nombreCampana}::${d.startsAt.toISOString()}` 
         : `AUTO::${d.tipo}-${d.valor}-${d.startsAt.toISOString()}-${d.endsAt.toISOString()}`;
@@ -75,7 +156,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         valor: Number(d.valor),
         inicio: d.startsAt,
         fin: d.endsAt,
-        // Calculamos el estado visual aquí en el servidor
         estadoCalculado: getEstadoCampaña(d.startsAt, d.endsAt, d.estado),
         idsDescuentos: [],
         productos: []
@@ -95,10 +175,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     }
   }
 
-  // Convertimos a array para pasarlo al componente cliente
   const campañas = Array.from(campañasMap.values());
 
-  // Stats rápidos
   const stats = {
       activas: campañas.filter(c => c.estadoCalculado === 'ACTIVO').length,
       programadas: campañas.filter(c => c.estadoCalculado === 'PROGRAMADO').length,
@@ -126,7 +204,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
          
          {/* Sidebar: Filtros y Stats */}
          <div className="lg:col-span-1 space-y-6 sticky top-6">
-            {/* Componente Cliente para búsqueda */}
             <FiltrosDescuentos initialQ={q} />
             
             <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
@@ -149,9 +226,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
             </div>
          </div>
 
-         {/* Lista Principal: Delegamos al Client Component */}
+         {/* Lista Principal */}
          <div className="lg:col-span-3 space-y-4">
-            {/* Aquí usamos el componente que tiene la lógica de "Cancelar" */}
             <ListaCampanas campañas={campañas} />
          </div>
       </div>

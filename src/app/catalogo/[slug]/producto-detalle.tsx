@@ -1,242 +1,191 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 
-function soles(v: any) {
-  const n = Number(v?.toString?.() ?? v);
-  if (Number.isNaN(n)) return `S/ ${String(v)}`;
-  return `S/ ${n.toFixed(2)}`;
-}
+type Variante = {
+  id: string;
+  talla: string;
+  color: string;
+  hex: string | null;
+  stock: number;
+};
 
 type Props = {
   producto: {
-    id: string;
     nombre: string;
-    descripcion: string;
-    precio: string;
+    descripcion: string | null;
     categoria: string;
-
-    // ✅ descuento
-    descuentoActivo: boolean;
-    descuentoLabel: string;
-    precioFinal: string | null; // "12.34"
+    precioOriginal: number;
+    precioFinal: number;
+    tieneDescuento: boolean;
+    descuentoTag: string;
+    imagenes: string[];
+    variantes: Variante[];
   };
-
-  imagenes: Array<{ id: string; url: string; esPortada: boolean; orden: number }>;
-
-  // ✅ imágenes por color
-  imagenesColor: Array<{ id: string; colorId: string; color: string; hex: string | null; url: string }>;
-
-  variantes: Array<{
-    id: string;
-    talla: string;
-    tallaOrden: number;
-    colorId: string;
-    color: string;
-    colorHex: string | null;
-    stock: number;
-  }>;
-
-  whatsappNumero: string;
-  agotado: boolean;
 };
 
-export default function ProductoDetalle({
-  producto,
-  imagenes,
-  imagenesColor,
-  variantes,
-  whatsappNumero,
-  agotado,
-}: Props) {
-  const portada = imagenes[0]?.url ?? "";
+export default function ProductoDetalle({ producto }: Props) {
+  // 1. Estados de Selección
+  const [imgActiva, setImgActiva] = useState(producto.imagenes[0] || "");
+  const [tallaSel, setTallaSel] = useState<string | null>(null);
+  const [colorSel, setColorSel] = useState<string | null>(null);
 
-  const tallas = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const v of variantes) if (!m.has(v.talla)) m.set(v.talla, v.tallaOrden);
-
-    return [...m.entries()]
-      .sort((a, b) => a[1] - b[1])
-      .map(([t]) => t);
-  }, [variantes]);
-
-  const [tallaSel, setTallaSel] = useState<string>(tallas[0] ?? "");
+  // 2. Lógica de Disponibilidad
+  const tallasDisponibles = useMemo(() => {
+    return Array.from(new Set(producto.variantes.map(v => v.talla)));
+  }, [producto.variantes]);
 
   const coloresDisponibles = useMemo(() => {
-    const m = new Map<string, { id: string; nombre: string; hex: string | null }>();
+    if (!tallaSel) return Array.from(new Set(producto.variantes.map(v => v.color)));
+    return Array.from(new Set(producto.variantes.filter(v => v.talla === tallaSel).map(v => v.color)));
+  }, [producto.variantes, tallaSel]);
 
-    for (const v of variantes) {
-      if (v.talla !== tallaSel) continue;
-      if (!m.has(v.colorId)) m.set(v.colorId, { id: v.colorId, nombre: v.color, hex: v.colorHex ?? null });
-    }
+  const varianteElegida = useMemo(() => {
+    return producto.variantes.find(v => v.talla === tallaSel && v.color === colorSel);
+  }, [producto.variantes, tallaSel, colorSel]);
 
-    return [...m.values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [variantes, tallaSel]);
+  const stockActual = varianteElegida ? varianteElegida.stock : null;
 
-  const [colorSelId, setColorSelId] = useState<string>(coloresDisponibles[0]?.id ?? "");
+  // 3. Generación de Enlace de WhatsApp
+  function contactarWhatsApp() {
+    const numero = "51900000000"; // Cambiar por tu número real
+    const variantInfo = varianteElegida 
+      ? ` en talla ${varianteElegida.talla} y color ${varianteElegida.color}` 
+      : "";
+    
+    const texto = `¡Hola Elara Atelier! ✨ Me interesa la pieza "${producto.nombre}"${variantInfo}. ¿Me podrían brindar más información?`;
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, "_blank");
+  }
 
-  // Mantener color válido si cambia talla
-  useEffect(() => {
-    if (!coloresDisponibles.some((c) => c.id === colorSelId)) {
-      setColorSelId(coloresDisponibles[0]?.id ?? "");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tallaSel, coloresDisponibles.map((c) => c.id).join("|")]);
-
-  const colorSelNombre = useMemo(() => {
-    return coloresDisponibles.find((c) => c.id === colorSelId)?.nombre ?? "";
-  }, [coloresDisponibles, colorSelId]);
-
-  // ✅ imagen por color seleccionada
-  const imagenPorColor = useMemo(() => {
-    return imagenesColor.find((x) => x.colorId === colorSelId)?.url ?? "";
-  }, [imagenesColor, colorSelId]);
-
-  const imagenPrincipal = imagenPorColor || portada;
-
-  const linkWhatsApp = useMemo(() => {
-    const precioMostrar = producto.descuentoActivo && producto.precioFinal
-      ? `S/ ${Number(producto.precioFinal).toFixed(2)} (antes ${soles(producto.precio)})`
-      : soles(producto.precio);
-
-    const msg = agotado
-      ? `Hola, estoy interesado en este producto:
-• Producto: ${producto.nombre}
-• Precio: ${precioMostrar}
-
-¿Podrían confirmarme cuándo reponen o si se puede separar?`
-      : `Hola, quiero este producto:
-• Producto: ${producto.nombre}
-• Talla: ${tallaSel || "-"}
-• Color: ${colorSelNombre || "-"}
-• Precio: ${precioMostrar}
-
-¿Está disponible?`;
-
-    return `https://wa.me/${whatsappNumero}?text=${encodeURIComponent(msg)}`;
-  }, [agotado, whatsappNumero, producto.nombre, producto.precio, producto.descuentoActivo, producto.precioFinal, tallaSel, colorSelNombre]);
+  // Formateador
+  const soles = (v: number) => `S/ ${v.toFixed(2)}`;
 
   return (
-    <div className="p-6 space-y-5 max-w-5xl mx-auto">
-      <a className="underline" href="/catalogo">
-        ← Volver
-      </a>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* IMÁGENES */}
-        <div className="space-y-3">
-          <div className="relative aspect-square bg-black rounded-xl overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {imagenPrincipal ? (
-              <img src={imagenPrincipal} alt={producto.nombre} className="w-full h-full object-cover" />
-            ) : null}
-
-            {producto.descuentoActivo && producto.descuentoLabel && (
-              <div className="absolute top-5 right-5 z-10 bg-red-600 text-white text-xs font-bold px-5 py-1 rounded-none shadow">
-              {producto.descuentoLabel}
-              </div>
+    <section className="max-w-7xl mx-auto px-6 pb-20">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 xl:gap-20">
+        
+        {/* GALERÍA DE IMÁGENES (7/12) */}
+        <div className="lg:col-span-7 flex flex-col md:flex-row-reverse gap-4">
+          <div className="flex-1 aspect-[3/4] bg-slate-50 rounded-3xl overflow-hidden relative border border-slate-100 shadow-inner">
+            {imgActiva ? (
+              <img 
+                src={imgActiva} 
+                alt={producto.nombre} 
+                className="w-full h-full object-cover animate-in fade-in zoom-in-95 duration-500"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-slate-300">Sin imagen</div>
+            )}
+            
+            {producto.tieneDescuento && (
+               <div className="absolute top-6 left-6 bg-rose-500 text-white text-[11px] font-black px-4 py-1.5 rounded-full shadow-xl tracking-widest uppercase">
+                  {producto.descuentoTag}
+               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
-            {/* miniaturas normales */}
-            {imagenes.slice(0, 6).map((img) => (
-              <div key={img.id} className="aspect-square bg-black rounded-lg overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img.url} alt="img" className="w-full h-full object-cover" />
-              </div>
+          {/* Miniaturas */}
+          <div className="flex md:flex-col gap-3 overflow-x-auto md:overflow-y-auto no-scrollbar md:w-24">
+            {producto.imagenes.map((url, i) => (
+              <button
+                key={i}
+                onClick={() => setImgActiva(url)}
+                className={`w-16 md:w-full aspect-square rounded-xl overflow-hidden border-2 transition-all shrink-0 ${imgActiva === url ? 'border-slate-900 shadow-md' : 'border-transparent opacity-60 hover:opacity-100'}`}
+              >
+                <img src={url} alt={`Vista ${i}`} className="w-full h-full object-cover" />
+              </button>
             ))}
-
-            {/* miniatura del color seleccionado (si existe y no está ya) */}
-            {imagenPorColor && !imagenes.some((i) => i.url === imagenPorColor) ? (
-              <div className="aspect-square bg-black rounded-lg overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imagenPorColor} alt="color" className="w-full h-full object-cover" />
-              </div>
-            ) : null}
           </div>
         </div>
 
-        {/* INFO + COMPRA */}
-        <div className="space-y-3">
-          <div>
-            <h1 className="text-2xl font-semibold">{producto.nombre}</h1>
-            <p className="text-sm opacity-80">{producto.categoria}</p>
+        {/* INFO Y SELECCIÓN (5/12) */}
+        <div className="lg:col-span-5 flex flex-col pt-4">
+          <div className="space-y-2 mb-8">
+            <span className="text-[11px] uppercase tracking-[0.3em] font-bold text-slate-400">{producto.categoria}</span>
+            <h1 className="text-4xl md:text-5xl font-serif text-slate-900 leading-[1.1]">{producto.nombre}</h1>
           </div>
 
-          {/* ✅ precio con descuento */}
-          {producto.descuentoActivo && producto.precioFinal ? (
-            <div className="space-y-1">
-              <div className="text-lg font-semibold">S/ {Number(producto.precioFinal).toFixed(2)}</div>
-              <div className="text-sm opacity-70 line-through">{soles(producto.precio)}</div>
-            </div>
-          ) : (
-            <div className="text-lg">{soles(producto.precio)}</div>
-          )}
-
-          {producto.descripcion && (
-            <p className="text-sm opacity-90 whitespace-pre-wrap">{producto.descripcion}</p>
-          )}
-
-          <div className="border rounded-xl p-4 space-y-3">
-            {agotado ? (
-              <>
-                <div className="inline-block bg-black text-white text-xs px-2 py-1 rounded-full">
-                  Agotado
-                </div>
-
-                <p className="text-sm opacity-80">
-                  Este producto no está disponible por el momento. Escríbenos y te avisamos cuando esté disponible.
-                </p>
-
-                <a className="inline-block bg-black text-white rounded-md px-4 py-2" href={linkWhatsApp} target="_blank" rel="noreferrer">
-                  Consultar disponibilidad
-                </a>
-              </>
-            ) : (
-              <>
-                <div>
-                  <p className="text-sm font-medium mb-2">Talla</p>
-                  <div className="flex flex-wrap gap-2">
-                    {tallas.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        className={`px-3 py-1 rounded-full border text-sm ${tallaSel === t ? "bg-black text-white" : ""}`}
-                        onClick={() => setTallaSel(t)}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium mb-2">Color</p>
-                  <div className="flex flex-wrap gap-2">
-                    {coloresDisponibles.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className={`px-3 py-1 rounded-full border text-sm ${colorSelId === c.id ? "bg-black text-white" : ""}`}
-                        onClick={() => setColorSelId(c.id)}
-                      >
-                        {c.nombre}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <a className="inline-block bg-black text-white rounded-md px-4 py-2" href={linkWhatsApp} target="_blank" rel="noreferrer">
-                  Comprar
-                </a>
-              </>
+          <div className="flex items-baseline gap-4 mb-10">
+            <span className="text-3xl font-light text-slate-900">{soles(producto.precioFinal)}</span>
+            {producto.tieneDescuento && (
+              <span className="text-lg text-slate-300 line-through font-light decoration-slate-300/40">
+                {soles(producto.precioOriginal)}
+              </span>
             )}
-
-            {!whatsappNumero && <p className="text-xs text-red-600">Falta WHATSAPP_NUMERO</p>}
           </div>
+
+          {/* Selector de Tallas */}
+          <div className="space-y-4 mb-8">
+            <div className="flex justify-between items-center">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Talla</label>
+              <button className="text-[10px] text-slate-300 uppercase underline underline-offset-4 hover:text-slate-900 transition-colors">Guía de tallas</button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {tallasDisponibles.map(t => (
+                <button
+                  key={t}
+                  onClick={() => { setTallaSel(t); setColorSel(null); }}
+                  className={`min-w-[50px] px-4 py-2 text-xs font-bold rounded-lg border transition-all ${tallaSel === t ? 'bg-slate-900 border-slate-900 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Selector de Colores */}
+          <div className="space-y-4 mb-10">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Color: <span className="text-slate-900">{colorSel || "—"}</span></label>
+            <div className="flex flex-wrap gap-3">
+              {coloresDisponibles.map(c => {
+                const vari = producto.variantes.find(v => v.color === c);
+                return (
+                  <button
+                    key={c}
+                    onClick={() => setColorSel(c)}
+                    className={`w-9 h-9 rounded-full border-2 p-0.5 transition-all flex items-center justify-center ${colorSel === c ? 'border-slate-900 scale-110 shadow-md' : 'border-transparent hover:scale-105'}`}
+                    title={c}
+                  >
+                    <span 
+                      className="w-full h-full rounded-full border border-black/5" 
+                      style={{ backgroundColor: vari?.hex || '#ccc' }} 
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Disponibilidad Stock */}
+          {stockActual !== null && (
+            <div className="mb-6 animate-in fade-in duration-300">
+               <p className={`text-xs font-medium ${stockActual === 0 ? 'text-rose-500' : 'text-slate-400'}`}>
+                 {stockActual === 0 
+                   ? '⚠️ Agotado para esta variante.' 
+                   : `✓ Disponibilidad inmediata (${stockActual} unidades)`}
+               </p>
+            </div>
+          )}
+
+          {/* Botón Principal (WhatsApp) */}
+          <button
+            onClick={contactarWhatsApp}
+            disabled={stockActual === 0}
+            className="w-full py-5 bg-slate-900 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-slate-800 transition-all shadow-xl hover:shadow-2xl active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+          >
+            {stockActual === 0 ? 'Sin Stock' : 'Solicitar por WhatsApp'}
+          </button>
+
+          {/* Descripción de Producto */}
+          <div className="mt-12 pt-8 border-t border-slate-100 space-y-4">
+             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-900">Descripción y Detalles</h3>
+             <div className="text-sm text-slate-500 font-light leading-relaxed whitespace-pre-wrap">
+                {producto.descripcion || "Esta pieza de Elara Atelier destaca por su corte impecable y la calidad de sus tejidos, diseñada para durar y acompañarte en tus mejores momentos."}
+             </div>
+          </div>
+
         </div>
       </div>
-    </div>
+    </section>
   );
 }
