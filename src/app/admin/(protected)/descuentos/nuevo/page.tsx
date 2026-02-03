@@ -14,9 +14,9 @@ export default async function Page() {
           id: true, 
           nombre: true, 
           categoriaId: true,
-          precio: true, // <--- AGREGADO
-          estado: true, // <--- AGREGADO
-          variantes: {  // <--- AGREGADO (Para calcular stock total)
+          precio: true, 
+          estado: true, 
+          variantes: { 
             select: { stockActual: true }
           },
           imagenes: { 

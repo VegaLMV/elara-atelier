@@ -1,166 +1,264 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { 
+  Calendar, 
+  Tag, 
+  Clock, 
+  Ban,
+  Pencil,
+  MoreHorizontal,
+  X,
+  Search
+} from "lucide-react";
 
-// Tipos adaptados para la vista
-type CampanaVisual = {
-  idRef: string; // ID de referencia (primer descuento del grupo)
+interface ProductoMini {
+  id: string;
   nombre: string;
-  descripcion?: string | null;
+  imagen: string | null;
+}
+
+interface Campana {
+  idRef: string;
+  nombre: string;
+  descripcion: string | null;
   tipo: "PORCENTAJE" | "MONTO";
   valor: number;
   inicio: Date;
   fin: Date;
   estadoCalculado: "ACTIVO" | "PROGRAMADO" | "FINALIZADO" | "CANCELADO";
-  // Lista de IDs de descuentos individuales que componen esta campaña
-  idsDescuentos: string[]; 
-  productos: Array<{
-    id: string; // ID del descuento individual
-    productoId: string;
-    nombre: string;
-    imagen: string | null;
-  }>;
-};
+  idsDescuentos: string[];
+  productos: ProductoMini[];
+}
 
-export default function ListaCampanas({ campañas }: { campañas: CampanaVisual[] }) {
+export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
   const router = useRouter();
-  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState<string | null>(null);
+  const [menuAbierto, setMenuAbierto] = useState<string | null>(null);
+  
+  const [campanaSeleccionada, setCampanaSeleccionada] = useState<Campana | null>(null);
+  const [imagenZoom, setImagenZoom] = useState<string | null>(null);
 
-  async function cancelarCampaña(campaña: CampanaVisual) {
-    if (!confirm(`¿Estás seguro de CANCELAR la campaña "${campaña.nombre}"?\n\nEsto desactivará el descuento en ${campaña.productos.length} productos.`)) {
-      return;
-    }
-
-    setLoadingId(campaña.idRef);
-
+  const cancelarCampaña = async (ids: string[]) => {
+    if (!confirm("¿Estás seguro de cancelar esta campaña?")) return;
     try {
+      setLoading(ids[0]);
       const res = await fetch("/api/admin/descuentos/cancelar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: campaña.idsDescuentos }),
+        body: JSON.stringify({ ids }),
       });
-
-      if (!res.ok) throw new Error("Error al cancelar");
-      
+      if (!res.ok) throw new Error();
+      toast.success("Campaña cancelada");
       router.refresh();
-      alert("Campaña cancelada correctamente.");
-    } catch (error) {
-      alert("No se pudo cancelar la campaña.");
+    } catch {
+      toast.error("Error al cancelar");
     } finally {
-      setLoadingId(null);
+      setLoading(null);
+      setMenuAbierto(null);
     }
-  }
-
-  if (campañas.length === 0) {
-    return (
-      <div className="bg-white border-2 border-dashed border-gray-200 rounded-3xl p-16 text-center flex flex-col items-center justify-center">
-        <span className="text-5xl opacity-20 mb-4">🏷️</span>
-        <p className="text-lg text-gray-600 font-medium">No se encontraron campañas.</p>
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="space-y-4">
-      {campañas.map((c, idx) => (
-        <details 
-          key={c.idRef + idx} 
-          className={`group bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all open:ring-2 open:ring-slate-900/5 ${c.estadoCalculado === 'CANCELADO' ? 'opacity-60' : ''}`}
-        >
-          {/* HEADER DE LA TARJETA */}
-          <summary className="list-none cursor-pointer p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
-            <div className="flex items-start gap-4">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white text-lg shadow-sm flex-shrink-0 ${
-                  c.estadoCalculado === 'ACTIVO' ? 'bg-green-500' : 
-                  c.estadoCalculado === 'PROGRAMADO' ? 'bg-blue-500' : 
-                  c.estadoCalculado === 'CANCELADO' ? 'bg-red-400' : 'bg-gray-400'
-              }`}>
-                  {c.tipo === "PORCENTAJE" ? "%" : "S/"}
-              </div>
-
-              <div>
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center flex-wrap gap-2">
-                      {c.nombre}
-                      <span className="text-gray-400 font-normal text-sm bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-                          {c.productos.length} prods.
-                      </span>
-                  </h3>
-                  
-                  {c.descripcion && (
-                      <p className="text-sm text-gray-500 mt-1 line-clamp-1">{c.descripcion}</p>
-                  )}
-
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 mt-2">
-                      <span className="font-bold text-slate-700">
-                         {c.tipo === "PORCENTAJE" ? `-${c.valor}%` : `-S/ ${c.valor}`}
-                      </span>
-                      <span className="flex items-center gap-1 font-mono text-xs bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
-                          {new Date(c.inicio).toLocaleDateString()} ➜ {new Date(c.fin).toLocaleDateString()}
-                      </span>
-                      
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                          c.estadoCalculado === 'ACTIVO' ? 'bg-green-50 text-green-700 border-green-100' :
-                          c.estadoCalculado === 'PROGRAMADO' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                          c.estadoCalculado === 'CANCELADO' ? 'bg-red-50 text-red-700 border-red-100 line-through' : 'bg-gray-50 text-gray-500 border-gray-200'
-                      }`}>
+    <>
+      <div className="grid gap-6">
+        {campañas.map((c) => (
+          <div 
+            key={c.idRef} 
+            className={`bg-white rounded-2xl p-6 border transition-all hover:shadow-md relative ${
+              c.estadoCalculado === 'ACTIVO' ? 'border-green-200 shadow-green-50/50' : 
+              c.estadoCalculado === 'CANCELADO' ? 'border-red-100 opacity-75' : 
+              c.estadoCalculado === 'FINALIZADO' ? 'border-gray-100 opacity-60' :
+              'border-blue-100'
+            }`}
+          >
+            <div className="flex flex-col md:flex-row justify-between gap-6">
+              <div className="flex-1 space-y-4">
+                
+                {/* Header Tarjeta */}
+                <div className="flex items-start justify-between">
+                  <div>
+                     <div className="flex items-center gap-2 mb-1">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          c.estadoCalculado === 'ACTIVO' ? 'bg-green-100 text-green-700' :
+                          c.estadoCalculado === 'PROGRAMADO' ? 'bg-blue-100 text-blue-700' :
+                          c.estadoCalculado === 'CANCELADO' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+                        }`}>
                           {c.estadoCalculado}
-                      </span>
+                        </span>
+                        <span className="text-xs text-gray-400 font-mono">
+                          {c.tipo === 'PORCENTAJE' ? `-${c.valor}%` : `-S/ ${c.valor}`}
+                        </span>
+                     </div>
+                     <h3 className="text-lg font-bold text-gray-900">{c.nombre}</h3>
+                     {c.descripcion && <p className="text-sm text-gray-500 mt-1">{c.descripcion}</p>}
                   </div>
+                  
+                  {/* Menú Acciones */}
+                  <div className="relative">
+                    <button onClick={() => setMenuAbierto(menuAbierto === c.idRef ? null : c.idRef)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                      <MoreHorizontal className="h-5 w-5 text-gray-500" />
+                    </button>
+                    {menuAbierto === c.idRef && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setMenuAbierto(null)}></div>
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-20 py-1 text-sm overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                          <button
+                            disabled={c.estadoCalculado === 'FINALIZADO'}
+                            // CAMBIO AQUI: Ruta explícita 'editar'
+                            onClick={() => router.push(`/admin/descuentos/${c.idRef}`)}
+                            className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
+                          >
+                            <Pencil className="h-4 w-4 text-blue-600" /> Editar
+                          </button>
+                          <div className="h-px bg-gray-100 my-1"></div>
+                          <button
+                            disabled={loading === c.idRef || c.estadoCalculado === 'FINALIZADO' || c.estadoCalculado === 'CANCELADO'}
+                            onClick={() => cancelarCampaña(c.idsDescuentos)}
+                            className="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-600 flex items-center gap-2 disabled:opacity-50"
+                          >
+                            <Ban className="h-4 w-4" /> Cancelar
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Fechas */}
+                <div className="flex items-center gap-6 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span>{new Date(c.inicio).toLocaleDateString()}</span>
+                  </div>
+                  <div className="h-4 w-px bg-gray-200"></div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                    <span>{new Date(c.fin).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                {/* Lista Mini de Productos */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      Productos ({c.productos.length})
+                    </p>
+                    <button 
+                      onClick={() => { setCampanaSeleccionada(c); setImagenZoom(c.productos[0]?.imagen || null); }}
+                      className="text-[10px] text-blue-600 font-medium hover:underline"
+                    >
+                      Ver detalles
+                    </button>
+                  </div>
+                  <div className="flex -space-x-2 overflow-hidden py-1">
+                    {c.productos.slice(0, 8).map((p, idx) => (
+                      <button 
+                        key={p.id + idx} 
+                        onClick={() => { setCampanaSeleccionada(c); setImagenZoom(p.imagen); }}
+                        className="relative w-8 h-8 rounded-full border-2 border-white bg-gray-100 overflow-hidden hover:scale-110 transition-transform hover:z-10 focus:outline-none" 
+                        title={p.nombre}
+                      >
+                        {p.imagen ? (
+                          <img src={p.imagen} alt={p.nombre} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-400">IMG</div>
+                        )}
+                      </button>
+                    ))}
+                    {c.productos.length > 8 && (
+                      <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-50 flex items-center justify-center text-[10px] font-bold text-gray-500">
+                        +{c.productos.length - 8}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-
-            <div className="flex items-center gap-4">
-               {/* BOTÓN CANCELAR DIRECTO */}
-               {c.estadoCalculado !== 'CANCELADO' && c.estadoCalculado !== 'FINALIZADO' && (
-                 <button
-                    onClick={(e) => {
-                      e.preventDefault(); // Evita que se abra/cierre el details
-                      cancelarCampaña(c);
-                    }}
-                    disabled={loadingId === c.idRef}
-                    className="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg border border-red-100 font-medium hover:bg-red-100 transition-colors z-10"
-                 >
-                    {loadingId === c.idRef ? "Cancelando..." : "Cancelar Campaña"}
-                 </button>
-               )}
-
-               <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider group-open:text-slate-900 transition-colors">
-                  <span>Detalles</span>
-                  <span className="transform group-open:rotate-180 transition-transform text-lg leading-none">▾</span>
-               </div>
-            </div>
-          </summary>
-
-          {/* CONTENIDO DETALLADO */}
-          <div className="border-t border-gray-100 bg-gray-50/50 p-6 animate-in fade-in slide-in-from-top-2 duration-200">
-             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                 {c.productos.map((prod) => (
-                    <Link 
-                        key={prod.id} 
-                        href={`/admin/productos/${prod.productoId}`}
-                        className="flex items-center gap-3 p-2.5 bg-white border border-gray-200 rounded-xl hover:border-slate-300 hover:shadow-md transition-all group/item"
-                    >
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden relative flex-shrink-0 border border-gray-100">
-                            {prod.imagen ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={prod.imagen} alt="" className="w-full h-full object-cover group-hover/item:scale-110 transition-transform duration-500" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">📷</div>
-                            )}
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-sm font-semibold text-gray-700 truncate group-hover/item:text-slate-900">{prod.nombre}</p>
-                            <p className="text-[10px] text-gray-400 group-hover/item:text-blue-500 transition-colors">Ver producto →</p>
-                        </div>
-                    </Link>
-                 ))}
-             </div>
           </div>
+        ))}
+        {campañas.length === 0 && (
+           <div className="text-center py-12 text-gray-400">
+              <Tag className="w-12 h-12 mx-auto mb-3 opacity-20" />
+              <p>No hay campañas registradas.</p>
+           </div>
+        )}
+      </div>
 
-        </details>
-      ))}
-    </div>
+      {/* MODAL (Sin cambios mayores, solo la redirección en el botón inferior) */}
+      {campanaSeleccionada && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-200">
+            <div className="w-full md:w-1/2 bg-gray-100 p-8 flex items-center justify-center relative min-h-[300px]">
+              {imagenZoom ? (
+                <img src={imagenZoom} alt="Zoom" className="max-w-full max-h-[50vh] md:max-h-full object-contain rounded-lg shadow-sm" />
+              ) : (
+                <div className="flex flex-col items-center text-gray-400">
+                  <Tag className="w-16 h-16 mb-2 opacity-20" />
+                  <p className="text-sm">Sin imagen disponible</p>
+                </div>
+              )}
+              <button 
+                onClick={() => setCampanaSeleccionada(null)}
+                className="absolute top-4 right-4 md:hidden bg-white/80 p-2 rounded-full shadow-sm"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="w-full md:w-1/2 flex flex-col h-full bg-white">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-start">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">{campanaSeleccionada.nombre}</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {campanaSeleccionada.tipo === 'PORCENTAJE' ? `Descuento del ${campanaSeleccionada.valor}%` : `Descuento de S/ ${campanaSeleccionada.valor}`}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setCampanaSeleccionada(null)}
+                  className="hidden md:block p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 pl-2">
+                  Productos Incluidos ({campanaSeleccionada.productos.length})
+                </p>
+                {campanaSeleccionada.productos.map((prod) => (
+                  <div 
+                    key={prod.id} 
+                    onClick={() => setImagenZoom(prod.imagen)}
+                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${imagenZoom === prod.imagen ? 'bg-blue-50 ring-1 ring-blue-100' : 'hover:bg-gray-50'}`}
+                  >
+                    <div className="w-10 h-10 rounded-md bg-white border border-gray-200 overflow-hidden flex-shrink-0">
+                      {prod.imagen ? (
+                        <img src={prod.imagen} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                         <div className="w-full h-full flex items-center justify-center bg-gray-50 text-[8px]">IMG</div>
+                      )}
+                    </div>
+                    <span className="text-sm font-medium text-gray-700 truncate">
+                      {prod.nombre}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 bg-gray-50 border-t border-gray-100 text-right">
+                <button 
+                   // CAMBIO AQUI: Ruta explícita 'editar'
+                   onClick={() => router.push(`/admin/descuentos/editar/${campanaSeleccionada.idRef}`)}
+                   disabled={campanaSeleccionada.estadoCalculado === 'FINALIZADO'}
+                   className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+                >
+                  Editar Campaña Completa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

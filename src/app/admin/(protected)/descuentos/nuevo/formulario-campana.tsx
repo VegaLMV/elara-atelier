@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Loader2, Search, CheckCircle2, Circle, X } from "lucide-react";
 
 // Definición de tipos más completa
 type ProductoInput = {
@@ -12,59 +14,69 @@ type ProductoInput = {
   precio: number;
   stockTotal: number;
   estado: string;
+  categoria?: { id: string; nombre: string } | null;
+};
+
+type CategoriaInfo = {
+  id: string;
+  nombre: string;
 };
 
 type Props = {
-  categorias: { id: string; nombre: string }[];
-  productos: ProductoInput[];
+  initialData?: any;
+  categorias?: CategoriaInfo[];
+  productos?: ProductoInput[];
 };
 
-export default function FormularioCampana({ categorias, productos }: Props) {
+export default function FormularioCampana({ initialData, categorias = [], productos = [] }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   // --- ESTADOS DEL FORMULARIO ---
-  const [nombreCampana, setNombreCampana] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [tipo, setTipo] = useState<"PORCENTAJE" | "MONTO">("PORCENTAJE");
-  const [valor, setValor] = useState("");
-  const [startsAt, setStartsAt] = useState("");
-  const [endsAt, setEndsAt] = useState("");
+  const [nombreCampana, setNombreCampana] = useState(initialData?.nombreCampana || "");
+  const [descripcion, setDescripcion] = useState(initialData?.descripcion || "");
+  const [tipo, setTipo] = useState<"PORCENTAJE" | "MONTO">(initialData?.tipo || "PORCENTAJE");
+  const [valor, setValor] = useState(initialData?.valor ? String(initialData.valor) : "");
+  
+  // Fechas: Convertir formato ISO si viene de edición
+  const defaultStart = initialData?.startsAt ? new Date(initialData.startsAt).toISOString().split('T')[0] : "";
+  const defaultEnd = initialData?.endsAt ? new Date(initialData.endsAt).toISOString().split('T')[0] : "";
+  
+  const [startsAt, setStartsAt] = useState(defaultStart);
+  const [endsAt, setEndsAt] = useState(defaultEnd);
 
   // --- LÓGICA DE SELECCIÓN ---
   const [modoAlcance, setModoAlcance] = useState<"TODOS" | "CATEGORIA" | "SELECCION">("SELECCION");
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
-  const [productosSeleccionados, setProductosSeleccionados] = useState<string[]>([]);
-  
+  const [productosSeleccionados, setProductosSeleccionados] = useState<string[]>(initialData?.productoIds || []);
+   
   // --- FILTROS VISUALES ---
   const [busquedaProd, setBusquedaProd] = useState("");
-  const [ocultarSinStock, setOcultarSinStock] = useState(true); // Recomendación por defecto
+  const [ocultarSinStock, setOcultarSinStock] = useState(true);
 
   // --- MODAL DE PREVISUALIZACIÓN ---
   const [productoEnModal, setProductoEnModal] = useState<ProductoInput | null>(null);
 
   // 1. Efecto: Cuando se selecciona una categoría, pre-llenamos la selección manual
-  // Esto permite "Quitar algunos relacionados a esa categoría"
   useEffect(() => {
-    if (modoAlcance === "CATEGORIA" && categoriaSeleccionada) {
+    if (modoAlcance === "CATEGORIA" && categoriaSeleccionada && productos) {
       const idsDeCategoria = productos
-        .filter(p => p.categoriaId === categoriaSeleccionada)
-        // Opcional: Si quieres que al elegir categoría NO se seleccionen los de stock 0, descomenta:
-        // .filter(p => !ocultarSinStock || p.stockTotal > 0) 
+        .filter(p => p.categoriaId === categoriaSeleccionada || p.categoria?.id === categoriaSeleccionada)
         .map(p => p.id);
       
       setProductosSeleccionados(idsDeCategoria);
     }
   }, [modoAlcance, categoriaSeleccionada, productos]); 
-  // Nota: No incluimos ocultarSinStock en dependencias para evitar reselecciones accidentales al cambiar filtros visuales
 
   // 2. Filtrado VISUAL de productos (Grid)
   const productosVisibles = useMemo(() => {
+    if (!productos || !Array.isArray(productos)) return [];
+
     let lista = productos;
 
     // Filtro 1: Si estamos en modo Categoría, solo mostramos esa categoría visualmente
     if (modoAlcance === "CATEGORIA" && categoriaSeleccionada) {
-       lista = lista.filter(p => p.categoriaId === categoriaSeleccionada);
+       lista = lista.filter(p => p.categoriaId === categoriaSeleccionada || p.categoria?.id === categoriaSeleccionada);
     }
 
     // Filtro 2: Búsqueda por texto
@@ -73,9 +85,9 @@ export default function FormularioCampana({ categorias, productos }: Props) {
        lista = lista.filter(p => p.nombre.toLowerCase().includes(q));
     }
 
-    // Filtro 3: Ocultar sin stock (Mejora solicitada)
+    // Filtro 3: Ocultar sin stock
     if (ocultarSinStock) {
-        lista = lista.filter(p => p.stockTotal > 0);
+       lista = lista.filter(p => p.stockTotal > 0);
     }
     
     return lista;
@@ -84,10 +96,6 @@ export default function FormularioCampana({ categorias, productos }: Props) {
 
   // 3. Manejador de selección individual (Toggle)
   const toggleSeleccion = (id: string) => {
-    // Si estamos en modo Categoría y el usuario desmarca uno, conceptualmente pasamos a "SELECCION"
-    // para que el backend reciba la lista exacta de IDs y no "Toda la categoría".
-    // Visualmente mantenemos el filtro de categoría para no confundir.
-    
     setProductosSeleccionados(prev => {
       if (prev.includes(id)) {
         return prev.filter(pId => pId !== id);
@@ -101,39 +109,43 @@ export default function FormularioCampana({ categorias, productos }: Props) {
     e.preventDefault();
     
     if (!valor || !startsAt || !endsAt) {
-        alert("Completa los campos obligatorios de la oferta (Valor y Fechas).");
+        toast.error("Completa los campos obligatorios (Valor y Fechas).");
         return;
     }
     
-    // Determinar qué enviamos al backend
     let aplicarA_Final = modoAlcance;
     let ids_Final = productosSeleccionados;
 
-    // Lógica especial: Si el usuario eligió CATEGORIA pero luego modificó la selección manualmente,
-    // enviamos como SELECCION MANUAL para respetar las exclusiones.
-    if (modoAlcance === "CATEGORIA") {
-        const totalEnCategoria = productos.filter(p => p.categoriaId === categoriaSeleccionada).length;
-        // Si la selección es diferente al total, significa que hubo exclusiones manuales
+    // Lógica especial: Si el usuario eligió CATEGORIA pero luego modificó la selección manualmente
+    if (modoAlcance === "CATEGORIA" && productos) {
+        const totalEnCategoria = productos.filter(p => p.categoriaId === categoriaSeleccionada || p.categoria?.id === categoriaSeleccionada).length;
         if (productosSeleccionados.length !== totalEnCategoria) {
             aplicarA_Final = "SELECCION";
         }
     }
 
     if (aplicarA_Final === "SELECCION" && ids_Final.length === 0) {
-        alert("Selecciona al menos un producto.");
+        toast.error("Selecciona al menos un producto.");
         return;
     }
 
     if (aplicarA_Final === "CATEGORIA" && !categoriaSeleccionada) {
-        alert("Selecciona una categoría.");
+        toast.error("Selecciona una categoría.");
         return;
+    }
+
+    if (aplicarA_Final === "TODOS" && productos) {
+        ids_Final = productos.map(p => p.id);
     }
 
     setLoading(true);
 
     try {
-      const res = await fetch("/api/admin/descuentos", {
-        method: "POST",
+      const url = initialData ? `/api/admin/descuentos/${initialData.id}` : `/api/admin/descuentos`;
+      const method = initialData ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nombreCampana, 
@@ -150,15 +162,14 @@ export default function FormularioCampana({ categorias, productos }: Props) {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Error al crear campaña");
+        throw new Error(errorData.error || "Error al procesar campaña");
       }
 
-      const data = await res.json();
-      alert(data.mensaje || "Campaña creada con éxito");
+      toast.success(initialData ? "Campaña actualizada" : "Campaña creada");
       router.push("/admin/descuentos");
       router.refresh();
     } catch (error: any) {
-      alert(error.message || "Ocurrió un error inesperado.");
+      toast.error(error.message || "Ocurrió un error inesperado.");
     } finally {
       setLoading(false);
     }
@@ -171,7 +182,7 @@ export default function FormularioCampana({ categorias, productos }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* COLUMNA IZQUIERDA: CONFIGURACIÓN */}
         <div className="lg:col-span-1 space-y-6">
-           
+            
            {/* Info Básica */}
            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
               <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-2 mb-2">
@@ -272,13 +283,13 @@ export default function FormularioCampana({ categorias, productos }: Props) {
                     <span>🎯 Alcance</span>
                  </h2>
                  
-                 {/* Filtro Stock (Mejora 4) */}
+                 {/* Filtro Stock */}
                  <label className="flex items-center gap-2 text-xs cursor-pointer select-none bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
                     <input 
-                        type="checkbox"
-                        checked={ocultarSinStock}
-                        onChange={e => setOcultarSinStock(e.target.checked)}
-                        className="rounded border-gray-300 text-slate-900 focus:ring-slate-900"
+                       type="checkbox"
+                       checked={ocultarSinStock}
+                       onChange={e => setOcultarSinStock(e.target.checked)}
+                       className="rounded border-gray-300 text-slate-900 focus:ring-slate-900"
                     />
                     <span className="font-medium text-gray-600">Ocultar sin Stock (0)</span>
                  </label>
@@ -312,7 +323,7 @@ export default function FormularioCampana({ categorias, productos }: Props) {
               {/* Contenido Dinámico */}
               <div className="flex-1 flex flex-col">
                  
-                 {/* Barra de Herramientas (Buscador y Dropdown Categoría) */}
+                 {/* Barra de Herramientas */}
                  <div className="flex flex-col sm:flex-row gap-3 mb-4">
                     <div className="relative flex-1">
                         <input 
@@ -321,7 +332,7 @@ export default function FormularioCampana({ categorias, productos }: Props) {
                            value={busquedaProd}
                            onChange={e => setBusquedaProd(e.target.value)}
                         />
-                        <span className="absolute left-3 top-2.5 text-gray-400">🔍</span>
+                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
                     </div>
 
                     {modoAlcance === 'CATEGORIA' && (
@@ -347,13 +358,9 @@ export default function FormularioCampana({ categorias, productos }: Props) {
                           </div>
                        ) : (
                           productosVisibles.map(p => {
-                             // Lógica visual: ¿Está seleccionado?
                              const isSelected = productosSeleccionados.includes(p.id);
                              const isAllMode = modoAlcance === 'TODOS';
                              const isActive = isSelected || isAllMode;
-                             
-                             // En modo TODOS, no permitimos deseleccionar individualmente (limitación lógica simple), 
-                             // o podríamos permitir exclusiones, pero simplificamos UX.
                              const canInteract = modoAlcance !== 'TODOS';
 
                              return (
@@ -361,9 +368,9 @@ export default function FormularioCampana({ categorias, productos }: Props) {
                                    key={p.id}
                                    className={`relative group bg-white border rounded-xl overflow-hidden transition-all shadow-sm flex flex-col h-full ${
                                       isActive ? 'ring-2 ring-slate-900 border-transparent' : 'hover:border-gray-400'
-                                    } ${
+                                   } ${
                                       !isActive ? 'opacity-70 hover:opacity-100' : ''
-                                    }`}
+                                   }`}
                                 >
                                    {/* Imagen y Botón Zoom */}
                                    <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
@@ -384,14 +391,14 @@ export default function FormularioCampana({ categorias, productos }: Props) {
                                          </div>
                                       )}
 
-                                      {/* Botón Ver (Modal) - Mejora 2 */}
+                                      {/* Botón Ver (Modal) */}
                                       <button
                                          type="button"
                                          onClick={(e) => { e.stopPropagation(); setProductoEnModal(p); }}
                                          className="absolute top-2 right-2 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-gray-600 hover:text-slate-900 hover:scale-110 transition-all shadow-sm z-20"
                                          title="Ver detalle grande"
                                       >
-                                         👁️
+                                         <Search className="w-4 h-4" />
                                       </button>
                                    </div>
                                    
@@ -400,17 +407,16 @@ export default function FormularioCampana({ categorias, productos }: Props) {
                                       className={`p-3 flex-1 flex flex-col cursor-pointer ${canInteract ? '' : 'cursor-default'}`}
                                       onClick={() => canInteract && toggleSeleccion(p.id)}
                                    >
-                                      {/* Nombre con más espacio - Mejora 1 */}
                                       <p className="text-xs font-semibold text-gray-800 leading-tight mb-2 line-clamp-3 min-h-[2.5em]" title={p.nombre}>
                                          {p.nombre}
                                       </p>
                                       
                                       <div className="mt-auto flex items-center justify-between text-[11px] text-gray-500 font-mono pt-2 border-t border-gray-50">
                                           <span className={`${p.stockTotal === 0 ? 'text-red-500 font-bold' : ''}`}>
-                                            Stock: {p.stockTotal}
+                                             Stock: {p.stockTotal}
                                           </span>
                                           <span className="font-bold text-slate-700">
-                                            S/ {p.precio.toFixed(2)}
+                                             S/ {p.precio.toFixed(2)}
                                           </span>
                                       </div>
                                    </div>
@@ -423,10 +429,10 @@ export default function FormularioCampana({ categorias, productos }: Props) {
                  
                  {/* Footer de estado de selección */}
                  <div className="mt-4 flex justify-between items-center text-xs text-gray-500 px-1">
-                     <span>Mostrando {productosVisibles.length} productos</span>
-                     <span className="font-medium bg-slate-100 px-3 py-1 rounded-full text-slate-700">
-                        {modoAlcance === 'TODOS' ? 'Seleccionados TODOS' : `Seleccionados: ${productosSeleccionados.length}`}
-                     </span>
+                    <span>Mostrando {productosVisibles.length} productos</span>
+                    <span className="font-medium bg-slate-100 px-3 py-1 rounded-full text-slate-700">
+                       {modoAlcance === 'TODOS' ? 'Seleccionados TODOS' : `Seleccionados: ${productosSeleccionados.length}`}
+                    </span>
                  </div>
 
               </div>
@@ -455,25 +461,24 @@ export default function FormularioCampana({ categorias, productos }: Props) {
                <button 
                   type="submit" 
                   disabled={loading}
-                  className="px-8 py-2.5 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl active:scale-[0.98]"
+                  className="px-8 py-2.5 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center"
                >
-                  {loading ? "Guardando..." : "🚀 Lanzar Campaña"}
+                  {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {initialData ? "Guardar Cambios" : "🚀 Lanzar Campaña"}
                </button>
             </div>
          </div>
       </div>
     </form>
 
-    {/* --- MODAL DE DETALLE (Mejora 2) --- */}
+    {/* --- MODAL DE DETALLE --- */}
     {productoEnModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            {/* Backdrop */}
             <div 
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
                 onClick={() => setProductoEnModal(null)}
             ></div>
 
-            {/* Modal Content */}
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
                 <div className="relative h-64 bg-gray-100">
                     {productoEnModal.imagen ? (
@@ -486,7 +491,7 @@ export default function FormularioCampana({ categorias, productos }: Props) {
                         onClick={() => setProductoEnModal(null)}
                         className="absolute top-4 right-4 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center text-gray-500 hover:text-black font-bold transition-transform hover:scale-110"
                     >
-                        ✕
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
                 
