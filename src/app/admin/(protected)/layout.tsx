@@ -10,7 +10,6 @@ export default async function ProtectedAdminLayout({
   // ✅ Usamos sesionAdmin en lugar de obtenerSesion
   const admin = await obtenerSesion();
 
-  // Si no hay sesión de admin, redirigir al login
   if (!admin) {
     redirect("/admin/login");
   }

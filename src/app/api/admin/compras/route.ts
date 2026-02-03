@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { obtenerSesion } from "@/lib/sesion";
 import { Prisma } from "@prisma/client";
 
+// Tipado actualizado para aceptar items híbridos
 type BodyCompra = {
   proveedorId?: string | null;
   fechaCompra?: string; // ISO
@@ -13,9 +14,10 @@ type BodyCompra = {
   notas?: string | null;
   estado?: "BORRADOR" | "ORDENADO" | "RECIBIDO" | "CANCELADO";
   items: Array<{
-    varianteId: string;
+    id: string; // Puede ser ID de Variante o de Empaque
+    tipo: "PRODUCTO" | "EMPAQUE"; // Nuevo campo discriminador
     cantidad: number;
-    costoUnitario: string | number; // Decimal
+    costoUnitario: string | number;
   }>;
 };
 
@@ -39,7 +41,12 @@ export async function GET(req: Request) {
       : undefined,
     include: {
       proveedor: true,
-      items: true,
+      items: {
+        include: {
+          variante: { include: { producto: true, talla: true, color: true } }, // Incluimos detalles de ropa
+          tipoEmpaque: true // Incluimos detalles de empaque
+        }
+      },
     },
     orderBy: { creadoEn: "desc" },
     take: 50,
@@ -62,8 +69,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Agrega al menos 1 ítem" }, { status: 400 });
   }
 
+  // Validaciones
   for (const it of items) {
-    if (!it?.varianteId) return NextResponse.json({ error: "Falta varianteId" }, { status: 400 });
+    if (!it?.id) return NextResponse.json({ error: "Falta ID del ítem" }, { status: 400 });
+    if (!it?.tipo || (it.tipo !== "PRODUCTO" && it.tipo !== "EMPAQUE")) {
+       // Si viene del código antiguo sin 'tipo', asumimos PRODUCTO por compatibilidad, 
+       // pero el frontend nuevo siempre envía tipo.
+       if (!it.tipo) it.tipo = "PRODUCTO"; 
+       else return NextResponse.json({ error: "Tipo de ítem inválido" }, { status: 400 });
+    }
+    
     if (!Number.isFinite(Number(it.cantidad)) || Number(it.cantidad) <= 0) {
       return NextResponse.json({ error: "Cantidad inválida" }, { status: 400 });
     }
@@ -72,7 +87,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const estado = body.estado ?? "RECIBIDO"; // por defecto: entra stock
+  const estado = body.estado ?? "RECIBIDO"; 
   const fechaCompra = body.fechaCompra ? new Date(body.fechaCompra) : new Date();
 
   const costoEnvio = body.costoEnvio === null || body.costoEnvio === undefined ? null : String(body.costoEnvio);
@@ -81,54 +96,77 @@ export async function POST(req: Request) {
   const proveedorId = body.proveedorId ? String(body.proveedorId) : null;
   const notas = body.notas ? String(body.notas) : null;
 
-  // Transacción completa
-  const result = await prisma.$transaction(async (tx) => {
-    const compra = await tx.compra.create({
-      data: {
-        proveedorId,
-        estado,
-        fechaCompra,
-        costoEnvio: costoEnvio ? new Prisma.Decimal(costoEnvio) : null,
-        otrosCostos: otrosCostos ? new Prisma.Decimal(otrosCostos) : null,
-        notas,
-      },
-    });
+  try {
+    // Transacción completa
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Crear Cabecera de Compra
+      const compra = await tx.compra.create({
+        data: {
+          proveedorId,
+          estado,
+          fechaCompra,
+          costoEnvio: costoEnvio ? new Prisma.Decimal(costoEnvio) : null,
+          otrosCostos: otrosCostos ? new Prisma.Decimal(otrosCostos) : null,
+          notas,
+        },
+      });
 
-    await tx.itemCompra.createMany({
-      data: items.map((it) => ({
-        compraId: compra.id,
-        varianteId: it.varianteId,
-        cantidad: Number(it.cantidad),
-        costoUnitario: new Prisma.Decimal(String(it.costoUnitario)),
-      })),
-    });
+      // 2. Crear Ítems (Mapeando según el tipo)
+      await tx.itemCompra.createMany({
+        data: items.map((it) => ({
+          compraId: compra.id,
+          // Lógica condicional para guardar el ID en la columna correcta
+          varianteId: it.tipo === "PRODUCTO" ? it.id : null,
+          tipoEmpaqueId: it.tipo === "EMPAQUE" ? it.id : null,
+          cantidad: Number(it.cantidad),
+          costoUnitario: new Prisma.Decimal(String(it.costoUnitario)),
+        })),
+      });
 
-    // Si es RECIBIDO, actualiza stock + crea movimientos
-    if (estado === "RECIBIDO") {
-      for (const it of items) {
-        const cant = Number(it.cantidad);
-        const cu = new Prisma.Decimal(String(it.costoUnitario));
+      // 3. Actualizar Stock + Movimientos (Solo si es RECIBIDO)
+      if (estado === "RECIBIDO") {
+        for (const it of items) {
+          const cant = Number(it.cantidad);
+          const cu = new Prisma.Decimal(String(it.costoUnitario));
 
-        await tx.variante.update({
-          where: { id: it.varianteId },
-          data: { stockActual: { increment: cant } },
-        });
+          if (it.tipo === "PRODUCTO") {
+            // A. Stock de Ropa (Variante)
+            await tx.variante.update({
+              where: { id: it.id },
+              data: { stockActual: { increment: cant } },
+            });
 
-        await tx.movimientoInventario.create({
-          data: {
-            varianteId: it.varianteId,
-            tipo: "COMPRA",
-            cambioCantidad: cant,
-            costoUnitario: cu,
-            nota: notas ? `Compra: ${notas}` : null,
-            compraId: compra.id,
-          },
-        });
+            // Registro en Kardex (MovimientoInventario está ligado a variantes)
+            await tx.movimientoInventario.create({
+              data: {
+                varianteId: it.id,
+                tipo: "COMPRA",
+                cambioCantidad: cant,
+                costoUnitario: cu,
+                nota: notas ? `Compra: ${notas}` : null,
+                compraId: compra.id,
+              },
+            });
+
+          } else if (it.tipo === "EMPAQUE") {
+            // B. Stock de Empaques
+            await tx.tipoEmpaque.update({
+              where: { id: it.id },
+              data: { stock: { increment: cant } },
+            });
+            // Nota: Los empaques no tienen tabla 'MovimientoInventario' en el schema actual,
+            // solo actualizamos el stock directo.
+          }
+        }
       }
-    }
 
-    return compra;
-  });
+      return compra;
+    });
 
-  return NextResponse.json({ ok: true, compraId: result.id }, { status: 201 });
+    return NextResponse.json({ ok: true, compraId: result.id }, { status: 201 });
+
+  } catch (error) {
+    console.error("Error creando compra:", error);
+    return NextResponse.json({ error: "Error interno al procesar la compra" }, { status: 500 });
+  }
 }

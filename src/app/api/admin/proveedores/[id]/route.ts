@@ -25,6 +25,8 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
       telefono: body.telefono ? String(body.telefono).trim() : null,
       correo: body.correo ? String(body.correo).trim() : null,
       direccion: body.direccion ? String(body.direccion).trim() : null,
+      ciudad: body.ciudad ? String(body.ciudad).trim() : null,
+      provincia: body.provincia ? String(body.provincia).trim() : null,
     },
   });
 
@@ -43,7 +45,6 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     await prisma.proveedor.delete({ where: { id } });
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (e: any) {
-    // si tiene compras relacionadas, Postgres rompe por FK
     return NextResponse.json({ error: "No se puede eliminar: tiene compras relacionadas." }, { status: 409 });
   }
 }

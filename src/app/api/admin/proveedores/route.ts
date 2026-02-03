@@ -22,6 +22,8 @@ export async function POST(req: Request) {
       telefono: body.telefono ? String(body.telefono).trim() : null,
       correo: body.correo ? String(body.correo).trim() : null,
       direccion: body.direccion ? String(body.direccion).trim() : null,
+      ciudad: body.ciudad ? String(body.ciudad).trim() : null,
+      provincia: body.provincia ? String(body.provincia).trim() : null,
     },
   });
 

@@ -11,22 +11,24 @@ export default async function Page() {
   if (!sesion) redirect("/admin/login");
   if (sesion.rol !== "ADMIN") redirect("/admin/login");
 
-  // Nota: Asegúrate de que tu modelo 'TipoEmpaque' tenga un campo 'imagenUrl' si quieres persistir la imagen.
-  // Si no lo tiene, tendrás que agregarlo a tu schema.prisma:
-  // model TipoEmpaque { ... imagenUrl String? ... }
-  // Por ahora, asumiremos que existe o lo manejarás. Si no existe, el cliente lo ignorará o fallará al guardar.
-  
   const empaques = await prisma.tipoEmpaque.findMany({
     orderBy: [{ activo: "desc" }, { nombre: "asc" }],
-    // select: { id: true, nombre: true, costoUnitario: true, activo: true, imagenUrl: true }, // Descomentar si agregaste imagenUrl
-    select: { id: true, nombre: true, costoUnitario: true, activo: true }, 
+    // CORRECCIÓN 1: Agregamos imagenUrl al select
+    select: { 
+      id: true, 
+      nombre: true, 
+      costoUnitario: true, 
+      activo: true, 
+      imagenUrl: true,
+      stock: true
+    }, 
   });
 
   const rows = empaques.map((e) => ({
     ...e,
     costoUnitario: e.costoUnitario.toString(),
-    // imagenUrl: e.imagenUrl, 
-    imagenUrl: null as string | null, // Placeholder hasta que actualices schema
+    // CORRECCIÓN 2: Asignamos el valor real, no null
+    imagenUrl: e.imagenUrl 
   }));
 
   return (

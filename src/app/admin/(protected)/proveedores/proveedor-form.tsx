@@ -10,6 +10,9 @@ type Proveedor = {
   telefono: string | null;
   correo: string | null;
   direccion: string | null;
+  // --- NUEVOS CAMPOS ---
+  ciudad: string | null;
+  provincia: string | null;
 };
 
 export default function ProveedorForm({ initialData }: { initialData: Proveedor | null }) {
@@ -20,6 +23,10 @@ export default function ProveedorForm({ initialData }: { initialData: Proveedor 
   const [telefono, setTelefono] = useState(initialData?.telefono ?? "");
   const [correo, setCorreo] = useState(initialData?.correo ?? "");
   const [direccion, setDireccion] = useState(initialData?.direccion ?? "");
+  
+  // Estados para los nuevos campos
+  const [ciudad, setCiudad] = useState(initialData?.ciudad ?? "");
+  const [provincia, setProvincia] = useState(initialData?.provincia ?? "");
 
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -42,6 +49,9 @@ export default function ProveedorForm({ initialData }: { initialData: Proveedor 
       telefono: telefono.trim() || null,
       correo: correo.trim() || null,
       direccion: direccion.trim() || null,
+      // Incluimos los nuevos campos en el payload
+      ciudad: ciudad.trim() || null,
+      provincia: provincia.trim() || null,
     };
 
     const url = initialData ? `/api/admin/proveedores/${initialData.id}` : `/api/admin/proveedores`;
@@ -172,9 +182,30 @@ export default function ProveedorForm({ initialData }: { initialData: Proveedor 
                     <label className="text-sm font-medium text-gray-700">Dirección</label>
                     <input 
                         className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                        placeholder="Av. Principal 123, Lima"
+                        placeholder="Av. Principal 123"
                         value={direccion} 
                         onChange={(e) => setDireccion(e.target.value)} 
+                    />
+                </div>
+
+                {/* --- NUEVOS CAMPOS --- */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Ciudad</label>
+                    <input 
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+                        placeholder="Ej: Lima"
+                        value={ciudad} 
+                        onChange={(e) => setCiudad(e.target.value)} 
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Provincia / Región</label>
+                    <input 
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+                        placeholder="Ej: Lima"
+                        value={provincia} 
+                        onChange={(e) => setProvincia(e.target.value)} 
                     />
                 </div>
             </div>

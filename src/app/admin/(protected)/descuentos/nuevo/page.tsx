@@ -7,7 +7,6 @@ export default async function Page() {
   const admin = await sesionAdmin();
   if (!admin) redirect("/admin/login");
 
-  // Cargamos datos necesarios para los selectores, INCLUYENDO IMÁGENES
   const [categorias, productos] = await Promise.all([
     prisma.categoria.findMany({ orderBy: { nombre: "asc" } }),
     prisma.producto.findMany({ 
@@ -15,6 +14,11 @@ export default async function Page() {
           id: true, 
           nombre: true, 
           categoriaId: true,
+          precio: true, // <--- AGREGADO
+          estado: true, // <--- AGREGADO
+          variantes: {  // <--- AGREGADO (Para calcular stock total)
+            select: { stockActual: true }
+          },
           imagenes: { 
             take: 1,
             select: { url: true },
@@ -25,12 +29,15 @@ export default async function Page() {
     }),
   ]);
 
-  // Transformar productos para facilitar el uso en el cliente
-  const productosConImagen = productos.map(p => ({
+  // Transformar productos y calcular stock total
+  const productosProcesados = productos.map(p => ({
     id: p.id,
     nombre: p.nombre,
     categoriaId: p.categoriaId,
-    imagen: p.imagenes[0]?.url || null
+    precio: Number(p.precio),
+    stockTotal: p.variantes.reduce((acc, v) => acc + v.stockActual, 0),
+    imagen: p.imagenes[0]?.url || null,
+    estado: p.estado
   }));
 
   return (
@@ -40,7 +47,7 @@ export default async function Page() {
         <p className="text-sm text-gray-500 mt-2">Configura un descuento masivo para tus productos.</p>
       </div>
 
-      <FormularioCampana categorias={categorias} productos={productosConImagen} />
+      <FormularioCampana categorias={categorias} productos={productosProcesados} />
     </div>
   );
 }

@@ -32,25 +32,30 @@ export default async function Page({
   const { id } = await params;
   if (!id) return notFound();
 
+  // 1. Consulta Mejorada: Incluye imágenes y empaques
   const compra = await prisma.compra.findUnique({
     where: { id },
     include: {
       proveedor: true,
       items: {
         include: {
+          // Opción A: Es Producto (Variante)
           variante: {
             include: {
-              producto: true,
+              producto: {
+                include: {
+                  imagenes: true,
+                  imagenesColor: true,
+                }
+              },
               talla: true,
               color: true,
             },
           },
+          // Opción B: Es Empaque
+          tipoEmpaque: true,
         },
-        orderBy: [
-          { variante: { producto: { nombre: "asc" } } },
-          { variante: { talla: { orden: "asc" } } },
-          { variante: { color: { nombre: "asc" } } },
-        ],
+        orderBy: { id: 'asc' }, // Orden simple por ingreso
       },
     },
   });
@@ -69,9 +74,10 @@ export default async function Page({
   const total = subtotal + envio + otros;
 
   // -----------------------------
-  // KARDEX: compra + (ajustes y devoluciones posteriores)
+  // KARDEX: Solo aplica para Variantes (Ropa)
   // -----------------------------
-  const varianteIds = Array.from(new Set(compra.items.map((it) => it.varianteId)));
+  // Filtramos solo los IDs de variantes válidos (excluyendo nulls de empaques)
+  const varianteIds = Array.from(new Set(compra.items.map((it) => it.varianteId).filter((id): id is string => id !== null)));
 
   const movimientos = await prisma.movimientoInventario.findMany({
     where: {
@@ -174,7 +180,7 @@ export default async function Page({
          </div>
       </div>
 
-      {/* ITEMS */}
+      {/* ITEMS (HÍBRIDO: PRODUCTOS Y EMPAQUES) */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-200">
           <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Detalle de Ítems</h2>
@@ -184,9 +190,10 @@ export default async function Page({
             <table className="w-full text-sm text-left">
             <thead className="bg-white text-gray-400 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
                 <tr>
-                <th className="px-6 py-3">Producto</th>
-                <th className="px-6 py-3">Talla</th>
-                <th className="px-6 py-3">Color</th>
+                <th className="px-6 py-3 w-16">Img</th>
+                <th className="px-6 py-3">Ítem</th>
+                <th className="px-6 py-3">Detalle</th>
+                <th className="px-6 py-3 text-center">Color</th>
                 <th className="px-6 py-3 text-right">Cant.</th>
                 <th className="px-6 py-3 text-right">Costo U.</th>
                 <th className="px-6 py-3 text-right">Importe</th>
@@ -197,16 +204,75 @@ export default async function Page({
                 const cu = Number(it.costoUnitario.toString());
                 const imp = cu * it.cantidad;
 
+                // --- LÓGICA DE VISUALIZACIÓN HÍBRIDA ---
+                let nombre = "";
+                let detalle = "";
+                let imagenUrl: string | null = null;
+                let hexColor: string | null = null;
+                let esProducto = false;
+
+                if (it.variante) {
+                    // CASO: PRODUCTO (ROPA)
+                    esProducto = true;
+                    nombre = it.variante.producto.nombre;
+                    detalle = it.variante.talla.nombre; // Talla
+                    hexColor = it.variante.color.hex;
+                    
+                    // Buscar imagen específica del color
+                    const imgColor = it.variante.producto.imagenesColor.find(
+                        ic => ic.colorId === it.variante!.colorId
+                    );
+                    // Si no hay foto color, usar la primera general (portada)
+                    imagenUrl = imgColor ? imgColor.url : it.variante.producto.imagenes[0]?.url || null;
+
+                } else if (it.tipoEmpaque) {
+                    // CASO: EMPAQUE
+                    nombre = it.tipoEmpaque.nombre;
+                    detalle = "Insumo / Empaque";
+                    imagenUrl = it.tipoEmpaque.imagenUrl;
+                }
+
                 return (
                     <tr key={it.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-900">{it.variante.producto.nombre}</td>
-                    <td className="px-6 py-4 text-gray-500">{it.variante.talla.nombre}</td>
+                    
+                    {/* IMAGEN */}
                     <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full border border-gray-300" style={{ backgroundColor: it.variante.color.hex ?? '#fff' }}></span>
-                            <span className="text-gray-500">{it.variante.color.nombre}</span>
+                        <div className="w-10 h-10 rounded border border-gray-200 overflow-hidden bg-white flex items-center justify-center">
+                            {imagenUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={imagenUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-xs text-gray-300">N/A</span>
+                            )}
                         </div>
                     </td>
+
+                    {/* NOMBRE */}
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                        {nombre}
+                        {!esProducto && <span className="ml-2 text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200">EMPAQUE</span>}
+                    </td>
+
+                    {/* TALLA / DETALLE */}
+                    <td className="px-6 py-4 text-gray-500 text-xs uppercase font-medium">
+                        {detalle}
+                    </td>
+
+                    {/* COLOR (Solo si es producto y tiene hex) */}
+                    <td className="px-6 py-4 text-center">
+                        {hexColor ? (
+                            <div className="flex justify-center">
+                                <span 
+                                    className="w-4 h-4 rounded-full border border-gray-300 shadow-sm" 
+                                    style={{ backgroundColor: hexColor }} 
+                                    title={it.variante?.color.nombre}
+                                ></span>
+                            </div>
+                        ) : (
+                            <span className="text-gray-300 text-xs">-</span>
+                        )}
+                    </td>
+
                     <td className="px-6 py-4 text-right font-mono text-gray-700">{it.cantidad}</td>
                     <td className="px-6 py-4 text-right text-gray-500">{soles(cu)}</td>
                     <td className="px-6 py-4 text-right font-bold text-gray-900">{soles(imp)}</td>
@@ -218,12 +284,12 @@ export default async function Page({
         </div>
       </div>
 
-      {/* KARDEX RELACIONADO */}
+      {/* KARDEX RELACIONADO (Solo muestra movimientos de PRODUCTOS) */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Trazabilidad (Kardex)</h2>
+          <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Trazabilidad (Kardex Productos)</h2>
           <span className="text-xs text-gray-400 font-medium bg-white px-2 py-1 rounded border border-gray-200">
-             Historial relacionado
+             Historial posterior
           </span>
         </div>
 
@@ -268,7 +334,7 @@ export default async function Page({
                 {movimientos.length === 0 && (
                 <tr>
                     <td className="p-8 text-center text-gray-400 italic" colSpan={5}>
-                    No hay movimientos posteriores relacionados.
+                    No hay movimientos posteriores relacionados para los productos de esta compra.
                     </td>
                 </tr>
                 )}

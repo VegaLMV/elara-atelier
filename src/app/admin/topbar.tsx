@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function AdminTopbar() {
   const router = useRouter();
-  const pathname = usePathname();
   const [cargando, setCargando] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   async function logout() {
     setCargando(true);
@@ -16,72 +16,153 @@ export default function AdminTopbar() {
     router.replace("/admin/login");
   }
 
-  // Helper para detectar link activo
-  const isActive = (path: string) => pathname.startsWith(path);
-
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         
-        {/* LOGO / HOME */}
+        {/* LOGO */}
         <div className="flex items-center gap-8">
-            <Link href="/admin" className="text-xl font-bold tracking-tight text-slate-900 hover:text-slate-700 transition-colors">
-              Elara Atelier <span className="text-slate-400 font-medium text-sm ml-1">Admin</span>
+            <Link href="/admin" className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+              <span className="bg-slate-900 text-white w-8 h-8 rounded-lg flex items-center justify-center text-sm">EA</span>
+              <span className="hidden sm:inline">Élara Atelier</span>
             </Link>
 
             {/* MENÚ DESKTOP */}
-            <div className="hidden md:flex items-center gap-1">
-                <NavLink href="/admin/productos" active={isActive("/admin/productos")}>Productos</NavLink>
-                <NavLink href="/admin/compras" active={isActive("/admin/compras")}>Compras</NavLink>
-                <NavLink href="/admin/kardex" active={isActive("/admin/kardex")}>Kardex</NavLink>
+            <div className="hidden md:flex items-center gap-6">
                 
-                {/* Menú "Más" o dropdown simple para secundarios */}
-                <div className="h-6 w-px bg-gray-200 mx-2"></div>
-                
-                <NavLink href="/admin/proveedores" active={isActive("/admin/proveedores")}>Proveedores</NavLink>
-                <NavLink href="/admin/descuentos" active={isActive("/admin/descuentos")}>Descuentos</NavLink>
+                {/* GRUPO 1: CATÁLOGO */}
+                <DropdownMenu title="Catálogo">
+                    <DropdownItem href="/admin/productos">📦 Productos</DropdownItem>
+                    <DropdownItem href="/admin/categorias">🏷️ Categorías</DropdownItem>
+                    <div className="h-px bg-gray-100 my-1"></div>
+                    <DropdownItem href="/admin/descuentos">⚡ Campañas</DropdownItem>
+                </DropdownMenu>
+
+                {/* GRUPO 2: LOGÍSTICA */}
+                <DropdownMenu title="Logística">
+                    <DropdownItem href="/admin/compras">🛒 Mis Compras</DropdownItem>
+                    <DropdownItem href="/admin/proveedores">🚚 Proveedores</DropdownItem>
+                    <div className="h-px bg-gray-100 my-1"></div>
+                    <DropdownItem href="/admin/kardex">📋 Kardex / Inventario</DropdownItem>
+                </DropdownMenu>
+
+                {/* GRUPO 3: CONFIGURACIÓN */}
+                <DropdownMenu title="Ajustes">
+                    <DropdownItem href="/admin/tallas">📏 Tallas</DropdownItem>
+                    <DropdownItem href="/admin/colores">🎨 Colores</DropdownItem>
+                    <DropdownItem href="/admin/empaques">🛍️ Empaques</DropdownItem>
+                </DropdownMenu>
             </div>
         </div>
 
-        {/* PERFIL / LOGOUT */}
+        {/* PERFIL / LOGOUT / HAMBURGUESA */}
         <div className="flex items-center gap-4">
-           {/* Puedes poner aquí el nombre del usuario si lo tienes en contexto/prop */}
-           {/* <span className="text-sm text-gray-500 hidden sm:block">admin@elara.com</span> */}
-           
            <button 
              onClick={logout} 
              disabled={cargando}
-             className="text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+             className="hidden md:block text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors border border-transparent hover:border-red-100"
            >
-             {cargando ? "Saliendo..." : "Cerrar sesión"}
+             {cargando ? "..." : "Cerrar sesión"}
+           </button>
+
+           {/* Botón Móvil */}
+           <button 
+             className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+           >
+             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
            </button>
         </div>
       </div>
       
-      {/* MENÚ MÓVIL (Simple scroll horizontal si hay muchos items) */}
-      <div className="md:hidden overflow-x-auto pb-2 px-6 flex gap-4 text-sm font-medium text-gray-600 border-t pt-2 no-scrollbar">
-          <Link href="/admin/productos" className={isActive("/admin/productos") ? "text-black" : ""}>Productos</Link>
-          <Link href="/admin/compras" className={isActive("/admin/compras") ? "text-black" : ""}>Compras</Link>
-          <Link href="/admin/kardex" className={isActive("/admin/kardex") ? "text-black" : ""}>Kardex</Link>
-          <Link href="/admin/proveedores" className={isActive("/admin/proveedores") ? "text-black" : ""}>Proveedores</Link>
-          <Link href="/admin/descuentos" className={isActive("/admin/descuentos") ? "text-black" : ""}>Campañas</Link>
-      </div>
+      {/* MENÚ MÓVIL (Simple List) */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-gray-100 bg-white p-4 space-y-4 shadow-xl absolute w-full left-0 z-50">
+            <MobileGroup title="Catálogo">
+                <Link href="/admin/productos" className="block py-2 pl-4 text-sm text-gray-600">Productos</Link>
+                <Link href="/admin/categorias" className="block py-2 pl-4 text-sm text-gray-600">Categorías</Link>
+                <Link href="/admin/descuentos" className="block py-2 pl-4 text-sm text-gray-600">Campañas</Link>
+            </MobileGroup>
+            
+            <MobileGroup title="Logística">
+                <Link href="/admin/compras" className="block py-2 pl-4 text-sm text-gray-600">Compras</Link>
+                <Link href="/admin/proveedores" className="block py-2 pl-4 text-sm text-gray-600">Proveedores</Link>
+                <Link href="/admin/kardex" className="block py-2 pl-4 text-sm text-gray-600">Kardex</Link>
+            </MobileGroup>
+
+            <MobileGroup title="Ajustes">
+                <Link href="/admin/tallas" className="block py-2 pl-4 text-sm text-gray-600">Tallas</Link>
+                <Link href="/admin/colores" className="block py-2 pl-4 text-sm text-gray-600">Colores</Link>
+            </MobileGroup>
+
+            <button onClick={logout} className="w-full text-left py-3 text-sm font-bold text-red-600 border-t border-gray-100 mt-2">
+                Cerrar Sesión
+            </button>
+        </div>
+      )}
     </nav>
   );
 }
 
-// Componente auxiliar para links del menú
-function NavLink({ href, children, active }: { href: string; children: React.ReactNode; active?: boolean }) {
+// --- SUBCOMPONENTES ---
+
+function DropdownMenu({ title, children }: { title: string, children: React.ReactNode }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const pathname = usePathname();
+
+    // Detectar si algún hijo está activo para marcar el padre
+    // (Lógica simple: podrías refinarla pasando props)
+    
+    // Cerrar al hacer click fuera
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        setIsOpen(false);
+    }, [pathname]);
+
     return (
-        <Link 
-            href={href} 
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                active 
-                ? "bg-slate-900 text-white shadow-sm" 
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-            }`}
-        >
+        <div className="relative" ref={containerRef}>
+            <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className={`flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition-all ${isOpen ? 'bg-slate-50 text-slate-900' : 'text-gray-600 hover:text-slate-900 hover:bg-white'}`}
+            >
+                {title}
+                <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+
+            {isOpen && (
+                <div className="absolute top-full left-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    {children}
+                </div>
+            )}
+        </div>
+    )
+}
+
+function DropdownItem({ href, children }: { href: string, children: React.ReactNode }) {
+    return (
+        <Link href={href} className="block px-3 py-2 text-sm text-gray-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors">
             {children}
         </Link>
+    )
+}
+
+function MobileGroup({ title, children }: { title: string, children: React.ReactNode }) {
+    return (
+        <div>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{title}</h3>
+            <div className="space-y-1 border-l-2 border-gray-100 ml-1">
+                {children}
+            </div>
+        </div>
     )
 }
