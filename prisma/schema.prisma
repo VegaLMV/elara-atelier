@@ -49,6 +49,12 @@ enum MetodoPago {
   TRANSFERENCIA
 }
 
+enum EstadoVenta {
+  PENDIENTE
+  COMPLETADO
+  ANULADO
+}
+
 model Usuario {
   id       String   @id @default(cuid())
   correo   String   @unique
@@ -206,8 +212,9 @@ model MovimientoInventario {
   nota           String?
 
   compraId String?
+  compra   Compra? @relation(fields: [compraId], references: [id])
   ventaId  String?
-
+  venta    Venta?   @relation(fields: [ventaId], references: [id])
   creadoEn DateTime @default(now())
 }
 
@@ -239,6 +246,7 @@ model Compra {
   notas       String?
 
   items    ItemCompra[]
+  movimientos MovimientoInventario[]
   creadoEn DateTime     @default(now())
 }
 
@@ -259,15 +267,29 @@ model ItemCompra {
 
 model Venta {
   id            String   @id @default(cuid())
+  codigo        String      @unique @default(cuid())
+
+  clienteId     String?    
+  cliente       Cliente?    @relation(fields: [clienteId], references: [id])
+  clienteNombre String?    
+
   canal         String   @default("WhatsApp")
-  clienteNombre String?
+  metodoPago MetodoPago @default(YAPE)
+  estado        EstadoVenta @default(COMPLETADO)
+
+  subtotal      Decimal     @db.Decimal(10, 2) @default(0) 
+  descuentoTotal Decimal    @db.Decimal(10, 2) @default(0)
+  total         Decimal     @db.Decimal(10, 2) @default(0)
+
   notas         String?
   fechaVenta    DateTime @default(now())
-  metodoPago MetodoPago @default(YAPE)
 
   items    ItemVenta[]
   empaques UsoEmpaque[]
+
+  movimientos   MovimientoInventario[]
   creadoEn DateTime     @default(now())
+  actualizadoEn DateTime    @updatedAt
 }
 
 model ItemVenta {
@@ -279,6 +301,14 @@ model ItemVenta {
   variante   Variante @relation(fields: [varianteId], references: [id])
 
   cantidad Int
+  
+  precioUnitario Decimal @db.Decimal(10, 2)
+  precioFinal    Decimal @db.Decimal(10, 2)
+  subtotal       Decimal @db.Decimal(10, 2)
+
+  tieneDescuento Boolean @default(false)
+  descuentoMonto Decimal @db.Decimal(10, 2) @default(0)
+  descuentoRazon String? 
 }
 
 model TipoEmpaque {
@@ -294,14 +324,29 @@ model TipoEmpaque {
 }
 
 model UsoEmpaque {
-  id      String @id @default(cuid())
-  ventaId String
-  venta   Venta  @relation(fields: [ventaId], references: [id], onDelete: Cascade)
-
+  id            String      @id @default(cuid())
+  ventaId       String
+  venta         Venta       @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   tipoEmpaqueId String
   tipoEmpaque   TipoEmpaque @relation(fields: [tipoEmpaqueId], references: [id])
+  cantidad      Int
+  costoTotal    Decimal     @db.Decimal(10, 2)
+  creadoEn      DateTime    @default(now())
+}
 
-  cantidad   Int
-  costoTotal Decimal  @db.Decimal(10, 2)
-  creadoEn   DateTime @default(now())
+model Cliente {
+  id        String   @id @default(cuid())
+  nombre    String  
+  dni       String?  @unique
+  telefono  String?
+  email     String?
+  departamento  String?  
+  provincia     String?  
+  distrito      String?  
+  direccion     String?  
+  referencia    String?  
+  
+  ventas    Venta[] 
+  creadoEn  DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
 }

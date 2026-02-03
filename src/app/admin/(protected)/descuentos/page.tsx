@@ -13,8 +13,6 @@ export const metadata = {
 };
 
 // --- NUEVO: Función de Sincronización Automática ---
-// Esta función se ejecutará cada vez que cargues la página de administración
-// para asegurar que la BD refleje el estado real de las fechas.
 async function sincronizarEstados() {
   const now = new Date();
   
@@ -35,7 +33,7 @@ async function sincronizarEstados() {
         data: { estado: "ACTIVO" } 
       });
 
-      // B. Reflejar datos en el PRODUCTO (Esto hace que aparezca la etiqueta en la tienda)
+      // B. Reflejar datos en el PRODUCTO
       await prisma.producto.update({
         where: { id: d.productoId },
         data: {
@@ -64,13 +62,12 @@ async function sincronizarEstados() {
         data: { estado: "FINALIZADO" } 
       });
       
-      // B. Limpiar el producto (solo si no tiene ya otra campaña más nueva superpuesta)
+      // B. Limpiar el producto
       const prod = await prisma.producto.findUnique({ 
           where: { id: d.productoId },
           select: { descuentoActualId: true }
       });
       
-      // Si el producto sigue apuntando a esta campaña vieja, lo limpiamos
       if (prod?.descuentoActualId === d.id) {
           await prisma.producto.update({
             where: { id: d.productoId },
@@ -87,7 +84,6 @@ async function sincronizarEstados() {
     }
   } catch (error) {
     console.error("Error en sincronización automática:", error);
-    // No lanzamos error para no bloquear la carga de la página, solo logueamos
   }
 }
 
@@ -112,7 +108,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   if (!admin) redirect("/admin/login");
 
   // 🔥 EJECUTAR SINCRONIZACIÓN ANTES DE CARGAR DATOS 🔥
-  // Esto arregla el problema: actualiza la BD justo antes de que veas la lista.
   await sincronizarEstados();
 
   const sp = await searchParams;
@@ -165,13 +160,19 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     const campaña = campañasMap.get(identificadorUnico);
     campaña.idsDescuentos.push(d.id);
 
+    // --- CORRECCIÓN DE DUPLICIDAD VISUAL ---
     if (d.estado !== 'CANCELADO') {
-        campaña.productos.push({
-          id: d.id,
-          productoId: d.producto.id,
-          nombre: d.producto.nombre,
-          imagen: d.producto.imagenes[0]?.url || null
-        });
+        // Verificar si este producto YA fue agregado a la lista visual de esta campaña
+        const yaExisteEnVista = campaña.productos.some((p: any) => p.productoId === d.producto.id);
+
+        if (!yaExisteEnVista) {
+            campaña.productos.push({
+              id: d.id,
+              productoId: d.producto.id,
+              nombre: d.producto.nombre,
+              imagen: d.producto.imagenes[0]?.url || null
+            });
+        }
     }
   }
 

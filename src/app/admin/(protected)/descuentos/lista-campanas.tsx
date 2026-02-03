@@ -248,7 +248,7 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
               <div className="p-4 bg-gray-50 border-t border-gray-100 text-right">
                 <button 
                    // CAMBIO AQUI: Ruta explícita 'editar'
-                   onClick={() => router.push(`/admin/descuentos/editar/${campanaSeleccionada.idRef}`)}
+                   onClick={() => router.push(`/admin/descuentos/${campanaSeleccionada.idRef}`)}
                    disabled={campanaSeleccionada.estadoCalculado === 'FINALIZADO'}
                    className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
                 >

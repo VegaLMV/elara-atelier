@@ -3,9 +3,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Search, CheckCircle2, Circle, X } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 
-// Definición de tipos más completa
+// --- Tipos ---
 type ProductoInput = {
   id: string;
   nombre: string;
@@ -32,13 +32,24 @@ export default function FormularioCampana({ initialData, categorias = [], produc
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
+  // --- OBTENER FECHA DE HOY (LOCAL) ---
+  // Esto evita problemas de zona horaria (UTC vs Local)
+  const getTodayStr = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayStr = getTodayStr();
+
   // --- ESTADOS DEL FORMULARIO ---
   const [nombreCampana, setNombreCampana] = useState(initialData?.nombreCampana || "");
   const [descripcion, setDescripcion] = useState(initialData?.descripcion || "");
   const [tipo, setTipo] = useState<"PORCENTAJE" | "MONTO">(initialData?.tipo || "PORCENTAJE");
   const [valor, setValor] = useState(initialData?.valor ? String(initialData.valor) : "");
   
-  // Fechas: Convertir formato ISO si viene de edición
   const defaultStart = initialData?.startsAt ? new Date(initialData.startsAt).toISOString().split('T')[0] : "";
   const defaultEnd = initialData?.endsAt ? new Date(initialData.endsAt).toISOString().split('T')[0] : "";
   
@@ -74,18 +85,15 @@ export default function FormularioCampana({ initialData, categorias = [], produc
 
     let lista = productos;
 
-    // Filtro 1: Si estamos en modo Categoría, solo mostramos esa categoría visualmente
     if (modoAlcance === "CATEGORIA" && categoriaSeleccionada) {
        lista = lista.filter(p => p.categoriaId === categoriaSeleccionada || p.categoria?.id === categoriaSeleccionada);
     }
 
-    // Filtro 2: Búsqueda por texto
     if (busquedaProd) {
        const q = busquedaProd.toLowerCase();
        lista = lista.filter(p => p.nombre.toLowerCase().includes(q));
     }
 
-    // Filtro 3: Ocultar sin stock
     if (ocultarSinStock) {
        lista = lista.filter(p => p.stockTotal > 0);
     }
@@ -94,7 +102,7 @@ export default function FormularioCampana({ initialData, categorias = [], produc
   }, [productos, categoriaSeleccionada, modoAlcance, busquedaProd, ocultarSinStock]);
 
 
-  // 3. Manejador de selección individual (Toggle)
+  // 3. Manejador de selección individual
   const toggleSeleccion = (id: string) => {
     setProductosSeleccionados(prev => {
       if (prev.includes(id)) {
@@ -108,15 +116,30 @@ export default function FormularioCampana({ initialData, categorias = [], produc
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     
+    // --- VALIDACIÓN DE CLIENTE (ALERTA INMEDIATA) ---
     if (!valor || !startsAt || !endsAt) {
         toast.error("Completa los campos obligatorios (Valor y Fechas).");
         return;
     }
+
+    // Validar que la fecha no sea pasada (Solo si estamos creando o editando la fecha de inicio)
+    // Comparamos cadenas YYYY-MM-DD directamente
+    if (startsAt < todayStr) {
+        toast.error("⚠️ Fecha inválida", {
+            description: "No puedes programar el inicio de una campaña para una fecha pasada (Ayer o antes)."
+        });
+        return;
+    }
+
+    if (endsAt < startsAt) {
+        toast.error("La fecha de fin no puede ser anterior a la de inicio.");
+        return;
+    }
     
+    // Lógica de alcance
     let aplicarA_Final = modoAlcance;
     let ids_Final = productosSeleccionados;
 
-    // Lógica especial: Si el usuario eligió CATEGORIA pero luego modificó la selección manualmente
     if (modoAlcance === "CATEGORIA" && productos) {
         const totalEnCategoria = productos.filter(p => p.categoriaId === categoriaSeleccionada || p.categoria?.id === categoriaSeleccionada).length;
         if (productosSeleccionados.length !== totalEnCategoria) {
@@ -137,6 +160,7 @@ export default function FormularioCampana({ initialData, categorias = [], produc
     if (aplicarA_Final === "TODOS" && productos) {
         ids_Final = productos.map(p => p.id);
     }
+    
 
     setLoading(true);
 
@@ -160,16 +184,21 @@ export default function FormularioCampana({ initialData, categorias = [], produc
         }),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
+if (!res.ok) {
+        // ... (tu lógica de leer el error del response)
+        const errorData = await res.json().catch(() => ({})); // O tu lógica actual
         throw new Error(errorData.error || "Error al procesar campaña");
       }
 
-      toast.success(initialData ? "Campaña actualizada" : "Campaña creada");
+      toast.success(initialData ? "Campaña actualizada correctamente" : "Campaña lanzada exitosamente");
       router.push("/admin/descuentos");
       router.refresh();
     } catch (error: any) {
-      toast.error(error.message || "Ocurrió un error inesperado.");
+      // Esta es la parte que muestra la alerta detallada del backend
+      toast.error("⚠️ No se pudo guardar", { 
+          description: error.message, // Aquí viene el mensaje: "CONFLICTO: El producto X ya tiene..."
+          duration: 6000, // Damos 6 segundos para que lean bien el conflicto
+      });
     } finally {
       setLoading(false);
     }
@@ -252,9 +281,15 @@ export default function FormularioCampana({ initialData, categorias = [], produc
 
               <div className="grid grid-cols-2 gap-3">
                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Inicio</label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">
+                        Inicio 
+                        <span className="text-xs font-normal text-gray-400 ml-1 lowercase">(mín. hoy)</span>
+                    </label>
                     <input 
-                       type="date" required
+                       type="date" 
+                       required
+                       // 🔥 BLOQUEO DE FECHAS ANTERIORES VISUAL 🔥
+                       min={todayStr} 
                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none"
                        value={startsAt}
                        onChange={e => setStartsAt(e.target.value)}
@@ -263,7 +298,10 @@ export default function FormularioCampana({ initialData, categorias = [], produc
                  <div>
                     <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Fin</label>
                     <input 
-                       type="date" required
+                       type="date" 
+                       required
+                       // 🔥 EL FIN NO PUEDE SER ANTES DEL INICIO 🔥
+                       min={startsAt || todayStr}
                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none"
                        value={endsAt}
                        onChange={e => setEndsAt(e.target.value)}
@@ -277,13 +315,11 @@ export default function FormularioCampana({ initialData, categorias = [], produc
         <div className="lg:col-span-2 space-y-6">
            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm min-h-[700px] flex flex-col">
               
-              {/* Header de la sección */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-4 mb-4 gap-4">
                  <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide flex items-center gap-2">
                     <span>🎯 Alcance</span>
                  </h2>
                  
-                 {/* Filtro Stock */}
                  <label className="flex items-center gap-2 text-xs cursor-pointer select-none bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
                     <input 
                        type="checkbox"
@@ -323,7 +359,6 @@ export default function FormularioCampana({ initialData, categorias = [], produc
               {/* Contenido Dinámico */}
               <div className="flex-1 flex flex-col">
                  
-                 {/* Barra de Herramientas */}
                  <div className="flex flex-col sm:flex-row gap-3 mb-4">
                     <div className="relative flex-1">
                         <input 
@@ -347,7 +382,6 @@ export default function FormularioCampana({ initialData, categorias = [], produc
                     )}
                  </div>
 
-                 {/* GRID DE PRODUCTOS */}
                  <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 flex-1 relative min-h-[400px]">
                     <div className="absolute inset-0 overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 custom-scrollbar content-start">
                        
@@ -372,7 +406,6 @@ export default function FormularioCampana({ initialData, categorias = [], produc
                                       !isActive ? 'opacity-70 hover:opacity-100' : ''
                                    }`}
                                 >
-                                   {/* Imagen y Botón Zoom */}
                                    <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
                                       {p.imagen ? (
                                          // eslint-disable-next-line @next/next/no-img-element
@@ -381,7 +414,6 @@ export default function FormularioCampana({ initialData, categorias = [], produc
                                          <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">SIN FOTO</div>
                                       )}
                                       
-                                      {/* Checkbox Visual */}
                                       {canInteract && (
                                          <div 
                                             onClick={() => toggleSeleccion(p.id)}
@@ -391,7 +423,6 @@ export default function FormularioCampana({ initialData, categorias = [], produc
                                          </div>
                                       )}
 
-                                      {/* Botón Ver (Modal) */}
                                       <button
                                          type="button"
                                          onClick={(e) => { e.stopPropagation(); setProductoEnModal(p); }}
@@ -402,7 +433,6 @@ export default function FormularioCampana({ initialData, categorias = [], produc
                                       </button>
                                    </div>
                                    
-                                   {/* Info del Producto */}
                                    <div 
                                       className={`p-3 flex-1 flex flex-col cursor-pointer ${canInteract ? '' : 'cursor-default'}`}
                                       onClick={() => canInteract && toggleSeleccion(p.id)}
@@ -427,7 +457,6 @@ export default function FormularioCampana({ initialData, categorias = [], produc
                     </div>
                  </div>
                  
-                 {/* Footer de estado de selección */}
                  <div className="mt-4 flex justify-between items-center text-xs text-gray-500 px-1">
                     <span>Mostrando {productosVisibles.length} productos</span>
                     <span className="font-medium bg-slate-100 px-3 py-1 rounded-full text-slate-700">
@@ -538,6 +567,7 @@ export default function FormularioCampana({ initialData, categorias = [], produc
                 </div>
             </div>
         </div>
+        
     )}
     </>
   );

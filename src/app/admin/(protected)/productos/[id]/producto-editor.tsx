@@ -102,9 +102,7 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
   const [categoriaId, setCategoriaId] = useState(initialData.producto.categoriaId);
 
   // ------ ESTADOS DE UI (Toast & Modales) ------
-  // ✅ Nuevo sistema de notificaciones
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-  // ✅ Estado para modal de color
   const [previewColor, setPreviewColor] = useState<{ nombre: string; hex: string | null } | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
@@ -333,6 +331,19 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
     showToast("Producto guardado correctamente");
   }
 
+  // ✅ Función para eliminar descuento (Ahora disponible para el formulario superior)
+  async function eliminarDescuento(id: string) {
+    if (!confirm("¿Deseas cancelar o eliminar este descuento?")) return;
+    try {
+      const res = await fetch(`/api/admin/descuentos/${id}`, { method: "DELETE" });
+      if (res.ok) {
+          router.refresh();
+          showToast("Descuento eliminado/cancelado");
+      }
+      else showToast("Error al eliminar", "error");
+    } catch { showToast("Error", "error"); }
+  }
+
   async function crearVariantes() {
     const r = await fetch(`/api/admin/productos/${initialData.producto.id}/variantes`, {
       method: "POST",
@@ -415,6 +426,11 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
 
   const combinaciones = tallasSel.length * coloresSel.length;
 
+  // ✅ Filtramos el historial para NO mostrar la campaña activa (ya que está arriba)
+  const historialFiltrado = initialData.descuentosHistorial.filter(d => 
+    !descuentoVigente || d.id !== descuentoVigente.id
+  );
+
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto relative">
       {/* ✅ TOAST NOTIFICATION */}
@@ -453,6 +469,7 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
             <h2 className="font-semibold text-lg border-b pb-2 text-gray-800">Detalles Generales</h2>
             
             <div className="space-y-4">
+              {/* ... Campos básicos ... */}
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Nombre</label>
                 <input className="w-full border rounded-md px-3 py-2 text-gray-900 focus:ring-black/5 outline-none" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
@@ -508,9 +525,17 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
                     )}
                  </div>
 
+                 {/* ✅ Mensaje + Botón de Cancelar para la campaña activa (que hemos ocultado de la lista) */}
                  {descuentoVigente && (
-                   <div className="text-xs text-blue-700 mb-2">
-                     ℹ️ Hay una campaña activa. Para crear una nueva, ve al módulo <b>Descuentos</b>.
+                   <div className="flex items-center justify-between text-xs text-blue-700 mb-2 bg-blue-100/50 p-2 rounded">
+                     <span>ℹ️ Hay una campaña activa gestionada desde el módulo <b>Descuentos</b>.</span>
+                     <button 
+                        type="button" 
+                        onClick={() => eliminarDescuento(descuentoVigente.id)}
+                        className="text-red-600 hover:text-red-800 font-bold underline px-2"
+                     >
+                        Cancelar Campaña
+                     </button>
                    </div>
                  )}
 
@@ -547,10 +572,13 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
             </div>
           </form>
 
-          {/* HISTORIAL DE DESCUENTOS (Solo lectura/eliminar) */}
-          <HistorialDescuentos historial={initialData.descuentosHistorial} onToast={showToast} />
+          {/* ✅ Pasamos el historial filtrado y la función de eliminar */}
+          <HistorialDescuentos 
+             historial={historialFiltrado} 
+             onEliminar={eliminarDescuento} 
+          />
 
-          {/* GESTIÓN DE VARIANTES */}
+          {/* GESTIÓN DE VARIANTES (Igual) */}
           <div className="bg-white border rounded-xl p-6 shadow-sm space-y-6">
             <div className="flex items-center justify-between">
                <h2 className="font-semibold text-lg text-gray-800">Variantes y Stock</h2>
@@ -762,28 +790,14 @@ function FilaVarianteAgrupada({ row, onAjustar, onCambiarActiva, onPreviewColor 
 }
 
 // ✅ SOLO MUESTRA HISTORIAL (Eliminada la opción de crear)
-function HistorialDescuentos({ historial, onToast }: { historial: DescuentoItem[], onToast: (msg: string, type?: "success" | "error") => void }) {
-  const router = useRouter();
-
-  async function eliminarDescuento(id: string) {
-    if (!confirm("¿Deseas cancelar o eliminar este descuento?")) return;
-    try {
-      const res = await fetch(`/api/admin/descuentos/${id}`, { method: "DELETE" });
-      if (res.ok) {
-          router.refresh();
-          onToast("Descuento eliminado/cancelado");
-      }
-      else onToast("Error al eliminar", "error");
-    } catch { onToast("Error", "error"); }
-  }
-
+function HistorialDescuentos({ historial, onEliminar }: { historial: DescuentoItem[], onEliminar: (id: string) => void }) {
   const listaOrdenada = [...historial].sort((a,b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
 
   if (listaOrdenada.length === 0) return null;
 
   return (
     <div className="bg-white border rounded-xl p-6 shadow-sm">
-      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b pb-4 mb-4">Historial de Campañas</h4>
+      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b pb-4 mb-4">Historial de Campañas Pasadas</h4>
       <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
         {listaOrdenada.map((desc) => {
           const now = new Date();
@@ -821,7 +835,7 @@ function HistorialDescuentos({ historial, onToast }: { historial: DescuentoItem[
                 </div>
               </div>
               {!isCancelled && (
-                 <button onClick={() => eliminarDescuento(desc.id)} className="text-gray-400 hover:text-red-600 p-2" title="Cancelar/Eliminar">🗑️</button>
+                 <button onClick={() => onEliminar(desc.id)} className="text-gray-400 hover:text-red-600 p-2" title="Cancelar/Eliminar">🗑️</button>
               )}
             </div>
           )

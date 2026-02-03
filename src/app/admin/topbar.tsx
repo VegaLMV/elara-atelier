@@ -30,6 +30,14 @@ export default function AdminTopbar() {
             {/* MENÚ DESKTOP */}
             <div className="hidden md:flex items-center gap-6">
                 
+                {/* --- NUEVO GRUPO: COMERCIAL (Ventas y Devoluciones) --- */}
+                <DropdownMenu title="Comercial">
+                    <DropdownItem href="/admin/ventas/nueva">➕ Nueva Venta (POS)</DropdownItem>
+                    <DropdownItem href="/admin/ventas">📋 Historial Ventas</DropdownItem>
+                    <div className="h-px bg-gray-100 my-1"></div>
+                    <DropdownItem href="/admin/devoluciones">↩️ Devoluciones</DropdownItem>
+                </DropdownMenu>
+
                 {/* GRUPO 1: CATÁLOGO */}
                 <DropdownMenu title="Catálogo">
                     <DropdownItem href="/admin/productos">📦 Productos</DropdownItem>
@@ -42,6 +50,7 @@ export default function AdminTopbar() {
                 <DropdownMenu title="Logística">
                     <DropdownItem href="/admin/compras">🛒 Mis Compras</DropdownItem>
                     <DropdownItem href="/admin/proveedores">🚚 Proveedores</DropdownItem>
+                    <DropdownItem href="/admin/clientes">👥 Clientes</DropdownItem>
                     <div className="h-px bg-gray-100 my-1"></div>
                     <DropdownItem href="/admin/kardex">📋 Kardex / Inventario</DropdownItem>
                 </DropdownMenu>
@@ -75,9 +84,16 @@ export default function AdminTopbar() {
         </div>
       </div>
       
-      {/* MENÚ MÓVIL (Simple List) */}
+      {/* MENÚ MÓVIL */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-100 bg-white p-4 space-y-4 shadow-xl absolute w-full left-0 z-50">
+        <div className="md:hidden border-t border-gray-100 bg-white p-4 space-y-4 shadow-xl absolute w-full left-0 z-50 max-h-[90vh] overflow-y-auto">
+            
+            <MobileGroup title="Comercial">
+                <Link href="/admin/ventas/nueva" className="block py-2 pl-4 text-sm font-medium text-blue-600">Nueva Venta (POS)</Link>
+                <Link href="/admin/ventas" className="block py-2 pl-4 text-sm text-gray-600">Historial Ventas</Link>
+                <Link href="/admin/devoluciones" className="block py-2 pl-4 text-sm text-gray-600">Devoluciones</Link>
+            </MobileGroup>
+
             <MobileGroup title="Catálogo">
                 <Link href="/admin/productos" className="block py-2 pl-4 text-sm text-gray-600">Productos</Link>
                 <Link href="/admin/categorias" className="block py-2 pl-4 text-sm text-gray-600">Categorías</Link>
@@ -93,6 +109,7 @@ export default function AdminTopbar() {
             <MobileGroup title="Ajustes">
                 <Link href="/admin/tallas" className="block py-2 pl-4 text-sm text-gray-600">Tallas</Link>
                 <Link href="/admin/colores" className="block py-2 pl-4 text-sm text-gray-600">Colores</Link>
+                <Link href="/admin/empaques" className="block py-2 pl-4 text-sm text-gray-600">Empaques</Link>
             </MobileGroup>
 
             <button onClick={logout} className="w-full text-left py-3 text-sm font-bold text-red-600 border-t border-gray-100 mt-2">
@@ -110,9 +127,6 @@ function DropdownMenu({ title, children }: { title: string, children: React.Reac
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const pathname = usePathname();
-
-    // Detectar si algún hijo está activo para marcar el padre
-    // (Lógica simple: podrías refinarla pasando props)
     
     // Cerrar al hacer click fuera
     useEffect(() => {

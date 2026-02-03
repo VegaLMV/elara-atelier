@@ -8,6 +8,8 @@ type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function NuevaCompraPage({ searchParams }: Props) {
   const admin = await sesionAdmin();
   if (!admin) redirect("/admin/login");
@@ -22,25 +24,21 @@ export default async function NuevaCompraPage({ searchParams }: Props) {
       where: { estado: "ACTIVO" },
       orderBy: { nombre: "asc" },
       include: {
-        // --- 📸 AGREGADO: Imágenes del producto ---
         imagenes: {
             select: { url: true, esPortada: true },
             orderBy: { esPortada: 'desc' },
-            take: 1 // Solo necesitamos la portada si no hay color específico
+            take: 1 
         },
-        // --- 🎨 AGREGADO: Imágenes por color ---
         imagenesColor: {
             select: { url: true, colorId: true }
         },
-        // ----------------------------------------
         variantes: {
           include: { 
               talla: true, 
-              color: true // Traemos el HEX del color
+              color: true 
           },
           orderBy: [{ talla: { orden: 'asc' } }]
         },
-        // proveedorSugerido eliminado
       },
     }),
 
@@ -48,20 +46,18 @@ export default async function NuevaCompraPage({ searchParams }: Props) {
     prisma.tipoEmpaque.findMany({
         where: { activo: true },
         orderBy: { nombre: "asc" },
-        // Traemos imagenUrl para que se vea en el detalle
         select: { id: true, nombre: true, stock: true, costoUnitario: true, imagenUrl: true } 
     })
   ]);
 
-  // 2. Transformar datos de Productos
+  // 2. Transformar datos de Productos (CORRECCIÓN CRÍTICA AQUÍ)
   const productosProcesados = productosDB.map(p => ({
     ...p,
-    precio: Number(p.precio),
+    precio: Number(p.precio), // Convertir Decimal a Number
+    descuentoValor: p.descuentoValor ? Number(p.descuentoValor) : 0,
     proveedorSugerido: null,
-    // Aseguramos que variantes tenga la estructura correcta (aunque Prisma ya lo hace)
     variantes: p.variantes.map(v => ({
         ...v,
-        // Hex necesario para el círculo de color
         color: { ...v.color, hex: v.color.hex } 
     }))
   }));
@@ -69,7 +65,7 @@ export default async function NuevaCompraPage({ searchParams }: Props) {
   // 3. Transformar datos de Empaques
   const empaquesProcesados = empaquesDB.map(e => ({
       ...e,
-      costoUnitario: Number(e.costoUnitario)
+      costoUnitario: Number(e.costoUnitario) // Convertir Decimal a Number
   }));
 
   // 4. Leer parámetros de URL

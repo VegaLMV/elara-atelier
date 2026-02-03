@@ -48,7 +48,7 @@ export default function ProductoDetalle({ producto }: Props) {
 
   // 3. Generación de Enlace de WhatsApp
   function contactarWhatsApp() {
-    const numero = "51900000000"; // Cambiar por tu número real
+    const numero = "51944434054"; 
     const variantInfo = varianteElegida 
       ? ` en talla ${varianteElegida.talla} y color ${varianteElegida.color}` 
       : "";
@@ -161,7 +161,7 @@ export default function ProductoDetalle({ producto }: Props) {
             <div className="mb-6 animate-in fade-in duration-300">
                <p className={`text-xs font-medium ${stockActual === 0 ? 'text-rose-500' : 'text-slate-400'}`}>
                  {stockActual === 0 
-                   ? '⚠️ Agotado para esta variante.' 
+                   ? 'Agotado para esta variante.' 
                    : `✓ Disponibilidad inmediata (${stockActual} unidades)`}
                </p>
             </div>
@@ -173,7 +173,7 @@ export default function ProductoDetalle({ producto }: Props) {
             disabled={stockActual === 0}
             className="w-full py-5 bg-slate-900 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-slate-800 transition-all shadow-xl hover:shadow-2xl active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
           >
-            {stockActual === 0 ? 'Sin Stock' : 'Solicitar por WhatsApp'}
+            {stockActual === 0 ? 'No Disponible' : 'Solicitar por WhatsApp'}
           </button>
 
           {/* Descripción de Producto */}

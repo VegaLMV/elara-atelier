@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link"; // <--- IMPORTANTE: Importamos Link
+import Link from "next/link";
+import { Search } from "lucide-react"; // Importamos icono para el buscador
 
 type Row = { 
   id: string; 
@@ -22,6 +23,9 @@ export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) 
   const [nuevoStock, setNuevoStock] = useState("0");
   const [file, setFile] = useState<File | null>(null); 
   
+  // Estado del Filtro
+  const [busqueda, setBusqueda] = useState(""); 
+
   const [busy, setBusy] = useState(false);
   
   // UI States
@@ -34,6 +38,14 @@ export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) 
     if (nuevoStock === "" || isNaN(Number(nuevoStock)) || Number(nuevoStock) < 0) return false;
     return true;
   }, [nombre, costo, nuevoStock]);
+
+  // Lógica de Filtrado
+  const rowsFiltradas = useMemo(() => {
+    if (!busqueda) return initialRows;
+    return initialRows.filter(r => 
+        r.nombre.toLowerCase().includes(busqueda.toLowerCase())
+    );
+  }, [initialRows, busqueda]);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
@@ -139,7 +151,8 @@ export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) 
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start relative">
+    // CAMBIO: Se agregó 'xl:grid-cols-4' para dar más espacio horizontal en pantallas grandes
+    <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-8 items-start relative">
       
       {/* Toast */}
       {toast && (
@@ -161,8 +174,9 @@ export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) 
       )}
 
       {/* FORMULARIO */}
-      <div className="lg:col-span-1">
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm sticky top-6">
+      {/* CAMBIO: Se mantiene en 1 columna */}
+      <div className="lg:col-span-1 xl:col-span-1">
+        <div className="bg-white border border-gray-200 rounded-2xl p-2 shadow-sm sticky top-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4 border-b pb-2 flex items-center gap-2">
             <span>📦</span> Nuevo Empaque
           </h2>
@@ -180,7 +194,7 @@ export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) 
 
             <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Stock Inicial</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Stock</label>
                   <input
                     type="number" min="0"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all font-bold"
@@ -219,11 +233,26 @@ export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) 
         </div>
       </div>
 
-      {/* LISTA */}
-      <div className="lg:col-span-2">
+      {/* LISTA E INVENTARIO */}
+      {/* CAMBIO: Se expande a 3 columnas en pantallas XL para dar más espacio horizontal */}
+      <div className="lg:col-span-2 xl:col-span-3">
          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-            <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-               <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Inventario</span>
+            
+            {/* Header con Buscador */}
+            <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+               <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Inventario ({rowsFiltradas.length})
+               </span>
+               <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                  <input 
+                    type="text"
+                    placeholder="Buscar empaque..."
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                  />
+               </div>
             </div>
             
             <div className="overflow-x-auto">
@@ -239,7 +268,7 @@ export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {initialRows.map((r) => (
+                  {rowsFiltradas.map((r) => (
                     <Fila
                       key={r.id}
                       row={r}
@@ -250,10 +279,10 @@ export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) 
                       onPreview={() => r.imagenUrl && setPreviewImage(r.imagenUrl)}
                     />
                   ))}
-                  {initialRows.length === 0 && (
+                  {rowsFiltradas.length === 0 && (
                     <tr>
                       <td className="p-12 text-center text-gray-400" colSpan={6}>
-                        No hay empaques registrados.
+                        {busqueda ? "No se encontraron coincidencias." : "No hay empaques registrados."}
                       </td>
                     </tr>
                   )}
