@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 import ProductoDetalle from "./producto-detalle";
 import Link from "next/link";
 
-// Cálculo del precio con descuento (idéntico al catálogo para consistencia)
 function calcularPrecioFinal(precio: number, tipo: string | null, valor: number | null) {
   if (!tipo || !valor) return precio;
   if (tipo === "PORCENTAJE") return precio * (1 - valor / 100);
@@ -16,12 +15,16 @@ function calcularPrecioFinal(precio: number, tipo: string | null, valor: number 
 export default async function ProductoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  // 1. Cargar producto con todas sus relaciones necesarias para el cliente
+  // 1. Consulta enriquecida: Incluimos imagenesColor
   const producto = await prisma.producto.findUnique({
     where: { slug },
     include: {
       categoria: true,
       imagenes: { orderBy: [{ esPortada: "desc" }, { orden: "asc" }] },
+      // MEJORA: Traemos las imágenes asociadas a colores
+      imagenesColor: {
+        include: { color: true }
+      },
       variantes: {
         where: { activa: true },
         include: { talla: true, color: true },
@@ -31,19 +34,20 @@ export default async function ProductoPage({ params }: { params: Promise<{ slug:
 
   if (!producto || producto.estado === "INACTIVO") return notFound();
 
-  // 2. Procesar descuento vigente
+  // 2. Validación de Descuento
   const ahora = new Date();
+  const inicioValido = !producto.descuentoInicio || new Date(producto.descuentoInicio) <= ahora;
+  const finValido = !producto.descuentoFin || new Date(producto.descuentoFin) >= ahora;
+  
   const tieneDescuento = 
-    producto.descuentoActivo && 
-    (!producto.descuentoInicio || producto.descuentoInicio <= ahora) && 
-    (!producto.descuentoFin || producto.descuentoFin >= ahora);
+    producto.descuentoActivo && inicioValido && finValido;
 
   const precioOriginal = Number(producto.precio);
   const precioFinal = tieneDescuento 
     ? calcularPrecioFinal(precioOriginal, producto.descuentoTipo, Number(producto.descuentoValor))
     : precioOriginal;
 
-  // 3. Preparar datos para el Componente de Cliente
+  // 3. Transformación de datos
   const data = {
     id: producto.id,
     nombre: producto.nombre,
@@ -53,8 +57,13 @@ export default async function ProductoPage({ params }: { params: Promise<{ slug:
     precioOriginal,
     precioFinal,
     tieneDescuento,
-    descuentoTag: producto.descuentoTipo === 'PORCENTAJE' ? `-${producto.descuentoValor}%` : 'OFERTA',
+    descuentoTag: producto.descuentoTipo === 'PORCENTAJE' ? `-${producto.descuentoValor}%` : 'SALE',
     imagenes: producto.imagenes.map(img => img.url),
+    // MEJORA: Mapeamos las imágenes de color para fácil acceso en el cliente
+    imagenesColor: producto.imagenesColor.map(ic => ({
+        colorNombre: ic.color.nombre, // Usamos nombre para matchear con el selector
+        url: ic.url
+    })),
     variantes: producto.variantes.map(v => ({
       id: v.id,
       talla: v.talla.nombre,
@@ -66,8 +75,7 @@ export default async function ProductoPage({ params }: { params: Promise<{ slug:
 
   return (
     <div className="bg-white min-h-screen">
-      {/* Breadcrumbs minimalistas */}
-      <nav className="max-w-7xl mx-auto px-6 py-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-400">
+      <nav className="max-w-7xl mx-auto px-6 py-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-400 border-b border-slate-50">
         <Link href="/" className="hover:text-slate-900 transition-colors">Inicio</Link>
         <span>/</span>
         <Link href="/catalogo" className="hover:text-slate-900 transition-colors">Catálogo</Link>
@@ -79,39 +87,9 @@ export default async function ProductoPage({ params }: { params: Promise<{ slug:
             </Link>
           </>
         )}
-        <span className="hidden md:inline">/</span>
-        <span className="text-slate-900 font-bold hidden md:inline truncate max-w-[200px]">{data.nombre}</span>
       </nav>
 
-      {/* Componente Interactivo */}
       <ProductoDetalle producto={data} />
-
-      {/* Sección de Compromiso Elara */}
-      <section className="max-w-7xl mx-auto px-6 py-20 border-t border-slate-50">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
-          <div className="space-y-3">
-             <div className="text-2xl">✨</div>
-             <h4 className="text-sm font-serif italic text-slate-900">Diseño Exclusivo</h4>
-             <p className="text-xs text-slate-400 font-light leading-relaxed px-10">
-               Cada prenda de Elara Atelier es confeccionada bajo estándares de alta costura.
-             </p>
-          </div>
-          <div className="space-y-3">
-             <div className="text-2xl">🌿</div>
-             <h4 className="text-sm font-serif italic text-slate-900">Materiales Premium</h4>
-             <p className="text-xs text-slate-400 font-light leading-relaxed px-10">
-               Seleccionamos las mejores fibras para asegurar durabilidad y confort excepcional.
-             </p>
-          </div>
-          <div className="space-y-3">
-             <div className="text-2xl">🤝</div>
-             <h4 className="text-sm font-serif italic text-slate-900">Atención Personalizada</h4>
-             <p className="text-xs text-slate-400 font-light leading-relaxed px-10">
-               Nuestras asesoras te acompañarán en cada paso de tu compra.
-             </p>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

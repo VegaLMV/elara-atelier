@@ -789,15 +789,46 @@ function FilaVarianteAgrupada({ row, onAjustar, onCambiarActiva, onPreviewColor 
   );
 }
 
-// ✅ SOLO MUESTRA HISTORIAL (Eliminada la opción de crear)
+// ✅ SOLO MUESTRA HISTORIAL
 function HistorialDescuentos({ historial, onEliminar }: { historial: DescuentoItem[], onEliminar: (id: string) => void }) {
-  const listaOrdenada = [...historial].sort((a,b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
+  
+  const listaOrdenada = [...historial].sort((a, b) => {
+    const now = new Date();
+    
+    const getEstadoPeso = (item: DescuentoItem) => {
+      const start = new Date(item.startsAt);
+      const end = new Date(item.endsAt);
+      end.setHours(23, 59, 59, 999);
+
+      const isCancelled = item.estado === 'CANCELADO';
+      if (isCancelled) return 0;
+
+      const isActive = now >= start && now <= end;
+      if (isActive) return 2;
+
+      const isFuture = now < start;
+      if (isFuture) return 1;
+
+      return 0;
+    };
+
+    const pesoA = getEstadoPeso(a);
+    const pesoB = getEstadoPeso(b);
+
+    if (pesoA !== pesoB) {
+      return pesoB - pesoA;
+    }
+
+    return new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime();
+  });
 
   if (listaOrdenada.length === 0) return null;
 
   return (
     <div className="bg-white border rounded-xl p-6 shadow-sm">
-      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b pb-4 mb-4">Historial de Campañas Pasadas</h4>
+      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b pb-4 mb-4">
+        Historial de Campañas
+      </h4>
       <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
         {listaOrdenada.map((desc) => {
           const now = new Date();
@@ -814,28 +845,39 @@ function HistorialDescuentos({ historial, onEliminar }: { historial: DescuentoIt
           let bgClass = 'bg-white';
           
           if (isActive) { borderClass = 'border-green-200'; bgClass = 'bg-green-50'; }
+          else if (isFuture) { borderClass = 'border-blue-200'; bgClass = 'bg-blue-50/30'; }
           if (isCancelled) { borderClass = 'border-red-100'; bgClass = 'bg-red-50/50 opacity-70'; }
           
           return (
-            <div key={desc.id} className={`flex items-center justify-between p-4 rounded-xl border ${borderClass} ${bgClass}`}>
+            <div key={desc.id} className={`flex items-center justify-between p-4 rounded-xl border ${borderClass} ${bgClass} transition-all`}>
               <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold text-white text-xs ${isActive ? 'bg-green-600' : isFuture ? 'bg-blue-500' : isCancelled ? 'bg-red-400' : 'bg-gray-400'}`}>
+                <div className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold text-white text-xs shadow-sm ${isActive ? 'bg-green-600' : isFuture ? 'bg-blue-500' : isCancelled ? 'bg-red-400' : 'bg-gray-400'}`}>
                    {desc.tipo === "PORCENTAJE" ? "%" : "S/"}
                 </div>
                 <div>
                    <div className="flex items-center gap-2">
-                      <span className={`font-bold text-sm ${isCancelled ? 'line-through text-gray-500' : 'text-gray-900'}`}>{desc.tipo === "PORCENTAJE" ? `-${desc.valor}%` : `-S/ ${desc.valor}`}</span>
-                      {isActive && <span className="text-[10px] bg-green-100 text-green-700 px-2 rounded-full font-bold">ACTIVO</span>}
-                      {isFuture && <span className="text-[10px] bg-blue-50 text-blue-700 px-2 rounded-full font-bold">PROGRAMADO</span>}
-                      {isCancelled && <span className="text-[10px] bg-red-100 text-red-700 px-2 rounded-full font-bold">CANCELADO</span>}
+                      <span className={`font-bold text-sm ${isCancelled ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                        {desc.tipo === "PORCENTAJE" ? `-${desc.valor}%` : `-S/ ${desc.valor}`}
+                      </span>
+                      {isActive && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold border border-green-200">ACTIVO</span>}
+                      {isFuture && <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold border border-blue-100">PROGRAMADO</span>}
+                      {isCancelled && <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold border border-red-200">CANCELADO</span>}
                    </div>
-                   <div className="text-xs text-gray-500 mt-1">
-                     {start.toLocaleDateString()} ➜ {end.toLocaleDateString()}
+                   <div className="text-xs text-gray-500 mt-1 flex gap-1">
+                     <span>{start.toLocaleDateString()}</span>
+                     <span>➜</span>
+                     <span>{end.toLocaleDateString()}</span>
                    </div>
                 </div>
               </div>
               {!isCancelled && (
-                 <button onClick={() => onEliminar(desc.id)} className="text-gray-400 hover:text-red-600 p-2" title="Cancelar/Eliminar">🗑️</button>
+                 <button 
+                  onClick={() => onEliminar(desc.id)} 
+                  className="group p-2 rounded-full hover:bg-red-50 transition-colors" 
+                  title="Cancelar campaña"
+                 >
+                    <span className="text-gray-400 group-hover:text-red-600 transition-colors">🗑️</span>
+                 </button>
               )}
             </div>
           )

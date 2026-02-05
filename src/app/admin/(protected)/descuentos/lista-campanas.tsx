@@ -41,6 +41,20 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
   const [campanaSeleccionada, setCampanaSeleccionada] = useState<Campana | null>(null);
   const [imagenZoom, setImagenZoom] = useState<string | null>(null);
 
+  // --- LÓGICA DE ORDENAMIENTO ---
+  const campañasOrdenadas = [...campañas].sort((a, b) => {
+    // 1. Prioridad absoluta: Estado ACTIVO
+    const esActivoA = a.estadoCalculado === 'ACTIVO';
+    const esActivoB = b.estadoCalculado === 'ACTIVO';
+
+    if (esActivoA && !esActivoB) return -1; // A va primero
+    if (!esActivoA && esActivoB) return 1;  // B va primero
+
+    // 2. Secundaria: Fecha de Inicio Descendente (Lo más nuevo/futuro arriba)
+    // Esto asegura que PROGRAMADO salga antes que FINALIZADO, y los finalizados recientes antes que los antiguos.
+    return new Date(b.inicio).getTime() - new Date(a.inicio).getTime();
+  });
+
   const cancelarCampaña = async (ids: string[]) => {
     if (!confirm("¿Estás seguro de cancelar esta campaña?")) return;
     try {
@@ -64,7 +78,7 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
   return (
     <>
       <div className="grid gap-6">
-        {campañas.map((c) => (
+        {campañasOrdenadas.map((c) => (
           <div 
             key={c.idRef} 
             className={`bg-white rounded-2xl p-6 border transition-all hover:shadow-md relative ${
@@ -80,7 +94,7 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
                 {/* Header Tarjeta */}
                 <div className="flex items-start justify-between">
                   <div>
-                     <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                           c.estadoCalculado === 'ACTIVO' ? 'bg-green-100 text-green-700' :
                           c.estadoCalculado === 'PROGRAMADO' ? 'bg-blue-100 text-blue-700' :
@@ -91,9 +105,9 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
                         <span className="text-xs text-gray-400 font-mono">
                           {c.tipo === 'PORCENTAJE' ? `-${c.valor}%` : `-S/ ${c.valor}`}
                         </span>
-                     </div>
-                     <h3 className="text-lg font-bold text-gray-900">{c.nombre}</h3>
-                     {c.descripcion && <p className="text-sm text-gray-500 mt-1">{c.descripcion}</p>}
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900">{c.nombre}</h3>
+                      {c.descripcion && <p className="text-sm text-gray-500 mt-1">{c.descripcion}</p>}
                   </div>
                   
                   {/* Menú Acciones */}
@@ -107,7 +121,6 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-20 py-1 text-sm overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                           <button
                             disabled={c.estadoCalculado === 'FINALIZADO'}
-                            // CAMBIO AQUI: Ruta explícita 'editar'
                             onClick={() => router.push(`/admin/descuentos/${c.idRef}`)}
                             className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
                           >
@@ -179,7 +192,7 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
             </div>
           </div>
         ))}
-        {campañas.length === 0 && (
+        {campañasOrdenadas.length === 0 && (
            <div className="text-center py-12 text-gray-400">
               <Tag className="w-12 h-12 mx-auto mb-3 opacity-20" />
               <p>No hay campañas registradas.</p>
@@ -187,7 +200,7 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
         )}
       </div>
 
-      {/* MODAL (Sin cambios mayores, solo la redirección en el botón inferior) */}
+      {/* MODAL */}
       {campanaSeleccionada && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-200">
@@ -236,7 +249,7 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
                       {prod.imagen ? (
                         <img src={prod.imagen} alt="" className="w-full h-full object-cover" />
                       ) : (
-                         <div className="w-full h-full flex items-center justify-center bg-gray-50 text-[8px]">IMG</div>
+                          <div className="w-full h-full flex items-center justify-center bg-gray-50 text-[8px]">IMG</div>
                       )}
                     </div>
                     <span className="text-sm font-medium text-gray-700 truncate">
@@ -247,7 +260,6 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
               </div>
               <div className="p-4 bg-gray-50 border-t border-gray-100 text-right">
                 <button 
-                   // CAMBIO AQUI: Ruta explícita 'editar'
                    onClick={() => router.push(`/admin/descuentos/${campanaSeleccionada.idRef}`)}
                    disabled={campanaSeleccionada.estadoCalculado === 'FINALIZADO'}
                    className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50"

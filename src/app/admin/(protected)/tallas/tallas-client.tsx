@@ -2,6 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { 
+  Ruler, 
+  ListOrdered, 
+  Search, 
+  Save, 
+  Trash2, 
+  Plus, 
+  ArrowUpDown,
+  AlertCircle 
+} from "lucide-react";
 
 type Row = { id: string; nombre: string; orden: number };
 
@@ -11,11 +21,20 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
 
   const [nombre, setNombre] = useState("");
   const [orden, setOrden] = useState("0");
+  const [busqueda, setBusqueda] = useState(""); // Nuevo filtro
+
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const canCreate = useMemo(() => nombre.trim().length > 0, [nombre]);
+
+  // Lógica de filtrado
+  const rowsFiltradas = useMemo(() => {
+    return initialRows.filter(r => 
+        r.nombre.toLowerCase().includes(busqueda.toLowerCase())
+    );
+  }, [initialRows, busqueda]);
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
@@ -53,13 +72,11 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
 
   async function actualizar(id: string, patch: { nombre: string; orden: number }) {
     setError(null);
-    // setBusy(true); // No bloqueamos todo para edición inline
     const r = await fetch(`/api/admin/tallas/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
-    // setBusy(false);
 
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
@@ -89,82 +106,155 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start relative">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
       
       {/* TOAST NOTIFICATION */}
       {successMsg && (
-         <div className="fixed bottom-5 right-5 bg-slate-900 text-white px-6 py-3 rounded-lg shadow-xl z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
-            ✅ {successMsg}
+         <div className="fixed bottom-5 right-5 bg-slate-900 text-white px-6 py-3 rounded-lg shadow-xl z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 flex items-center gap-2">
+            <span>✅</span>
+            <span className="font-medium">{successMsg}</span>
          </div>
       )}
 
-      {/* FORMULARIO DE CREACIÓN */}
-      <div className="lg:col-span-1">
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm sticky top-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-4 border-b pb-2">Agregar Nueva Talla</h2>
+      {/* ---------------- COLUMNA IZQUIERDA: FORMULARIO ---------------- */}
+      <div className="lg:col-span-4 sticky top-6">
+        <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden">
           
-          <form onSubmit={crear} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Etiqueta</label>
-              <input
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all placeholder:text-gray-300"
-                placeholder="Ej. XL, 42, Standar"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                autoFocus
-              />
+          {/* Form Header */}
+          <div className="bg-slate-900 p-6 text-white">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                 <Plus className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="font-bold text-lg tracking-tight">Nueva Talla</h3>
             </div>
+            <p className="text-slate-400 text-xs">Define las dimensiones disponibles para tus productos.</p>
+          </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Orden de visualización</label>
-              <input
-                type="number"
-                step={1}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                value={orden}
-                onChange={(e) => setOrden(e.target.value)}
-              />
-              <p className="text-[10px] text-gray-400">Menor número aparece primero (1, 2, 3...)</p>
-            </div>
+          <div className="p-6">
+            <form onSubmit={crear} className="space-y-5">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Etiqueta</label>
+                <div className="relative group">
+                   <input
+                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300 text-sm font-medium"
+                    placeholder="Ej. XL, 42, Standar"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    autoFocus
+                   />
+                   <Ruler className="absolute left-3 top-3 w-4 h-4 text-slate-400 group-focus-within:text-slate-800 transition-colors" />
+                </div>
+              </div>
 
-            {error && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">{error}</div>}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Orden de Visualización</label>
+                <div className="relative group">
+                    <input
+                      type="number"
+                      step={1}
+                      className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all font-mono"
+                      value={orden}
+                      onChange={(e) => setOrden(e.target.value)}
+                    />
+                    <ListOrdered className="absolute left-3 top-3 w-4 h-4 text-slate-400 group-focus-within:text-slate-800 transition-colors" />
+                </div>
+                <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                   <AlertCircle className="w-3 h-3" />
+                   Menor número aparece primero (1, 2, 3...)
+                </p>
+              </div>
 
-            <button
-              type="submit"
-              className="w-full bg-slate-900 text-white rounded-lg px-4 py-3 font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md active:scale-[0.98]"
-              disabled={busy || !canCreate}
-            >
-              {busy ? "Guardando..." : "Guardar Talla"}
-            </button>
-          </form>
+              {error && (
+                <div className="text-xs text-red-600 bg-red-50 p-3 rounded-lg border border-red-100 flex gap-2 items-start">
+                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                   {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-slate-900/10 flex justify-center items-center gap-2"
+                disabled={busy || !canCreate}
+              >
+                {busy ? (
+                    <>
+                       <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+                       Guardando...
+                    </>
+                ) : (
+                    "Guardar Talla"
+                )}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
 
-      {/* LISTA DE TALLAS */}
-      <div className="lg:col-span-2">
-         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
-               <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Listado Actual</span>
+      {/* ---------------- COLUMNA DERECHA: LISTADO ---------------- */}
+      <div className="lg:col-span-8">
+         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[500px]">
+            
+            {/* Header Listado */}
+            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+               <div className="flex items-center gap-2">
+                  <span className="bg-white p-2 rounded-lg border border-slate-200 shadow-sm text-slate-600">
+                     <Ruler className="w-4 h-4" />
+                  </span>
+                  <div>
+                     <h2 className="font-bold text-slate-800 text-sm">Inventario de Tallas</h2>
+                     <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+                        Registros: {rowsFiltradas.length}
+                     </p>
+                  </div>
+               </div>
+
+               <div className="relative w-full sm:w-64 group">
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 group-focus-within:text-slate-600 transition-colors" />
+                  <input 
+                      className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none bg-white transition-all shadow-sm"
+                      placeholder="Buscar talla..."
+                      value={busqueda}
+                      onChange={e => setBusqueda(e.target.value)}
+                  />
+               </div>
             </div>
             
-            {initialRows.length === 0 ? (
-               <div className="p-12 text-center text-gray-400 flex flex-col items-center">
-                  <span className="text-4xl mb-2">📏</span>
-                  <p>No hay tallas registradas aún.</p>
-               </div>
-            ) : (
-               <div className="divide-y divide-gray-100">
-                  {initialRows.map((r) => (
-                    <Fila
-                      key={r.id}
-                      row={r}
-                      disabled={busy}
-                      onSave={(patch) => actualizar(r.id, patch)}
-                      onDelete={() => eliminar(r.id)}
-                    />
-                  ))}
-               </div>
-            )}
+            <div className="divide-y divide-slate-50 max-h-[600px] overflow-y-auto custom-scrollbar">
+               {rowsFiltradas.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+                        <Ruler className="w-8 h-8 text-slate-300" />
+                     </div>
+                     <h3 className="text-slate-900 font-bold">No hay tallas</h3>
+                     <p className="text-slate-400 text-sm max-w-xs mx-auto mt-1">
+                        {busqueda 
+                           ? `No hay resultados para "${busqueda}".`
+                           : "Comienza agregando las tallas para tus productos."}
+                     </p>
+                  </div>
+               ) : (
+                  <>
+                    {/* Header Tabla Falsa */}
+                    <div className="grid grid-cols-12 px-6 py-2 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                        <div className="col-span-2 text-center">Orden</div>
+                        <div className="col-span-5">Nombre</div>
+                        <div className="col-span-2 text-center">Prioridad</div>
+                        <div className="col-span-3 text-right">Acciones</div>
+                    </div>
+
+                    {rowsFiltradas.map((r) => (
+                      <Fila
+                        key={r.id}
+                        row={r}
+                        disabled={busy}
+                        onSave={(patch) => actualizar(r.id, patch)}
+                        onDelete={() => eliminar(r.id)}
+                      />
+                    ))}
+                  </>
+               )}
+            </div>
          </div>
       </div>
     </div>
@@ -188,53 +278,61 @@ function Fila({
   const changed = nombre.trim() !== row.nombre || Number(orden || 0) !== row.orden;
 
   return (
-    <div className="group flex items-center justify-between p-4 hover:bg-gray-50 transition-colors gap-4">
-       <div className="flex-1 grid grid-cols-2 gap-4 items-center">
-          
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-mono font-bold text-gray-500 border border-gray-200">
-                {row.orden}
-             </div>
-             <input
-               className="w-full bg-transparent border-b border-transparent hover:border-gray-300 focus:border-black focus:ring-0 outline-none px-2 py-1 font-medium text-gray-900 transition-colors"
-               value={nombre}
-               onChange={(e) => setNombre(e.target.value)}
-               placeholder="Nombre"
-             />
-          </div>
-
-          <div className="flex items-center gap-2">
-             <span className="text-xs text-gray-400 uppercase">Orden:</span>
-             <input
-               type="number"
-               step={1}
-               className="w-20 bg-transparent border border-transparent hover:border-gray-300 focus:border-black rounded px-2 py-1 text-sm text-gray-700 text-center transition-all"
-               value={orden}
-               onChange={(e) => setOrden(e.target.value)}
-             />
+    <div className="group grid grid-cols-12 items-center px-6 py-4 hover:bg-slate-50 transition-colors gap-4">
+       
+       {/* Columna Orden Visual */}
+       <div className="col-span-2 flex justify-center">
+          <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-xs font-mono font-bold text-indigo-600 border border-indigo-100 shadow-sm">
+             {row.orden}
           </div>
        </div>
 
-       <div className="flex items-center gap-2 opacity-30 group-hover:opacity-100 transition-opacity">
+       {/* Columna Nombre Editable */}
+       <div className="col-span-5">
+          <input
+            className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:ring-0 outline-none px-0 py-1 font-bold text-slate-700 transition-colors placeholder:font-normal"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Nombre"
+          />
+       </div>
+
+       {/* Columna Input Orden */}
+       <div className="col-span-2 flex justify-center">
+          <div className="relative w-16 group/input">
+             <input
+               type="number"
+               step={1}
+               className="w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-slate-900 rounded px-1 py-1 text-sm text-slate-600 text-center transition-all font-mono"
+               value={orden}
+               onChange={(e) => setOrden(e.target.value)}
+             />
+             <ArrowUpDown className="absolute right-1 top-2 w-3 h-3 text-slate-300 opacity-0 group-hover/input:opacity-100 pointer-events-none" />
+          </div>
+       </div>
+
+       {/* Columna Acciones */}
+       <div className="col-span-3 flex items-center justify-end gap-2 opacity-100 sm:opacity-40 sm:group-hover:opacity-100 transition-opacity">
           {changed && (
              <button
                type="button"
-               className="bg-green-600 text-white text-xs px-3 py-1.5 rounded-full font-medium hover:bg-green-700 transition-colors shadow-sm animate-in zoom-in"
+               className="bg-green-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-green-700 transition-all shadow-sm animate-in zoom-in flex items-center gap-1"
                disabled={disabled || !nombre.trim()}
                onClick={() => onSave({ nombre: nombre.trim(), orden: Number.parseInt(orden || "0", 10) || 0 })}
              >
+               <Save className="w-3 h-3" />
                Guardar
              </button>
           )}
           
           <button 
              type="button" 
-             className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-colors" 
+             className="text-slate-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors" 
              disabled={disabled} 
              onClick={onDelete}
              title="Eliminar talla"
           >
-             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+             <Trash2 className="w-4 h-4" />
           </button>
        </div>
     </div>

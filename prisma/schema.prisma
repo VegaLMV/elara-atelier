@@ -4,8 +4,10 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DIRECT_URL")
 }
 
+// --- ENUMS ---
 enum Rol {
   ADMIN
   COLABORADOR
@@ -35,7 +37,7 @@ enum TipoDescuentoProducto {
   MONTO
 }
 
-enum EstadoDescuentoProducto {
+enum EstadoDescuentoProducto { // Usado por Campana
   PROGRAMADO
   ACTIVO
   FINALIZADO
@@ -55,14 +57,17 @@ enum EstadoVenta {
   ANULADO
 }
 
-model Usuario {
-  id       String   @id @default(cuid())
-  correo   String   @unique
-  clave    String
-  rol      Rol      @default(COLABORADOR)
-  creadoEn DateTime @default(now())
+// --- MODELOS ---
 
-  descuentosCreados DescuentoProducto[] @relation("DescuentoCreadoPor")
+model Usuario {
+  id        String   @id @default(cuid())
+  correo    String   @unique
+  clave     String
+  rol       Rol      @default(COLABORADOR)
+  creadoEn  DateTime @default(now())
+
+  // Relación corregida: El usuario crea Campañas, no detalles sueltos
+  campanasCreadas Campana[] @relation("CampanaCreadaPor")
 }
 
 model Categoria {
@@ -81,21 +86,21 @@ model Producto {
   estado      EstadoProducto @default(ACTIVO)
   destacado   Boolean        @default(false)
 
-  // --- DESCUENTOS ---
+  // --- DESCUENTOS (Campos de caché para rendimiento en tienda) ---
   descuentoActivo Boolean                @default(false)
   descuentoTipo   TipoDescuentoProducto?
   descuentoValor  Decimal?               @db.Decimal(10, 2)
   descuentoInicio DateTime?
   descuentoFin    DateTime?
-
-  descuentos DescuentoProducto[] @relation("ProductoDescuentos")
-
-  descuentoActualId String?
-  descuentoActual   DescuentoProducto? @relation("ProductoDescuentoActual", fields: [descuentoActualId], references: [id])
+  // Nota: Eliminamos la relación compleja 'descuentoActual' para simplificar. 
+  // La verdad del descuento vive en estos campos planos o en la consulta de campañas activas.
 
   // --- RELACIONES ---
   categoriaId String?
   categoria   Categoria? @relation(fields: [categoriaId], references: [id])
+
+  // Relación inversa con los detalles de campañas
+  participacionesCampana DescuentoProducto[]
 
   imagenes      ImagenProducto[]
   variantes     Variante[]
@@ -105,34 +110,46 @@ model Producto {
   actualizadoEn DateTime @updatedAt
 }
 
-model DescuentoProducto {
-  id String @id @default(cuid())
+model Campana {
+  id          String                  @id @default(cuid())
+  nombre      String
+  descripcion String?
+  
+  tipo        TipoDescuentoProducto
+  valor       Decimal                 @db.Decimal(10, 2)
+  
+  startsAt    DateTime
+  endsAt      DateTime
+  
+  estado      EstadoDescuentoProducto @default(PROGRAMADO)
+  
+  // Relación con los productos (Detalle)
+  detalles    DescuentoProducto[]
 
-  productoId String
-  producto   Producto @relation("ProductoDescuentos", fields: [productoId], references: [id], onDelete: Cascade)
-
-  // Relación inversa necesaria para "descuentoActual" en Producto
-  productosQueLoUsanComoActual Producto[] @relation("ProductoDescuentoActual")
-
-  nombreCampana String?
-  descripcion   String?
-
-  tipo  TipoDescuentoProducto
-  valor Decimal               @db.Decimal(10, 2)
-
-  startsAt DateTime
-  endsAt   DateTime
-
-  estado EstadoDescuentoProducto @default(PROGRAMADO)
-
-  creadoPorId String?
-  creadoPor   Usuario? @relation("DescuentoCreadoPor", fields: [creadoPorId], references: [id])
+  // Relación con Usuario (Creador)
+  creadorId   String?
+  creador     Usuario? @relation("CampanaCreadaPor", fields: [creadorId], references: [id])
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
+}
 
-  @@index([productoId, estado, startsAt, endsAt])
-  @@index([startsAt, endsAt])
+model DescuentoProducto {
+  id          String   @id @default(cuid())
+  
+  // 1. Vinculación con la Campaña (Padre)
+  campanaId   String
+  campana     Campana  @relation(fields: [campanaId], references: [id], onDelete: Cascade)
+
+  // 2. Vinculación con el Producto (Hijo)
+  productoId  String
+  producto    Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  
+  // Un producto solo puede estar una vez en la misma campaña
+  @@unique([campanaId, productoId])
+  
+  @@index([campanaId])
+  @@index([productoId])
 }
 
 model ImagenProducto {
@@ -172,6 +189,7 @@ model Color {
   id        String     @id @default(cuid())
   nombre    String     @unique
   hex       String?
+  activo    Boolean    @default(true)
   variantes Variante[]
 
   imagenesProducto ImagenProductoColor[]
@@ -214,21 +232,24 @@ model MovimientoInventario {
   compraId String?
   compra   Compra? @relation(fields: [compraId], references: [id])
   ventaId  String?
-  venta    Venta?   @relation(fields: [ventaId], references: [id])
+  venta    Venta?  @relation(fields: [ventaId], references: [id])
   creadoEn DateTime @default(now())
 }
 
 model Proveedor {
-  id        String  @id @default(cuid())
-  nombre    String
-  telefono  String?
-  correo    String?
-  ruc       String?
-  razonSocial String?
-  departamento String?
-  provincia    String?
-  distrito     String?
-  direccion String?
+  id            String   @id @default(cuid())
+  nombre        String
+  telefono      String?
+  correo        String?
+  ruc           String?
+  razonSocial   String?
+  departamento  String?
+  provincia     String?
+  distrito      String?
+  direccion     String?
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
 
   compras Compra[]
 }
@@ -245,9 +266,9 @@ model Compra {
   otrosCostos Decimal? @db.Decimal(10, 2)
   notas       String?
 
-  items    ItemCompra[]
+  items       ItemCompra[]
   movimientos MovimientoInventario[]
-  creadoEn DateTime     @default(now())
+  creadoEn    DateTime               @default(now())
 }
 
 model ItemCompra {
@@ -266,30 +287,30 @@ model ItemCompra {
 }
 
 model Venta {
-  id            String   @id @default(cuid())
-  codigo        String      @unique @default(cuid())
+  id     String @id @default(cuid())
+  codigo String @unique @default(cuid())
 
-  clienteId     String?    
-  cliente       Cliente?    @relation(fields: [clienteId], references: [id])
-  clienteNombre String?    
+  clienteId     String?
+  cliente       Cliente? @relation(fields: [clienteId], references: [id])
+  clienteNombre String?
 
-  canal         String   @default("WhatsApp")
-  metodoPago MetodoPago @default(YAPE)
-  estado        EstadoVenta @default(COMPLETADO)
+  canal      String      @default("WhatsApp")
+  metodoPago MetodoPago  @default(YAPE)
+  estado     EstadoVenta @default(COMPLETADO)
 
-  subtotal      Decimal     @db.Decimal(10, 2) @default(0) 
-  descuentoTotal Decimal    @db.Decimal(10, 2) @default(0)
-  total         Decimal     @db.Decimal(10, 2) @default(0)
+  subtotal       Decimal @default(0) @db.Decimal(10, 2)
+  descuentoTotal Decimal @default(0) @db.Decimal(10, 2)
+  total          Decimal @default(0) @db.Decimal(10, 2)
 
-  notas         String?
-  fechaVenta    DateTime @default(now())
+  notas      String?
+  fechaVenta DateTime @default(now())
 
   items    ItemVenta[]
   empaques UsoEmpaque[]
 
   movimientos   MovimientoInventario[]
-  creadoEn DateTime     @default(now())
-  actualizadoEn DateTime    @updatedAt
+  creadoEn      DateTime               @default(now())
+  actualizadoEn DateTime               @updatedAt
 }
 
 model ItemVenta {
@@ -301,14 +322,14 @@ model ItemVenta {
   variante   Variante @relation(fields: [varianteId], references: [id])
 
   cantidad Int
-  
+
   precioUnitario Decimal @db.Decimal(10, 2)
   precioFinal    Decimal @db.Decimal(10, 2)
   subtotal       Decimal @db.Decimal(10, 2)
 
   tieneDescuento Boolean @default(false)
-  descuentoMonto Decimal @db.Decimal(10, 2) @default(0)
-  descuentoRazon String? 
+  descuentoMonto Decimal @default(0) @db.Decimal(10, 2)
+  descuentoRazon String?
 }
 
 model TipoEmpaque {
@@ -319,7 +340,7 @@ model TipoEmpaque {
   imagenUrl     String?
   stock         Int     @default(0)
 
-  usos UsoEmpaque[]
+  usos        UsoEmpaque[]
   itemsCompra ItemCompra[]
 }
 
@@ -335,18 +356,18 @@ model UsoEmpaque {
 }
 
 model Cliente {
-  id        String   @id @default(cuid())
-  nombre    String  
-  dni       String?  @unique
-  telefono  String?
-  email     String?
-  departamento  String?  
-  provincia     String?  
-  distrito      String?  
-  direccion     String?  
-  referencia    String?  
-  
-  ventas    Venta[] 
-  creadoEn  DateTime @default(now())
+  id           String  @id @default(cuid())
+  nombre       String
+  dni          String? @unique
+  telefono     String?
+  email        String?
+  departamento String?
+  provincia    String?
+  distrito     String?
+  direccion    String?
+  referencia   String?
+
+  ventas        Venta[]
+  creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 }

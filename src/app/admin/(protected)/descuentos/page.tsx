@@ -12,7 +12,7 @@ export const metadata = {
   title: "Campañas y Descuentos | Admin",
 };
 
-// --- NUEVO: Función de Sincronización Automática ---
+// --- FUNCIÓN CRÍTICA: Sincronización Automática ---
 async function sincronizarEstados() {
   const now = new Date();
   
@@ -62,7 +62,7 @@ async function sincronizarEstados() {
         data: { estado: "FINALIZADO" } 
       });
       
-      // B. Limpiar el producto
+      // B. Limpiar el producto si este era su descuento actual
       const prod = await prisma.producto.findUnique({ 
           where: { id: d.productoId },
           select: { descuentoActualId: true }
@@ -87,11 +87,12 @@ async function sincronizarEstados() {
   }
 }
 
-// Función auxiliar para calcular estado visual
+// Función auxiliar para calcular estado visual en el frontend
 function getEstadoCampaña(start: Date, end: Date, estadoDB: string) {
   if (estadoDB === "CANCELADO") return "CANCELADO";
   
   const ahora = new Date();
+  // Ajustamos el fin al final del día para comparaciones justas
   const finAjustado = new Date(end);
   finAjustado.setHours(23, 59, 59, 999);
 
@@ -101,31 +102,62 @@ function getEstadoCampaña(start: Date, end: Date, estadoDB: string) {
   return "ACTIVO";
 }
 
-type SP = { q?: string };
+// Tipado actualizado para soportar TODOS los filtros
+type SearchParams = { 
+  q?: string;
+  estado?: string;
+  tipo?: string;
+  desde?: string;
+  hasta?: string;
+};
 
-export default async function Page({ searchParams }: { searchParams: Promise<SP> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const admin = await sesionAdmin();
   if (!admin) redirect("/admin/login");
 
   // 🔥 EJECUTAR SINCRONIZACIÓN ANTES DE CARGAR DATOS 🔥
   await sincronizarEstados();
 
+  // Leer parámetros de URL
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
+  const estado = sp.estado ?? "";
+  const tipo = sp.tipo ?? "";
+  const desde = sp.desde ?? "";
+  const hasta = sp.hasta ?? "";
 
-  // 1. Filtros de Búsqueda
+  // 1. Construcción dinámica del WHERE (Filtros Avanzados)
   const where: any = {};
+
+  // Filtro de Texto (Búsqueda)
   if (q) {
     where.OR = [
       { nombreCampana: { contains: q, mode: "insensitive" } },
-      { producto: { nombre: { contains: q, mode: "insensitive" } } }
+      { producto: { nombre: { contains: q, mode: "insensitive" } } },
+      { descripcion: { contains: q, mode: "insensitive" } }
     ];
   }
 
-  // 2. Obtener datos crudos
+  // Filtros Exactos
+  if (estado) where.estado = estado;
+  if (tipo) where.tipo = tipo;
+
+  // Filtro de Rango de Fechas
+  if (desde || hasta) {
+    where.startsAt = {};
+    if (desde) where.startsAt.gte = new Date(desde);
+    if (hasta) {
+      // Ajustar 'hasta' al final del día seleccionado
+      const fechaHasta = new Date(hasta);
+      fechaHasta.setHours(23, 59, 59, 999);
+      where.startsAt.lte = fechaHasta;
+    }
+  }
+
+  // 2. Obtener datos filtrados
   const descuentosRaw = await prisma.descuentoProducto.findMany({
     where,
-    take: 500, 
+    take: 500, // Limite de seguridad
     orderBy: { creadoEn: "desc" },
     include: {
       producto: {
@@ -138,6 +170,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const campañasMap = new Map();
 
   for (const d of descuentosRaw) {
+    // Clave única para agrupar: Nombre + FechaInicio O Autogenerado
     const identificadorUnico = d.nombreCampana 
         ? `CAMPAÑA::${d.nombreCampana}::${d.startsAt.toISOString()}` 
         : `AUTO::${d.tipo}-${d.valor}-${d.startsAt.toISOString()}-${d.endsAt.toISOString()}`;
@@ -160,9 +193,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     const campaña = campañasMap.get(identificadorUnico);
     campaña.idsDescuentos.push(d.id);
 
-    // --- CORRECCIÓN DE DUPLICIDAD VISUAL ---
+    // Evitar duplicados visuales en la lista de miniaturas
     if (d.estado !== 'CANCELADO') {
-        // Verificar si este producto YA fue agregado a la lista visual de esta campaña
         const yaExisteEnVista = campaña.productos.some((p: any) => p.productoId === d.producto.id);
 
         if (!yaExisteEnVista) {
@@ -178,6 +210,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   const campañas = Array.from(campañasMap.values());
 
+  // Stats (Basados en la vista actual filtrada)
   const stats = {
       activas: campañas.filter(c => c.estadoCalculado === 'ACTIVO').length,
       programadas: campañas.filter(c => c.estadoCalculado === 'PROGRAMADO').length,
@@ -205,10 +238,16 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
          
          {/* Sidebar: Filtros y Stats */}
          <div className="lg:col-span-1 space-y-6 sticky top-6">
-            <FiltrosDescuentos initialQ={q} />
+            <FiltrosDescuentos 
+              initialQ={q} 
+              initialEstado={estado}
+              initialTipo={tipo}
+              initialDesde={desde}
+              initialHasta={hasta}
+            />
             
             <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Resumen</h3>
+               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Resumen (Vista Actual)</h3>
                
                <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600 font-medium">Activas</span>
@@ -221,7 +260,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
                </div>
                <div className="w-full h-px bg-gray-100"></div>
                <div className="pt-1">
-                   <p className="text-xs text-gray-400">Total productos en oferta</p>
+                   <p className="text-xs text-gray-400">Descuentos Individuales</p>
                    <p className="text-2xl font-bold text-slate-900">{stats.totalProds}</p>
                </div>
             </div>

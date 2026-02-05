@@ -3,7 +3,17 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search } from "lucide-react"; // Importamos icono para el buscador
+import { 
+  Package, 
+  Search, 
+  Plus, 
+  Save, 
+  Trash2, 
+  Maximize2,
+  Layers,
+  UploadCloud,
+  ShoppingCart
+} from "lucide-react";
 
 type Row = { 
   id: string; 
@@ -17,19 +27,20 @@ type Row = {
 export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) {
   const router = useRouter();
 
-  // Estados del Formulario
+  // 🔎 Filtros
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos">("todos");
+
+  // Formulario
   const [nombre, setNombre] = useState("");
   const [costo, setCosto] = useState("");
   const [nuevoStock, setNuevoStock] = useState("0");
   const [file, setFile] = useState<File | null>(null); 
   
-  // Estado del Filtro
-  const [busqueda, setBusqueda] = useState(""); 
-
   const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "warning" } | null>(null);
   
-  // UI States
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  // Modal Zoom para imágenes
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const canCreate = useMemo(() => {
@@ -39,15 +50,21 @@ export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) 
     return true;
   }, [nombre, costo, nuevoStock]);
 
-  // Lógica de Filtrado
   const rowsFiltradas = useMemo(() => {
-    if (!busqueda) return initialRows;
-    return initialRows.filter(r => 
-        r.nombre.toLowerCase().includes(busqueda.toLowerCase())
-    );
-  }, [initialRows, busqueda]);
+    return initialRows.filter(r => {
+      const q = busqueda.toLowerCase();
+      const coincideTexto = r.nombre.toLowerCase().includes(q);
+      
+      const coincideEstado = 
+        filtroEstado === "todos" ? true :
+        filtroEstado === "activos" ? r.activo :
+        !r.activo;
 
-  const showToast = (msg: string, type: "success" | "error" = "success") => {
+      return coincideTexto && coincideEstado;
+    });
+  }, [initialRows, busqueda, filtroEstado]);
+
+  const showToast = (msg: string, type: "success" | "error" | "warning" = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
@@ -99,12 +116,10 @@ export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) 
   async function actualizar(id: string, patch: { nombre: string; costoUnitario: string; stock: number }) {
     if (!patch.nombre.trim()) { showToast("Nombre inválido", "error"); return; }
     if (isNaN(Number(patch.costoUnitario)) || Number(patch.costoUnitario) < 0) {
-      showToast("Costo inválido", "error");
-      return;
+      showToast("Costo inválido", "error"); return;
     }
     if (isNaN(patch.stock) || patch.stock < 0) {
-      showToast("Stock inválido", "error");
-      return;
+      showToast("Stock inválido", "error"); return;
     }
 
     const r = await fetch(`/api/admin/empaques/${id}`, {
@@ -136,158 +151,214 @@ export default function EmpaquesClient({ initialRows }: { initialRows: Row[] }) 
     router.refresh();
   }
 
-  async function eliminar(id: string) {
-    if (!confirm("¿Eliminar empaque permanentemente?")) return;
+  async function eliminar(row: Row) {
+    if (!row.activo) {
+        showToast("El empaque ya está en estado INACTIVO.", "warning");
+        return;
+    }
 
-    const r = await fetch(`/api/admin/empaques/${id}`, { method: "DELETE" });
+    if (!confirm(`⚠️ ¿Deseas ARCHIVAR el empaque "${row.nombre}"?`)) return;
+
+    const r = await fetch(`/api/admin/empaques/${row.id}`, { 
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activo: false }), 
+    });
 
     if (!r.ok) {
-      showToast("No se puede eliminar (probablemente en uso)", "error");
+      showToast("Error al archivar", "error");
       return;
     }
 
-    showToast("Empaque eliminado");
+    showToast("Empaque archivado (Inactivo)", "warning");
     router.refresh();
   }
 
   return (
-    // CAMBIO: Se agregó 'xl:grid-cols-4' para dar más espacio horizontal en pantallas grandes
-    <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-8 items-start relative">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
       
-      {/* Toast */}
+      {/* Toast Notification */}
       {toast && (
-          <div className={`fixed bottom-5 right-5 px-6 py-4 rounded-xl shadow-2xl text-white font-medium text-sm animate-in slide-in-from-bottom-5 fade-in duration-300 z-[9999] flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-900'}`}>
-              <span className="text-xl">{toast.type === 'error' ? '⚠️' : '✅'}</span>
+          <div className={`fixed bottom-5 right-5 px-6 py-3 rounded-lg shadow-xl text-white font-medium text-sm animate-in slide-in-from-bottom-5 fade-in duration-300 z-[9999] flex items-center gap-3 ${
+              toast.type === 'error' ? 'bg-red-600' : 
+              toast.type === 'warning' ? 'bg-amber-600' : 'bg-slate-900'
+          }`}>
+              <span>{toast.type === 'error' ? '⚠️' : toast.type === 'warning' ? '🔒' : '✅'}</span>
               <span>{toast.msg}</span>
           </div>
       )}
 
       {/* Modal Zoom */}
       {previewImage && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-6 animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}>
-           <button className="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-           </button>
-           {/* eslint-disable-next-line @next/next/no-img-element */}
-           <img src={previewImage} alt="Zoom" className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()} />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}>
+           <div className="relative max-w-4xl w-full flex flex-col items-center">
+               <button className="absolute -top-12 right-0 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all">
+                  <Maximize2 className="w-6 h-6" />
+               </button>
+               {/* eslint-disable-next-line @next/next/no-img-element */}
+               <img src={previewImage} alt="Zoom" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()} />
+           </div>
         </div>
       )}
 
-      {/* FORMULARIO */}
-      {/* CAMBIO: Se mantiene en 1 columna */}
-      <div className="lg:col-span-1 xl:col-span-1">
-        <div className="bg-white border border-gray-200 rounded-2xl p-2 shadow-sm sticky top-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-4 border-b pb-2 flex items-center gap-2">
-            <span>📦</span> Nuevo Empaque
-          </h2>
-
-          <form onSubmit={crear} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Nombre</label>
-              <input
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all placeholder:text-gray-400"
-                placeholder="Ej: Bolsa Kraft Mediana"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-              />
+      {/* ---------------- COLUMNA IZQUIERDA: FORMULARIO (span-4) ---------------- */}
+      <div className="lg:col-span-4 sticky top-6">
+        <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden">
+          
+          {/* Header */}
+          <div className="bg-slate-900 p-6 text-white">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                 <Plus className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="font-bold text-lg tracking-tight">Nuevo Empaque</h3>
             </div>
+            <p className="text-slate-400 text-xs">Registra bolsas, cajas o insumos de entrega.</p>
+          </div>
 
-            <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Stock</label>
-                  <input
-                    type="number" min="0"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all font-bold"
-                    placeholder="0"
-                    value={nuevoStock}
-                    onChange={(e) => setNuevoStock(e.target.value)}
-                  />
+          <div className="p-6">
+            <form onSubmit={crear} className="space-y-5">
+                
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Nombre</label>
+                  <div className="relative group">
+                    <input
+                        className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300 text-sm font-medium"
+                        placeholder="Ej: Bolsa Kraft Mediana"
+                        value={nombre}
+                        onChange={(e) => setNombre(e.target.value)}
+                    />
+                    <Package className="absolute left-3 top-3 w-4 h-4 text-slate-400 group-focus-within:text-slate-800 transition-colors" />
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Costo (S/)</label>
-                  <input
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                    placeholder="0.00"
-                    value={costo}
-                    onChange={(e) => setCosto(e.target.value)}
-                  />
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Stock</label>
+                      <div className="relative group">
+                        <input
+                            type="number" min="0"
+                            className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all font-mono font-bold text-slate-700"
+                            placeholder="0"
+                            value={nuevoStock}
+                            onChange={(e) => setNuevoStock(e.target.value)}
+                        />
+                        <Layers className="absolute left-3 top-3 w-4 h-4 text-slate-400 group-focus-within:text-slate-800 transition-colors" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Costo (S/)</label>
+                      <div className="relative group">
+                        <input
+                            type="number" step="0.01" min="0"
+                            className="w-full pl-8 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all font-mono"
+                            placeholder="0.00"
+                            value={costo}
+                            onChange={(e) => setCosto(e.target.value)}
+                        />
+                        <span className="absolute left-3 top-3 text-slate-400 text-sm font-bold">S/</span>
+                      </div>
+                    </div>
                 </div>
-            </div>
 
-            <div className="space-y-1.5">
-               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Imagen Referencia</label>
-               <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors relative">
-                  <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-                  <span className="text-xs text-gray-500">{file ? file.name : "Click para subir foto"}</span>
-               </div>
-            </div>
+                <div className="space-y-2">
+                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Imagen Referencial</label>
+                   <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center cursor-pointer hover:bg-slate-50 hover:border-slate-400 transition-all relative group">
+                      <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                      <div className="flex flex-col items-center gap-2">
+                          <div className="p-3 bg-slate-100 rounded-full text-slate-400 group-hover:bg-white group-hover:shadow-sm transition-all">
+                             <UploadCloud className="w-6 h-6" />
+                          </div>
+                          <span className="text-xs text-slate-500 font-medium">{file ? file.name : "Click para subir foto"}</span>
+                      </div>
+                   </div>
+                </div>
 
-            <button
-              type="submit"
-              className="w-full bg-slate-900 text-white rounded-lg px-4 py-3 font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md active:scale-[0.98]"
-              disabled={busy || !canCreate}
-            >
-              {busy ? "Guardando..." : "Guardar Empaque"}
-            </button>
-          </form>
+                <button
+                  type="submit"
+                  className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-slate-900/10 flex justify-center items-center gap-2"
+                  disabled={busy || !canCreate}
+                >
+                  {busy ? (
+                      <>
+                         <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+                         Guardando...
+                      </>
+                  ) : (
+                      "Guardar Empaque"
+                  )}
+                </button>
+            </form>
+          </div>
         </div>
       </div>
 
-      {/* LISTA E INVENTARIO */}
-      {/* CAMBIO: Se expande a 3 columnas en pantallas XL para dar más espacio horizontal */}
-      <div className="lg:col-span-2 xl:col-span-3">
-         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-            
-            {/* Header con Buscador */}
-            <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-               <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Inventario ({rowsFiltradas.length})
-               </span>
-               <div className="relative w-full sm:w-64">
-                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                  <input 
-                    type="text"
-                    placeholder="Buscar empaque..."
-                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
-                    value={busqueda}
-                    onChange={(e) => setBusqueda(e.target.value)}
-                  />
-               </div>
+      {/* ---------------- COLUMNA DERECHA: LISTADO (span-8) ---------------- */}
+      <div className="lg:col-span-8 space-y-6">
+         
+         {/* Barra de Filtros */}
+         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+               <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+               <input
+                 className="w-full pl-10 pr-4 py-2.5 text-sm bg-transparent outline-none placeholder:text-slate-400"
+                 placeholder="Buscar empaque..."
+                 value={busqueda}
+                 onChange={(e) => setBusqueda(e.target.value)}
+               />
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-white border-b border-gray-100 text-gray-400 font-bold text-xs uppercase tracking-wider">
-                  <tr>
-                    <th className="px-6 py-4 w-16 text-center">Foto</th>
-                    <th className="px-6 py-4">Descripción</th>
-                    <th className="px-6 py-4 text-center">Stock</th>
-                    <th className="px-6 py-4 text-center">Costo</th>
-                    <th className="px-6 py-4 text-center">Estado</th>
-                    <th className="px-6 py-4 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {rowsFiltradas.map((r) => (
+            <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
+               {(['todos', 'activos', 'inactivos'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFiltroEstado(f)}
+                    className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all capitalize ${
+                        filtroEstado === f 
+                        ? 'bg-white text-slate-900 shadow-sm' 
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {f}
+                  </button>
+               ))}
+            </div>
+         </div>
+
+         {/* Tabla */}
+         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[400px]">
+            {/* Header Ajustado (Total 12 columnas) */}
+            <div className="grid grid-cols-12 px-6 py-3 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <div className="col-span-1 text-center">Foto</div>
+                <div className="col-span-4">Descripción</div>
+                <div className="col-span-2 text-center">Stock</div>
+                <div className="col-span-2 text-center">Costo</div>
+                <div className="col-span-1 text-center">Estado</div>
+                <div className="col-span-2 text-right">Acciones</div>
+            </div>
+
+            <div className="divide-y divide-slate-50 overflow-y-auto max-h-[600px] custom-scrollbar">
+               {rowsFiltradas.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+                        <Package className="w-8 h-8 text-slate-300" />
+                     </div>
+                     <h3 className="text-slate-900 font-bold">No se encontraron empaques</h3>
+                     <p className="text-slate-400 text-sm mt-1">Ajusta los filtros o crea uno nuevo.</p>
+                  </div>
+               ) : (
+                  rowsFiltradas.map((r) => (
                     <Fila
                       key={r.id}
                       row={r}
                       disabled={busy}
                       onSave={(patch) => actualizar(r.id, patch)}
                       onToggle={(val) => toggleActivo(r.id, val)}
-                      onDelete={() => eliminar(r.id)}
+                      onDelete={() => eliminar(r)} 
                       onPreview={() => r.imagenUrl && setPreviewImage(r.imagenUrl)}
                     />
-                  ))}
-                  {rowsFiltradas.length === 0 && (
-                    <tr>
-                      <td className="p-12 text-center text-gray-400" colSpan={6}>
-                        {busqueda ? "No se encontraron coincidencias." : "No hay empaques registrados."}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                  ))
+               )}
             </div>
          </div>
       </div>
@@ -317,100 +388,113 @@ function Fila({
   const changed = nombre.trim() !== row.nombre || costo !== row.costoUnitario || String(stock) !== String(row.stock);
 
   return (
-    <tr className="hover:bg-gray-50/80 transition-colors group">
-      <td className="px-6 py-4 text-center">
-         <div 
-            className={`w-12 h-12 rounded-lg border border-gray-200 overflow-hidden mx-auto relative ${row.imagenUrl ? 'cursor-zoom-in hover:ring-2 hover:ring-slate-200 hover:shadow-md' : 'bg-gray-50' } transition-all`}
+    <div className={`grid grid-cols-12 items-center px-6 py-4 hover:bg-slate-50 transition-colors gap-2 group ${!row.activo ? 'opacity-60 bg-slate-50/50' : ''}`}>
+      
+      {/* 1. Foto */}
+      <div className="col-span-1 flex justify-center">
+          <div 
+            className={`w-10 h-10 rounded-xl border border-slate-200 overflow-hidden relative shadow-sm transition-all ${row.imagenUrl ? 'cursor-pointer hover:scale-110 hover:ring-2 hover:ring-slate-200' : 'bg-slate-50 flex items-center justify-center'}`}
             onClick={row.imagenUrl ? onPreview : undefined}
+            title={row.imagenUrl ? "Ver imagen" : "Sin imagen"}
          >
             {row.imagenUrl ? (
                // eslint-disable-next-line @next/next/no-img-element
                <img src={row.imagenUrl} alt="" className="w-full h-full object-cover" />
             ) : (
-               <div className="w-full h-full flex items-center justify-center text-lg text-gray-300">📦</div>
+               <Package className="w-4 h-4 text-slate-300" />
             )}
          </div>
-      </td>
+      </div>
 
-      <td className="px-6 py-4">
+      {/* 2. Descripción */}
+      <div className="col-span-4">
         <input
-          className="w-full bg-transparent border-b border-transparent hover:border-gray-300 focus:border-black focus:ring-0 outline-none px-0 py-1 font-medium text-gray-900 transition-colors placeholder:text-gray-300"
+          className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:ring-0 outline-none py-1 font-bold text-slate-700 transition-colors disabled:text-slate-400"
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
           placeholder="Nombre"
+          disabled={!row.activo}
         />
-      </td>
+      </div>
 
-      <td className="px-6 py-4 text-center">
-         <input
-            type="number"
-            min="0"
-            className={`w-16 text-center bg-transparent border-b hover:border-gray-300 focus:border-black focus:ring-0 outline-none py-1 font-bold ${Number(stock) < 10 ? 'text-red-600' : 'text-gray-700'}`}
-            value={stock}
-            onChange={(e) => setStock(e.target.value)}
-         />
-      </td>
+      {/* 3. Stock */}
+      <div className="col-span-2 flex justify-center">
+          <div className="relative group/input w-20">
+             <input
+                type="number"
+                min="0"
+                className={`w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-slate-900 rounded px-1 py-1 text-center font-mono font-bold transition-colors ${Number(stock) < 10 && row.activo ? 'text-red-600 bg-red-50' : 'text-slate-700'}`}
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                disabled={!row.activo}
+             />
+             {Number(stock) < 5 && row.activo && (
+                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" title="Stock Bajo" />
+             )}
+          </div>
+      </div>
 
-      <td className="px-6 py-4 text-center">
-         <div className="flex items-center justify-center gap-1">
-            <span className="text-gray-400 text-xs">S/</span>
-            <input
-               className="w-16 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-black focus:ring-0 outline-none px-0 py-1 text-center font-mono text-gray-700"
-               value={costo}
-               onChange={(e) => setCosto(e.target.value)}
-            />
-         </div>
-      </td>
+      {/* 4. Costo */}
+      <div className="col-span-2 flex justify-center">
+          <div className="flex items-center gap-1">
+             <span className="text-slate-400 text-xs font-medium">S/</span>
+             <input
+                className="w-16 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:ring-0 outline-none px-0 py-1 text-center font-mono text-slate-700 disabled:text-slate-400"
+                value={costo}
+                onChange={(e) => setCosto(e.target.value)}
+                disabled={!row.activo}
+             />
+          </div>
+      </div>
 
-      <td className="px-6 py-4 text-center">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => onToggle(!row.activo)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1 ${row.activo ? 'bg-green-500' : 'bg-gray-300'}`}
-          title={row.activo ? "Activo" : "Inactivo"}
-        >
-           <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${row.activo ? 'translate-x-6' : 'translate-x-1'}`} />
-        </button>
-      </td>
-
-      <td className="px-6 py-4 text-right">
-        <div className="flex items-center justify-end gap-2 opacity-40 group-hover:opacity-100 transition-opacity">
-          {changed && (
-             <button
-               type="button"
-               className="bg-slate-900 text-white text-xs px-3 py-1.5 rounded-md font-medium hover:bg-slate-800 transition-all animate-in zoom-in"
-               disabled={disabled || !nombre.trim()}
-               onClick={() => onSave({ 
-                   nombre: nombre.trim(), 
-                   costoUnitario: costo,
-                   stock: Number(stock) 
-               })}
-             >
-               Guardar
-             </button>
-          )}
-          
-          {/* BOTÓN REPONER */}
-          <Link 
-             href={`/admin/compras/nueva?prefillEmpaque=${row.id}`}
-             className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-lg transition-colors"
-             title="Reponer Stock"
+      {/* 5. Estado Switch */}
+      <div className="col-span-1 flex justify-center">
+          <button
+             disabled={disabled}
+             onClick={() => onToggle(!row.activo)}
+             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${row.activo ? 'bg-emerald-500' : 'bg-slate-300'}`}
+             title={row.activo ? "Activar/Desactivar" : "Activar"}
           >
-             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-          </Link>
-
-          <button 
-             type="button" 
-             className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors" 
-             disabled={disabled} 
-             onClick={onDelete}
-             title="Eliminar"
-          >
-             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+             <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${row.activo ? 'translate-x-5' : 'translate-x-1'}`} />
           </button>
-        </div>
-      </td>
-    </tr>
+      </div>
+
+      {/* 6. Acciones */}
+      <div className="col-span-2 flex items-center justify-end gap-2">
+        {/* Guardar (Visible si cambia) */}
+        {changed && row.activo && (
+             <button
+               className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors shadow-sm animate-in zoom-in"
+               disabled={disabled || !nombre.trim()}
+               onClick={() => onSave({ nombre: nombre.trim(), costoUnitario: costo, stock: Number(stock) })}
+               title="Guardar cambios"
+             >
+               <Save className="w-4 h-4" />
+             </button>
+        )}
+        
+        {/* Reponer Stock */}
+        {row.activo && (
+            <Link 
+                href={`/admin/compras/nueva?prefillEmpaque=${row.id}`}
+                className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Reponer Stock (Crear Compra)"
+            >
+                <ShoppingCart className="w-4 h-4" />
+            </Link>
+        )}
+
+        {/* Archivar (Soft Delete) */}
+        <button
+            type="button"
+            className={`p-2 rounded-lg transition-colors ${row.activo ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-300 cursor-not-allowed'}`}
+            disabled={disabled || !row.activo}
+            onClick={onDelete}
+            title={row.activo ? "Archivar" : "Ya está inactivo"}
+        >
+            <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
   );
 }

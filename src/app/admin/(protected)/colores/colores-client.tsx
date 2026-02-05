@@ -2,9 +2,27 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { 
+  Palette, 
+  Search, 
+  Plus, 
+  Save, 
+  Trash2, 
+  Copy, 
+  Check, 
+  Ban, 
+  Maximize2
+} from "lucide-react";
 
-type Row = { id: string; nombre: string; hex: string | null; usos?: number };
+type Row = { 
+  id: string; 
+  nombre: string; 
+  hex: string | null; 
+  usos?: number; 
+  activo: boolean; 
+};
 
+// --- UTILS ---
 function esHex(v: string) {
   if (!v) return true;
   return /^#([0-9a-fA-F]{6})$/.test(v.trim());
@@ -22,14 +40,12 @@ function hexSeguroParaPicker(hex: string) {
 }
 
 async function copiarAlPortapapeles(text: string) {
-  const t = text ?? "";
-  if (!t) return;
+  if (!text) return;
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(t);
+    await navigator.clipboard.writeText(text);
   } else {
-    // fallback
     const ta = document.createElement("textarea");
-    ta.value = t;
+    ta.value = text;
     ta.style.position = "fixed";
     ta.style.left = "-9999px";
     document.body.appendChild(ta);
@@ -42,21 +58,20 @@ async function copiarAlPortapapeles(text: string) {
 export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
   const router = useRouter();
 
-  // 🔎 búsqueda
+  // 🔎 Filtros
   const [buscar, setBuscar] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos">("todos");
 
-  // create
+  // Form
   const [nombre, setNombre] = useState("");
   const [hex, setHex] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "warning" } | null>(null);
   
-  // Toast state
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-  
-  // ✅ Estado para la mini ventana (modal) de visualización
-  const [previewColor, setPreviewColor] = useState<Row | null>(null);
+  // Modal Preview
+  const [previewColor, setPreviewColor] = useState<{ nombre: string; hex: string | null; activo: boolean } | null>(null);
 
   const hexNorm = useMemo(() => normalizarHex(hex), [hex]);
 
@@ -66,17 +81,20 @@ export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
   );
 
   const rowsFiltradas = useMemo(() => {
-    const q = buscar.trim().toLowerCase();
-    if (!q) return initialRows;
-
     return initialRows.filter((r) => {
-      const a = (r.nombre ?? "").toLowerCase();
-      const b = normalizarHex(r.hex ?? "").toLowerCase();
-      return a.includes(q) || b.includes(q);
-    });
-  }, [buscar, initialRows]);
+      const q = buscar.trim().toLowerCase();
+      const coincideTexto = !q || (r.nombre ?? "").toLowerCase().includes(q) || normalizarHex(r.hex ?? "").toLowerCase().includes(q);
+      
+      const coincideEstado = 
+        filtroEstado === "todos" ? true :
+        filtroEstado === "activos" ? r.activo :
+        !r.activo;
 
-  const showToast = (msg: string, type: "success" | "error" = "success") => {
+      return coincideTexto && coincideEstado;
+    });
+  }, [buscar, filtroEstado, initialRows]);
+
+  const showToast = (msg: string, type: "success" | "error" | "warning" = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
@@ -111,7 +129,7 @@ export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
     const hexNorm2 = patch.hex ? normalizarHex(patch.hex) : "";
 
     if (!nombreTrim) { showToast("Nombre inválido", "error"); return; }
-    if (!esHex(hexNorm2)) { showToast("HEX inválido (usa #RRGGBB)", "error"); return; }
+    if (!esHex(hexNorm2)) { showToast("HEX inválido", "error"); return; }
 
     const r = await fetch(`/api/admin/colores/${id}`, {
       method: "PUT",
@@ -123,42 +141,68 @@ export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
       showToast("Error actualizando color", "error");
       return;
     }
-
     showToast("Color actualizado");
     router.refresh();
   }
 
-  async function eliminar(row: Row) {
-    if ((row.usos ?? 0) > 0) {
-      showToast(`No puedes eliminar "${row.nombre}" porque está en uso.`, "error");
-      return;
-    }
-
-    if (!confirm("¿Eliminar color permanentemente?")) return;
-
-    const r = await fetch(`/api/admin/colores/${row.id}`, { method: "DELETE" });
+  async function toggleActivo(id: string, activo: boolean) {
+    const r = await fetch(`/api/admin/colores/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activo }),
+    });
 
     if (!r.ok) {
-      showToast("Error eliminando color", "error");
+      showToast("Error cambiando estado", "error");
       return;
     }
+    showToast(activo ? "Color activado" : "Color desactivado");
+    router.refresh();
+  }
 
-    showToast("Color eliminado");
+  async function eliminar(row: Row) {
+    if (!row.activo) {
+        showToast(`El color ya se encuentra ARCHIVADO.`, "warning");
+        return;
+    }
+
+    const mensaje = (row.usos ?? 0) > 0 
+        ? `⚠️ ATENCIÓN: Este color está en uso en ${row.usos} productos.\n\n` +
+          `Si lo archivas, no se borrará de los productos existentes, pero NO podrás seleccionarlo para nuevos productos.\n\n` +
+          `¿Deseas archivar "${row.nombre}"?`
+        : `¿Deseas archivar el color "${row.nombre}"?\n\nPasará a estado Inactivo.`;
+
+    if (!confirm(mensaje)) return;
+
+    const r = await fetch(`/api/admin/colores/${row.id}`, { 
+        method: "PATCH", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activo: false }),
+    });
+
+    if (!r.ok) {
+      showToast("Error al archivar color", "error");
+      return;
+    }
+    showToast("Color archivado (Inactivo)", "warning");
     router.refresh();
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start relative">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
       
-      {/* TOAST NOTIFICATION */}
+      {/* TOAST */}
       {toast && (
-          <div className={`fixed bottom-5 right-5 px-6 py-3 rounded-lg shadow-xl text-white font-medium text-sm animate-in slide-in-from-bottom-5 fade-in duration-300 z-[9999] flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-900'}`}>
-              <span className="text-xl">{toast.type === 'error' ? '⚠️' : '✅'}</span>
+          <div className={`fixed bottom-5 right-5 px-6 py-3 rounded-lg shadow-xl text-white font-medium text-sm animate-in slide-in-from-bottom-5 fade-in duration-300 z-[9999] flex items-center gap-3 ${
+             toast.type === 'error' ? 'bg-red-600' : 
+             toast.type === 'warning' ? 'bg-amber-600' : 'bg-slate-900'
+          }`}>
+              <span>{toast.type === 'error' ? '⚠️' : toast.type === 'warning' ? '🔒' : '✅'}</span>
               <span>{toast.msg}</span>
           </div>
       )}
 
-      {/* ✅ MINI VENTANA (MODAL) DE VISUALIZACIÓN */}
+      {/* MODAL ZOOM */}
       {previewColor && (
         <div 
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
@@ -172,7 +216,7 @@ export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
                 className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors"
                 onClick={() => setPreviewColor(null)}
               >
-                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                 <Maximize2 className="w-5 h-5" />
               </button>
 
               <div 
@@ -181,9 +225,16 @@ export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
               />
               
               <div className="text-center space-y-2">
-                 <h3 className="text-2xl font-bold text-gray-900">{previewColor.nombre}</h3>
-                 <p 
-                    className="font-mono text-lg text-gray-500 bg-gray-100 px-4 py-1.5 rounded-full cursor-pointer hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                 <h3 className="text-2xl font-bold text-gray-900">{previewColor.nombre || "Nuevo Color"}</h3>
+                 <div className="flex justify-center gap-2 mb-2">
+                    {previewColor.activo ? (
+                        <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-bold">Activo</span>
+                    ) : (
+                        <span className="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full font-bold">Inactivo</span>
+                    )}
+                 </div>
+                 <button 
+                    className="font-mono text-lg text-gray-600 bg-gray-50 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-100 transition-colors flex items-center justify-center gap-2 w-full"
                     onClick={() => {
                         if (previewColor.hex) {
                             copiarAlPortapapeles(previewColor.hex);
@@ -192,142 +243,171 @@ export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
                     }}
                  >
                     {previewColor.hex || "N/A"}
-                    <span className="text-xs opacity-50">📋</span>
-                 </p>
+                    <Copy className="w-4 h-4 opacity-50" />
+                 </button>
               </div>
            </div>
         </div>
       )}
 
-      {/* COLUMNA IZQUIERDA: CREAR Y BUSCAR */}
-      <div className="lg:col-span-1 space-y-6">
+      {/* ---------------- COLUMNA IZQUIERDA: FORMULARIO ---------------- */}
+      <div className="lg:col-span-4 sticky top-6 space-y-6">
         
-        {/* BUSCADOR */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-           <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">Filtrar Colores</label>
-           <div className="relative">
-              <input
-                className="w-full border border-gray-300 rounded-lg pl-10 pr-3 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all placeholder:text-gray-400"
-                placeholder="Nombre o #HEX..."
-                value={buscar}
-                onChange={(e) => setBuscar(e.target.value)}
-              />
-              <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-           </div>
-           <p className="text-xs text-gray-400 mt-3 text-right font-medium">
-             Mostrando {rowsFiltradas.length} resultados
-           </p>
-        </div>
-
-        {/* CREAR */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm sticky top-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-6 border-b pb-4 flex items-center gap-2">
-            <span>🎨</span> Nuevo Color
-          </h2>
-          
-          <form onSubmit={crear} className="space-y-5">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Nombre del Color</label>
-              <input
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all placeholder:text-gray-300"
-                placeholder="Ej: Azul Marino"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Selector & Código</label>
-              <div className="flex gap-3">
-                 <input
-                   type="color"
-                   className="h-11 w-14 border border-gray-300 rounded-lg p-1 cursor-pointer bg-white shadow-sm hover:border-gray-400 transition-colors"
-                   value={hexSeguroParaPicker(hexNorm)}
-                   onChange={(e) => setHex(normalizarHex(e.target.value))}
-                   title="Abrir selector de color"
-                 />
-                 <input
-                   className="flex-1 border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all placeholder:text-gray-300 uppercase font-mono tracking-wider"
-                   placeholder="#RRGGBB"
-                   value={hex}
-                   onChange={(e) => setHex(e.target.value)}
-                 />
+        {/* Card Formulario */}
+        <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden">
+          <div className="bg-slate-900 p-6 text-white">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                 <Plus className="w-5 h-5 text-white" />
               </div>
-              {!esHex(hexNorm) && <p className="text-xs text-red-500 mt-1 font-medium">Formato inválido. Usa #RRGGBB</p>}
+              <h3 className="font-bold text-lg tracking-tight">Nuevo Color</h3>
             </div>
+            <p className="text-slate-400 text-xs">Añade variantes cromáticas a tu paleta.</p>
+          </div>
+          
+          <div className="p-6">
+            <form onSubmit={crear} className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Nombre</label>
+                  <input
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300 text-sm font-medium"
+                    placeholder="Ej: Azul Marino"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                  />
+                </div>
 
-            {/* Preview Miniatura en Formulario */}
-            <div className={`p-4 rounded-lg flex items-center gap-4 transition-colors ${esHex(hexNorm) && hexNorm ? 'bg-gray-50 border border-gray-200' : 'bg-gray-50 border border-dashed border-gray-300'}`}>
-               <div 
-                  className="w-10 h-10 rounded-full border border-gray-200 shadow-sm" 
-                  style={{ background: esHex(hexNorm) && hexNorm ? hexNorm : "transparent" }} 
-               />
-               <div className="text-xs text-gray-500">
-                  <span className="block font-bold text-gray-800 mb-0.5">Vista Previa</span>
-                  <span className="font-mono">{hexNorm || "—"}</span>
-               </div>
-            </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Selector</label>
+                  <div className="flex gap-3">
+                     <div className="relative flex-1 group">
+                        <span className="absolute left-3 top-3 text-slate-400 font-mono text-sm">#</span>
+                        <input
+                          className="w-full pl-7 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300 font-mono text-sm uppercase"
+                          placeholder="RRGGBB"
+                          value={hex}
+                          onChange={(e) => setHex(e.target.value)}
+                        />
+                        {/* Selector nativo invisible sobrepuesto */}
+                        <input 
+                            type="color" 
+                            className="absolute right-2 top-2 w-8 h-8 opacity-0 cursor-pointer"
+                            value={hexSeguroParaPicker(hexNorm)}
+                            onChange={(e) => setHex(normalizarHex(e.target.value))}
+                        />
+                        <div className="absolute right-3 top-3 pointer-events-none">
+                            <Palette className="w-5 h-5 text-slate-400 group-focus-within:text-slate-900 transition-colors" />
+                        </div>
+                     </div>
+                  </div>
+                  {!esHex(hexNorm) && <p className="text-xs text-red-500 ml-1">Formato inválido.</p>}
+                </div>
 
-            {error && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2">⚠️ {error}</div>}
+                {/* Vista Previa en Formulario */}
+                <div 
+                  className={`p-3 rounded-xl border flex items-center gap-4 cursor-pointer transition-all hover:shadow-sm ${esHex(hexNorm) && hexNorm ? 'bg-white border-slate-200' : 'bg-slate-50 border-dashed border-slate-300'}`}
+                  onClick={() => {
+                     if (esHex(hexNorm) && hexNorm) {
+                        setPreviewColor({ nombre: nombre || "Vista Previa", hex: hexNorm, activo: true });
+                     }
+                  }}
+                  title="Clic para ampliar"
+                >
+                   <div 
+                      className="w-12 h-12 rounded-full border border-slate-200 shadow-sm shrink-0" 
+                      style={{ background: esHex(hexNorm) && hexNorm ? hexNorm : "transparent" }} 
+                   />
+                   <div className="flex-1">
+                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Vista Previa</p>
+                      <p className="text-sm font-mono text-slate-500">{hexNorm || "---"}</p>
+                   </div>
+                   {esHex(hexNorm) && hexNorm && <Maximize2 className="w-4 h-4 text-slate-400" />}
+                </div>
 
-            <button
-              type="submit"
-              className="w-full bg-slate-900 text-white rounded-lg px-4 py-3 font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md active:scale-[0.98]"
-              disabled={busy || !canCreate}
-            >
-              {busy ? "Guardando..." : "Guardar Color"}
-            </button>
-          </form>
+                {error && <div className="text-xs text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">{error}</div>}
+
+                <button
+                  type="submit"
+                  className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-slate-900/10"
+                  disabled={busy || !canCreate}
+                >
+                  {busy ? "Guardando..." : "Guardar Color"}
+                </button>
+            </form>
+          </div>
         </div>
       </div>
 
-      {/* COLUMNA DERECHA: TABLA */}
-      <div className="lg:col-span-2">
-         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-               <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Listado de Colores</span>
+      {/* ---------------- COLUMNA DERECHA: LISTADO ---------------- */}
+      <div className="lg:col-span-8 space-y-6">
+         
+         {/* Barra de Filtros y Búsqueda */}
+         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+               <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+               <input
+                 className="w-full pl-10 pr-4 py-2.5 text-sm bg-transparent outline-none placeholder:text-slate-400"
+                 placeholder="Buscar color..."
+                 value={buscar}
+                 onChange={(e) => setBuscar(e.target.value)}
+               />
+            </div>
+            
+            <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
+               {(['todos', 'activos', 'inactivos'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFiltroEstado(f)}
+                    className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all capitalize ${
+                        filtroEstado === f 
+                        ? 'bg-white text-slate-900 shadow-sm' 
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {f}
+                  </button>
+               ))}
+            </div>
+         </div>
+
+         {/* Tabla */}
+         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[400px]">
+            {/* Header Ajustado para 12 columnas */}
+            <div className="grid grid-cols-12 px-6 py-3 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <div className="col-span-1 text-center">Muestra</div>
+                <div className="col-span-4">Nombre</div>
+                <div className="col-span-2">HEX</div>
+                <div className="col-span-2 text-center">Estado</div>
+                <div className="col-span-1 text-center">Usos</div>
+                <div className="col-span-2 text-right">Acciones</div>
             </div>
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-white border-b border-gray-100 text-gray-400 font-bold text-xs uppercase tracking-wider">
-                    <tr>
-                      <th className="px-6 py-4 w-20 text-center">Muestra</th>
-                      <th className="px-6 py-4">Nombre</th>
-                      <th className="px-6 py-4">Código HEX</th>
-                      <th className="px-6 py-4 text-center">Usos</th>
-                      <th className="px-6 py-4 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {rowsFiltradas.map((r) => (
+            <div className="divide-y divide-slate-50 overflow-y-auto max-h-[600px] custom-scrollbar">
+                {rowsFiltradas.length === 0 ? (
+                   <div className="flex flex-col items-center justify-center py-20 text-center">
+                      <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+                         <Palette className="w-8 h-8 text-slate-300" />
+                      </div>
+                      <h3 className="text-slate-900 font-bold">No se encontraron colores</h3>
+                      <p className="text-slate-400 text-sm mt-1">Intenta ajustar los filtros.</p>
+                   </div>
+                ) : (
+                   rowsFiltradas.map((r) => (
                       <Fila
                         key={r.id}
                         row={r}
                         disabled={busy}
                         onSave={(patch) => actualizar(r.id, patch)}
                         onDelete={() => eliminar(r)}
+                        onToggle={(act) => toggleActivo(r.id, act)}
                         onCopy={async (value) => {
                           await copiarAlPortapapeles(value);
                           showToast(`Copiado: ${value}`);
                         }}
                         onPreview={() => setPreviewColor(r)}
                       />
-                    ))}
-
-                    {rowsFiltradas.length === 0 && (
-                      <tr>
-                        <td className="p-16 text-center text-gray-400" colSpan={5}>
-                          <div className="flex flex-col items-center gap-3">
-                             <span className="text-5xl opacity-20">🎨</span>
-                             <p className="text-lg font-medium text-gray-500">No se encontraron colores.</p>
-                             <p className="text-sm">Intenta crear uno nuevo o ajusta tu búsqueda.</p>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                   ))
+                )}
             </div>
          </div>
       </div>
@@ -340,6 +420,7 @@ function Fila({
   disabled,
   onSave,
   onDelete,
+  onToggle,
   onCopy,
   onPreview,
 }: {
@@ -347,6 +428,7 @@ function Fila({
   disabled: boolean;
   onSave: (patch: { nombre: string; hex: string | null }) => void;
   onDelete: () => void;
+  onToggle: (activo: boolean) => void;
   onCopy: (value: string) => void;
   onPreview: () => void;
 }) {
@@ -355,90 +437,104 @@ function Fila({
 
   const hexNorm = normalizarHex(hex);
   const baseHex = normalizarHex(row.hex ?? "");
-  const usos = row.usos ?? 0;
-
   const changed = nombre.trim() !== row.nombre || (hexNorm || "") !== (baseHex || "");
-  const puedeEliminar = usos === 0;
-
+  const usos = row.usos ?? 0;
+  
   return (
-    <tr className="hover:bg-gray-50 transition-colors group">
-      <td className="px-6 py-4 text-center">
-        <div 
-            className="w-10 h-10 rounded-full border-2 border-white shadow-md mx-auto cursor-pointer hover:scale-110 transition-transform ring-1 ring-gray-200"
-            style={{ background: esHex(hexNorm) && hexNorm ? hexNorm : "transparent" }}
-            title="Clic para ver en grande"
-            onClick={onPreview}
-        />
-      </td>
+    <div className={`grid grid-cols-12 items-center px-6 py-4 hover:bg-slate-50 transition-colors gap-2 group ${!row.activo ? 'opacity-60 bg-slate-50/50' : ''}`}>
+       
+       {/* Muestra (col-span-1) */}
+       <div className="col-span-1 flex justify-center">
+          <div 
+             className="w-10 h-10 rounded-full border border-slate-200 shadow-sm cursor-pointer hover:scale-110 transition-transform ring-2 ring-transparent hover:ring-slate-100"
+             style={{ background: esHex(hexNorm) && hexNorm ? hexNorm : "transparent" }}
+             onClick={onPreview}
+             title="Ver detalle"
+          />
+       </div>
 
-      <td className="px-6 py-4">
-        <input
-          className="w-full bg-transparent border-b border-transparent hover:border-gray-300 focus:border-black focus:ring-0 outline-none px-2 py-1 font-semibold text-gray-700 transition-colors placeholder:font-normal"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          placeholder="Nombre"
-        />
-      </td>
+       {/* Nombre (col-span-4) */}
+       <div className="col-span-4">
+          <input
+            className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:ring-0 outline-none py-1 font-bold text-slate-700 transition-colors disabled:text-slate-400"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            disabled={!row.activo}
+          />
+       </div>
 
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-3 group/hex relative">
-            <span className="text-gray-400 text-lg">#</span>
-            <input
-                className="w-24 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-black focus:ring-0 outline-none px-0 py-1 font-mono text-sm text-gray-600 transition-colors uppercase"
+       {/* HEX + Picker (col-span-2) */}
+       <div className="col-span-2 relative group/hex">
+          <div className="flex items-center gap-2">
+             <span className="text-slate-400 font-mono">#</span>
+             <input
+                className="w-20 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:ring-0 outline-none py-1 font-mono text-sm text-slate-600 uppercase disabled:text-slate-400"
                 value={hex.replace('#', '')}
                 onChange={(e) => setHex('#' + e.target.value.replace(/[^0-9A-Fa-f]/g, ''))}
-                placeholder="RRGGBB"
-            />
-            {/* Overlay invisible para el color picker rápido */}
-            <input 
+                disabled={!row.activo}
+             />
+          </div>
+          {/* Picker flotante */}
+          {row.activo && (
+             <input 
                 type="color" 
-                className="absolute inset-0 opacity-0 w-8 cursor-pointer -left-6"
+                className="absolute inset-0 opacity-0 cursor-pointer w-full"
                 value={hexSeguroParaPicker(hexNorm)}
                 onChange={(e) => setHex(normalizarHex(e.target.value))}
-            />
-            
-            {hexNorm && (
-                <button 
-                    onClick={() => onCopy(hexNorm)}
-                    className="text-gray-300 hover:text-black opacity-0 group-hover/hex:opacity-100 transition-all transform hover:scale-110"
-                    title="Copiar Código"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                </button>
-            )}
-        </div>
-      </td>
+             />
+          )}
+          {/* Botón copiar flotante */}
+          {hexNorm && (
+             <button 
+                onClick={(e) => { e.stopPropagation(); onCopy(hexNorm); }}
+                className="absolute -right-6 top-1 text-slate-400 hover:text-slate-800 opacity-0 group-hover/hex:opacity-100 transition-opacity z-10"
+             >
+                <Copy className="w-3.5 h-3.5" />
+             </button>
+          )}
+       </div>
 
-      <td className="px-6 py-4 text-center">
-         <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${usos > 0 ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
-            {usos} {usos === 1 ? 'uso' : 'usos'}
-         </span>
-      </td>
+       {/* Estado Toggle (col-span-2) */}
+       <div className="col-span-2 flex justify-center">
+          <button
+             disabled={disabled}
+             onClick={() => onToggle(!row.activo)}
+             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${row.activo ? 'bg-emerald-500' : 'bg-slate-300'}`}
+             title={row.activo ? "Activar/Desactivar" : "Activar"}
+          >
+             <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${row.activo ? 'translate-x-5' : 'translate-x-1'}`} />
+          </button>
+       </div>
 
-      <td className="px-6 py-4 text-right">
-        <div className="flex items-center justify-end gap-3 opacity-40 group-hover:opacity-100 transition-opacity">
-          {changed && (
+       {/* Usos (col-span-1) */}
+       <div className="col-span-1 text-center">
+          <span className={`text-xs font-bold px-2 py-1 rounded-full ${usos > 0 ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+             {usos}
+          </span>
+       </div>
+
+       {/* Acciones (col-span-2) */}
+       <div className="col-span-2 flex items-center justify-end gap-2">
+          {changed && row.activo && (
              <button
-               type="button"
-               className="bg-green-600 text-white text-xs px-4 py-1.5 rounded-full font-bold hover:bg-green-700 transition-all shadow-sm animate-in zoom-in"
+               className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors shadow-sm animate-in zoom-in"
                disabled={disabled || !nombre.trim() || !esHex(hexNorm)}
                onClick={() => onSave({ nombre: nombre.trim(), hex: hexNorm ? hexNorm : null })}
+               title="Guardar cambios"
              >
-               Guardar
+               <Save className="w-4 h-4" />
              </button>
           )}
 
           <button
-            type="button"
-            className={`p-2 rounded-full transition-colors ${puedeEliminar ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' : 'text-gray-200 cursor-not-allowed'}`}
-            disabled={disabled || !puedeEliminar}
+            className={`p-2 rounded-lg transition-colors ${row.activo ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-300 cursor-not-allowed'}`}
+            disabled={disabled || !row.activo}
             onClick={onDelete}
-            title={!puedeEliminar ? "En uso por productos" : "Eliminar"}
+            title={row.activo ? "Archivar (Desactivar)" : "Ya está inactivo"}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+             {row.activo ? <Ban className="w-4 h-4" /> : <Check className="w-4 h-4" />}
           </button>
-        </div>
-      </td>
-    </tr>
+       </div>
+    </div>
   );
 }
