@@ -4,13 +4,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obtenerSesion } from "@/lib/sesion";
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const sesion = await obtenerSesion();
   if (!sesion || sesion.rol !== "ADMIN") {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const varianteId = params.id;
+  const { id: varianteId } = await params;
   if (!varianteId) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
 
   const ultimo = await prisma.itemCompra.findFirst({

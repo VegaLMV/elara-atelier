@@ -22,7 +22,8 @@ export async function PATCH(
       departamento, 
       provincia, 
       distrito, 
-      direccion 
+      direccion,
+      activo // Permitimos actualizar el estado si fuera necesario
     } = body;
 
     const proveedor = await prisma.proveedor.update({
@@ -37,6 +38,7 @@ export async function PATCH(
         provincia,
         distrito,
         direccion,
+        activo
       },
     });
 
@@ -47,6 +49,7 @@ export async function PATCH(
   }
 }
 
+// DELETE: Implementación de Soft Delete
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -57,13 +60,17 @@ export async function DELETE(
 
     const { id } = await params;
 
-    await prisma.proveedor.delete({
+    // En lugar de borrar, marcamos como inactivo
+    await prisma.proveedor.update({
       where: { id },
+      data: {
+        activo: false
+      }
     });
 
-    return new NextResponse("Proveedor eliminado");
+    return new NextResponse("Proveedor desactivado correctamente");
   } catch (error) {
     console.error("Error eliminando proveedor:", error);
-    return new NextResponse("Error al eliminar (puede tener compras asociadas)", { status: 500 });
+    return new NextResponse("Error al intentar desactivar el proveedor", { status: 500 });
   }
 }
