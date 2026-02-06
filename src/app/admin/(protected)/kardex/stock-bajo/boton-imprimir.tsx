@@ -1,13 +1,16 @@
-"use client"; // <--- Esto es lo que permite usar onClick
+"use client";
+
+import { Printer } from "lucide-react";
 
 export default function BotonImprimir() {
   return (
     <button 
       type="button"
       onClick={() => window.print()}
-      className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all active:scale-95"
+      className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-slate-800 flex items-center gap-2 shadow-lg shadow-slate-900/20 transition-all active:scale-95 print:hidden"
     >
-       <span>🖨️</span> Imprimir Reporte
+       <Printer className="w-4 h-4" />
+       <span>Imprimir Reporte</span>
     </button>
   );
 }

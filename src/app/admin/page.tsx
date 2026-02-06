@@ -43,13 +43,13 @@ export default async function AdminHome() {
     // 3. Total Categorías
     prisma.categoria.count(),
     
-    // 4. Campañas Activas (CORREGIDO)
-    // Contamos las que NO están canceladas ni finalizadas, y cuya fecha abarca "ahora"
-    prisma.descuentoProducto.count({ 
+    // 4. Campañas Activas (CORREGIDO: Usamos prisma.campana)
+    prisma.campana.count({ 
         where: { 
-            estado: { notIn: ['CANCELADO', 'FINALIZADO'] }, // Excluir estados muertos
-            startsAt: { lte: new Date() }, // Ya empezó
-            endsAt: { gte: new Date() }    // Aún no termina
+            // Buscamos campañas que NO estén muertas y que estén en fecha
+            estado: { notIn: ['CANCELADO', 'FINALIZADO'] }, 
+            startsAt: { lte: new Date() }, 
+            endsAt: { gte: new Date() }    
         } 
     })
   ]);

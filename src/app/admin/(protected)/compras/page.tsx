@@ -6,8 +6,16 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { obtenerSesion } from "@/lib/sesion";
 import { redirect } from "next/navigation";
+import { 
+  Plus, 
+  Search, 
+  Calendar, 
+  ShoppingCart, 
+  Filter,
+  DollarSign
+} from "lucide-react";
 
-
+// Helper de formato moneda
 function soles(v: any) {
   const n = Number(v?.toString?.() ?? v);
   if (Number.isNaN(n)) return `S/ ${String(v)}`;
@@ -20,10 +28,19 @@ type SP = {
   to?: string;
 };
 
+/**
+ * ============================================================================
+ * PÁGINA: LISTADO DE COMPRAS
+ * ============================================================================
+ * Muestra el historial de ingresos de mercadería (Ropa y Empaques).
+ * Permite filtrar por proveedor, rango de fechas y notas.
+ */
 export default async function Page({ searchParams }: { searchParams: Promise<SP> }) {
+  // 1. Seguridad
   const sesion = await obtenerSesion();
   if (!sesion || sesion.rol !== "ADMIN") redirect("/admin/login");
 
+  // 2. Filtros
   const sp = (await searchParams) ?? {};
   const q = (sp.q ?? "").trim();
   const from = (sp.from ?? "").trim();
@@ -31,7 +48,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   const where: Prisma.CompraWhereInput = {};
 
-  // Filtro de Texto
   if (q) {
     where.OR = [
       { notas: { contains: q, mode: "insensitive" } },
@@ -39,21 +55,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     ];
   }
 
-  // Filtro de Fechas
   if (from || to) {
       where.fechaCompra = {};
-      if (from) {
-          // Inicio del día seleccionado
-          where.fechaCompra.gte = new Date(from);
-      }
+      if (from) where.fechaCompra.gte = new Date(from);
       if (to) {
-          // Final del día seleccionado (23:59:59)
           const d = new Date(to);
           d.setHours(23, 59, 59, 999);
           where.fechaCompra.lte = d;
       }
   }
 
+  // 3. Consulta
   const compras = await prisma.compra.findMany({
     where,
     include: {
@@ -61,9 +73,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       items: { select: { cantidad: true, costoUnitario: true } },
     },
     orderBy: { fechaCompra: "desc" },
-    take: 100,
+    take: 100, // Límite de seguridad
   });
 
+  // 4. Procesamiento para vista (Cálculo de totales)
   const rows = compras.map((c) => {
     const totalItems = c.items.reduce((acc, it) => acc + it.cantidad, 0);
     const subtotal = c.items.reduce((acc, it) => acc + it.cantidad * Number(it.costoUnitario.toString()), 0);
@@ -74,81 +87,107 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     return {
       id: c.id,
       fecha: c.fechaCompra,
-      proveedor: c.proveedor?.nombre ?? "—",
+      proveedor: c.proveedor?.nombre ?? "Proveedor General",
       estado: c.estado,
       totalItems,
       total,
     };
   });
 
+  const totalGastoVisible = rows.reduce((acc, r) => acc + r.total, 0);
+
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 bg-gray-50 min-h-screen">
+    <div className="p-6 md:p-8 max-w-[1600px] mx-auto space-y-8 bg-gray-50/50 min-h-screen">
       
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 pb-6">
+      {/* --- HEADER --- */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-gray-200 pb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Compras de Mercadería</h1>
-          <p className="text-sm text-gray-500 mt-1">Gestiona ingresos de stock y costos asociados.</p>
+          <div className="flex items-center gap-3 mb-2">
+             <div className="p-2 bg-slate-900 text-white rounded-lg shadow-lg shadow-slate-900/20">
+                <ShoppingCart className="w-6 h-6" />
+             </div>
+             <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Compras</h1>
+          </div>
+          <p className="text-sm text-gray-500 max-w-xl ml-1">
+            Registro de ingresos de stock. Gestiona proveedores y costos operativos.
+          </p>
         </div>
+        
         <Link 
             href="/admin/compras/nueva"
-            className="bg-slate-900 text-white rounded-lg px-5 py-2.5 text-sm font-medium hover:bg-slate-800 transition shadow-md hover:shadow-lg flex items-center gap-2"
+            className="bg-slate-900 text-white rounded-xl px-6 py-3 text-sm font-bold hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2"
         >
-            <span>+</span> Nueva Compra
+            <Plus className="w-5 h-5 text-emerald-400" /> Nueva Compra
         </Link>
       </div>
 
-      {/* Stats & Search */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-         {/* Simple Stats */}
-         <div className="md:col-span-1 bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Registros</span>
-            <div className="text-3xl font-bold text-gray-900 mt-2">{rows.length}</div>
-            <p className="text-xs text-gray-400 mt-1">Mostrando últimos 100</p>
+      {/* --- STATS & SEARCH GRID --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+         
+         {/* Stats Card */}
+         <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
+            <div className="relative z-10">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" /> Gasto Total (Vista)
+                </span>
+                <div className="text-3xl font-bold text-slate-900 mt-2 tracking-tight">{soles(totalGastoVisible)}</div>
+                <p className="text-xs text-emerald-600 font-medium mt-1 bg-emerald-50 inline-block px-2 py-0.5 rounded-lg border border-emerald-100">
+                    {rows.length} compras registradas
+                </p>
+            </div>
+            <div className="absolute right-[-20px] bottom-[-20px] opacity-5 text-slate-900">
+                <ShoppingCart className="w-32 h-32" />
+            </div>
          </div>
          
-         {/* Search Bar & Filters */}
-         <div className="md:col-span-3 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-            <form className="flex flex-col md:flex-row gap-4 items-end">
-                <div className="flex-1 space-y-1.5 w-full">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Buscar</label>
-                    <div className="relative">
+         {/* Filtros */}
+         <div className="lg:col-span-3 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+            <form className="flex flex-col md:flex-row gap-4 items-end h-full">
+                <div className="flex-1 w-full space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Buscar</label>
+                    <div className="relative group">
                         <input
                             name="q"
                             defaultValue={q}
-                            className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all placeholder:text-gray-400"
+                            className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all placeholder:text-gray-400 font-medium"
                             placeholder="Proveedor, notas..."
                         />
-                        <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3 group-focus-within:text-slate-800 transition-colors" />
                     </div>
                 </div>
 
                 <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 px-2 uppercase tracking-wider">Desde</label>
-                    <input
-                        type="date"
-                        name="from"
-                        defaultValue={from}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                    />
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Desde</label>
+                    <div className="relative">
+                        <Calendar className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
+                        <input
+                            type="date"
+                            name="from"
+                            defaultValue={from}
+                            className="border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-sm bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-gray-600"
+                        />
+                    </div>
                 </div>
 
                 <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 px-2 uppercase tracking-wider">Hasta</label>
-                    <input
-                        type="date"
-                        name="to"
-                        defaultValue={to}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                    />
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Hasta</label>
+                    <div className="relative">
+                        <Calendar className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
+                        <input
+                            type="date"
+                            name="to"
+                            defaultValue={to}
+                            className="border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-sm bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-gray-600"
+                        />
+                    </div>
                 </div>
 
                 <div className="flex gap-2">
-                    <button className="bg-slate-900 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm">
-                        Filtrar
+                    <button className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-md active:scale-95 flex items-center gap-2">
+                        <Filter className="w-4 h-4" /> Filtrar
                     </button>
                     {(q || from || to) && (
-                        <Link href="/admin/compras" className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors" title="Limpiar filtros">
+                        <Link href="/admin/compras" className="bg-white border border-gray-200 text-gray-500 px-3 py-2.5 rounded-xl hover:bg-gray-50 hover:text-red-500 transition-colors" title="Limpiar">
                             ✕
                         </Link>
                     )}
@@ -157,53 +196,55 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
          </div>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+      {/* --- TABLA --- */}
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm min-h-[400px]">
         <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-200">
+            <thead className="bg-gray-50/80 border-b border-gray-200">
                 <tr>
-                <th className="px-6 py-4">Fecha</th>
-                <th className="px-6 py-4">Proveedor</th>
-                <th className="px-6 py-4 text-center">Estado</th>
-                <th className="px-6 py-4 text-center">Ítems</th>
-                <th className="px-6 py-4 text-right">Total</th>
-                <th className="px-6 py-4 text-right">Acción</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 uppercase text-[11px] tracking-wider w-32">Fecha</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 uppercase text-[11px] tracking-wider">Proveedor</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 uppercase text-[11px] tracking-wider text-center">Estado</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 uppercase text-[11px] tracking-wider text-center">Ítems</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 uppercase text-[11px] tracking-wider text-right">Total</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 uppercase text-[11px] tracking-wider text-right">Acción</th>
                 </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-50">
                 {rows.map((r) => (
-                    <tr key={r.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-4 text-gray-600 whitespace-nowrap font-mono text-xs">
+                    <tr key={r.id} className="hover:bg-blue-50/30 transition-colors group">
+                    <td className="px-6 py-4 text-gray-500 whitespace-nowrap font-mono text-xs">
                         {new Date(r.fecha).toLocaleDateString("es-PE", { year: 'numeric', month: 'short', day: 'numeric' })}
                     </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                        {r.proveedor}
+                    <td className="px-6 py-4">
+                        <span className="font-bold text-gray-900">{r.proveedor}</span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider ${
                             r.estado === 'RECIBIDO' 
                                 ? 'bg-green-50 text-green-700 border-green-200' 
                                 : r.estado === 'BORRADOR' 
-                                ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
                                 : 'bg-gray-100 text-gray-600 border-gray-200'
                         }`}>
                             {r.estado}
                         </span>
                     </td>
-                    <td className="px-6 py-4 text-center text-gray-600">
-                        {r.totalItems}
+                    <td className="px-6 py-4 text-center">
+                        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-md text-xs font-bold border border-gray-200">
+                            {r.totalItems}
+                        </span>
                     </td>
-                    <td className="px-6 py-4 text-right font-bold text-gray-900 font-mono">
+                    <td className="px-6 py-4 text-right font-bold text-slate-900 text-sm font-mono">
                         {soles(r.total)}
                     </td>
 
                     <td className="px-6 py-4 text-right">
                         <Link 
                             href={`/admin/compras/${r.id}`}
-                            className="text-blue-600 hover:text-blue-800 font-medium text-xs hover:underline bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100"
+                            className="text-blue-600 hover:text-blue-800 font-bold text-xs hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors inline-block"
                         >
-                        Ver Detalle
+                            Ver Detalle
                         </Link>
                     </td>
                     </tr>
@@ -211,10 +252,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
                 {rows.length === 0 && (
                     <tr>
-                    <td className="p-16 text-center text-gray-400 italic" colSpan={6}>
-                        <div className="flex flex-col items-center gap-2">
-                            <span className="text-4xl opacity-20">📅</span>
-                            <p className="font-medium">No se encontraron compras en este rango.</p>
+                    <td className="p-24 text-center text-gray-400" colSpan={6}>
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center border border-gray-100">
+                                <ShoppingCart className="w-8 h-8 text-gray-300" />
+                            </div>
+                            <div>
+                                <p className="font-bold text-gray-900">No se encontraron compras</p>
+                                <p className="text-xs text-gray-500 mt-1">Prueba cambiando los filtros de fecha.</p>
+                            </div>
                         </div>
                     </td>
                     </tr>

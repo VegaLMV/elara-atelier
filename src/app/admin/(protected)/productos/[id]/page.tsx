@@ -6,8 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
 import ProductoEditor from "./producto-editor";
 
+/**
+ * ============================================================================
+ * PÁGINA: WRAPPER DE EDICIÓN DE PRODUCTO
+ * ============================================================================
+ * Carga todos los datos del producto (Info, Variantes, Imágenes, Historial)
+ * y referencias necesarias (Tallas, Colores, Categorías) para el editor.
+ */
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  // 1. Verify Admin Session
   const admin = await sesionAdmin();
   if (!admin) redirect("/admin/login");
 
@@ -19,26 +25,33 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       where: { id },
       include: {
         categoria: true,
-        imagenes: true,
+        imagenes: { orderBy: { orden: 'asc' } },
         imagenesColor: { include: { color: true } },
         variantes: { include: { talla: true, color: true } },
-        // ✅ Include historical discounts for the editor
-        descuentos: {
-          orderBy: { startsAt: "desc" },
+        
+        // ✅ CORRECCIÓN: Usamos la relación correcta 'participacionesCampana'
+        // para obtener el historial de campañas donde participó este producto.
+        participacionesCampana: {
+          include: {
+            campana: true // Traemos los datos de la campaña padre
+          },
+          orderBy: {
+            campana: { startsAt: 'desc' }
+          }
         },
       },
     });
 
     if (!producto) return notFound();
 
-    // Fetch references for the editor select inputs
+    // Referencias para selectores
     const [categorias, tallas, colores] = await Promise.all([
       prisma.categoria.findMany({ orderBy: { nombre: "asc" } }),
       prisma.talla.findMany({ orderBy: { orden: "asc" } }),
       prisma.color.findMany({ orderBy: { nombre: "asc" } }),
     ]);
 
-    // Prepare data object for the client component
+    // Mapeo de datos para el cliente
     const data = {
       producto: {
         id: producto.id,
@@ -49,22 +62,24 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         destacado: producto.destacado,
         categoriaId: producto.categoriaId ?? "",
         
-        // Manual/Legacy discount fields
+        // Campos de descuento manual (Legacy/Directo)
         descuentoActivo: producto.descuentoActivo,
         descuentoTipo: (producto.descuentoTipo ?? "PORCENTAJE") as any,
         descuentoValor: producto.descuentoValor?.toString?.() ?? "",
         descuentoInicio: producto.descuentoInicio ? producto.descuentoInicio.toISOString().slice(0, 10) : "",
         descuentoFin: producto.descuentoFin ? producto.descuentoFin.toISOString().slice(0, 10) : "",
       },
-      // Map discounts for the new manager
-      descuentosHistorial: producto.descuentos.map((d) => ({
-        id: d.id,
-        tipo: d.tipo,
-        valor: d.valor.toString(),
-        startsAt: d.startsAt.toISOString(),
-        endsAt: d.endsAt.toISOString(),
-        estado: d.estado,
+      
+      // ✅ MAPEO CORREGIDO: Transformamos Campaña -> DescuentoItem
+      descuentosHistorial: producto.participacionesCampana.map((p) => ({
+        id: p.campana.id,
+        tipo: p.campana.tipo,
+        valor: p.campana.valor.toString(),
+        startsAt: p.campana.startsAt.toISOString(),
+        endsAt: p.campana.endsAt.toISOString(),
+        estado: p.campana.estado,
       })),
+
       variantes: producto.variantes.map((v) => ({
         id: v.id,
         tallaId: v.tallaId,
@@ -75,17 +90,20 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         stockActual: v.stockActual,
         activa: v.activa,
       })),
+      
       referencias: {
         categorias: categorias.map((c) => ({ id: c.id, nombre: c.nombre })),
         tallas: tallas.map((t) => ({ id: t.id, nombre: t.nombre })),
         colores: colores.map((c) => ({ id: c.id, nombre: c.nombre, hex: c.hex })),
       },
+      
       imagenes: producto.imagenes.map((img) => ({
         id: img.id,
         url: img.url,
         esPortada: img.esPortada,
         orden: img.orden,
       })),
+      
       imagenesColor: producto.imagenesColor.map((x) => ({
         id: x.id,
         url: x.url,
@@ -97,8 +115,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
     return <ProductoEditor initialData={data} />;
   } catch (error) {
-    console.error("Error loading product:", error);
-    // In dev, sometimes connection fails. We can show a friendly error or throw to Next error boundary
+    console.error("Error cargando producto:", error);
     throw error;
   }
 }

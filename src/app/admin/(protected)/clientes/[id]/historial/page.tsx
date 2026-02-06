@@ -2,17 +2,33 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
 import { redirect, notFound } from "next/navigation";
-import { ArrowLeft, ShoppingBag, Calendar, CreditCard, Tag } from "lucide-react";
+import { 
+  ArrowLeft, 
+  ShoppingBag, 
+  Calendar, 
+  CreditCard, 
+  Tag, 
+  User, 
+  MapPin,
+  TrendingUp
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * ============================================================================
+ * PÁGINA: HISTORIAL DE COMPRAS DEL CLIENTE
+ * ============================================================================
+ * Muestra un timeline detallado de todas las transacciones realizadas por el cliente.
+ * Calcula el LTV (Lifetime Value) y muestra detalles de cada item comprado.
+ */
 export default async function HistorialClientePage({ params }: { params: Promise<{ id: string }> }) {
   const admin = await sesionAdmin();
   if (!admin) redirect("/admin/login");
 
   const { id } = await params;
 
-  // Obtener cliente con todas sus ventas e items
+  // 1. Obtener cliente con historial profundo
   const cliente = await prisma.cliente.findUnique({
     where: { id },
     include: {
@@ -23,7 +39,7 @@ export default async function HistorialClientePage({ params }: { params: Promise
             include: {
               variante: {
                 include: {
-                  producto: { select: { nombre: true, imagenes: { take: 1 } } },
+                  producto: { select: { nombre: true, imagenes: { take: 1, orderBy: { esPortada: 'desc' } } } },
                   talla: true,
                   color: true
                 }
@@ -37,94 +53,137 @@ export default async function HistorialClientePage({ params }: { params: Promise
 
   if (!cliente) notFound();
 
-  // Cálculo de LTV (Lifetime Value)
+  // 2. Cálculo de Métricas (LTV)
   const totalGastado = cliente.ventas.reduce((acc, v) => acc + Number(v.total), 0);
+  const ticketPromedio = cliente.ventas.length > 0 ? totalGastado / cliente.ventas.length : 0;
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-8">
+    <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-8 bg-gray-50/50 min-h-screen">
       
-      {/* Header Cliente */}
+      {/* --- HEADER & RESUMEN --- */}
       <div className="flex flex-col md:flex-row justify-between gap-6 pb-6 border-b border-gray-200">
-         <div>
-            <Link href="/admin/clientes" className="text-sm text-gray-500 hover:text-slate-900 flex items-center gap-1 mb-2 transition-colors">
-                <ArrowLeft className="w-4 h-4" /> Volver a lista
+         <div className="flex-1">
+            <Link 
+                href="/admin/clientes" 
+                className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-slate-900 mb-3 transition-colors bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm hover:shadow"
+            >
+                <ArrowLeft className="w-4 h-4" /> Volver
             </Link>
-            <h1 className="text-3xl font-bold text-gray-900">{cliente.nombre}</h1>
-            <div className="flex items-center gap-3 mt-2 text-sm text-gray-600">
-                {cliente.telefono && <span className="flex items-center gap-1"><PhoneIcon /> {cliente.telefono}</span>}
-                {cliente.dni && <span className="bg-gray-100 px-2 py-0.5 rounded font-mono text-xs">DNI: {cliente.dni}</span>}
+            
+            <div className="flex items-start gap-4 mt-4">
+                <div className="w-16 h-16 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-2xl font-bold shadow-lg shadow-slate-900/20">
+                    {cliente.nombre.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{cliente.nombre}</h1>
+                    <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600">
+                        {cliente.dni && <span className="bg-white border border-gray-200 px-2 py-0.5 rounded font-mono text-xs shadow-sm">ID: {cliente.dni}</span>}
+                        {cliente.telefono && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> {cliente.telefono}</span>}
+                        {cliente.distrito && <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-red-500" /> {cliente.distrito}</span>}
+                    </div>
+                </div>
             </div>
          </div>
          
-         {/* Tarjeta Resumen (LTV) */}
-         <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-lg flex items-center gap-5 min-w-[250px]">
-             <div className="p-3 bg-white/10 rounded-full">
-                 <Tag className="w-6 h-6 text-yellow-400" />
+         {/* Tarjeta Métricas (LTV) */}
+         <div className="flex gap-4">
+             <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm min-w-[160px]">
+                 <p className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-1">Ticket Prom.</p>
+                 <p className="text-2xl font-bold text-slate-700">S/ {ticketPromedio.toFixed(0)}</p>
              </div>
-             <div>
-                 <p className="text-xs text-slate-300 uppercase tracking-wider font-bold">Total Gastado</p>
-                 <p className="text-2xl font-bold">S/ {totalGastado.toFixed(2)}</p>
-                 <p className="text-[10px] text-slate-400">{cliente.ventas.length} compras registradas</p>
+             
+             <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xl shadow-slate-900/20 flex flex-col justify-between min-w-[200px] relative overflow-hidden">
+                 <div className="absolute top-0 right-0 p-3 opacity-10">
+                     <TrendingUp className="w-16 h-16" />
+                 </div>
+                 <div className="relative z-10">
+                     <div className="flex items-center gap-2 mb-2">
+                         <Tag className="w-4 h-4 text-yellow-400" />
+                         <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Total Gastado</span>
+                     </div>
+                     <p className="text-3xl font-bold">S/ {totalGastado.toFixed(2)}</p>
+                     <p className="text-[10px] text-slate-400 mt-1">{cliente.ventas.length} compras registradas</p>
+                 </div>
              </div>
          </div>
       </div>
 
-      {/* Lista de Ventas */}
+      {/* --- LISTA DE VENTAS --- */}
       <div className="space-y-6">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <HistoryIcon /> Historial de Transacciones
+          <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+              Historial de Transacciones
           </h2>
 
           {cliente.ventas.length === 0 ? (
-              <div className="p-10 text-center bg-gray-50 rounded-xl border border-dashed border-gray-300 text-gray-500">
-                  Este cliente aún no tiene compras registradas.
+              <div className="flex flex-col items-center justify-center py-16 bg-white rounded-3xl border border-dashed border-gray-300 text-center">
+                  <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                      <ShoppingBag className="w-8 h-8 text-gray-300" />
+                  </div>
+                  <p className="text-gray-900 font-bold">Sin actividad reciente</p>
+                  <p className="text-gray-500 text-sm mt-1">Este cliente aún no ha realizado compras.</p>
+                  <Link href={`/admin/ventas/nueva?clienteId=${cliente.id}`} className="mt-4 text-blue-600 font-bold hover:underline text-sm">
+                      Crear primera venta →
+                  </Link>
               </div>
           ) : (
               <div className="grid gap-6">
                   {cliente.ventas.map(venta => (
-                      <div key={venta.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                      <div key={venta.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 group">
+                          
                           {/* Cabecera Venta */}
-                          <div className="bg-gray-50/50 p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4">
+                          <div className="bg-gray-50/50 p-5 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4">
                               <div className="flex items-center gap-4">
-                                  <div className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-400">
-                                      <ShoppingBag className="w-5 h-5" />
+                                  <div className="w-12 h-12 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
+                                      <ShoppingBag className="w-6 h-6" />
                                   </div>
                                   <div>
-                                      <p className="font-bold text-gray-900 text-sm">Venta #{venta.codigo.slice(-6).toUpperCase()}</p>
-                                      <p className="text-xs text-gray-500 flex items-center gap-1">
+                                      <div className="flex items-center gap-2">
+                                          <p className="font-bold text-gray-900 text-base">Venta #{venta.codigo.slice(-6).toUpperCase()}</p>
+                                          {venta.estado === 'ANULADO' && <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded-full font-bold">ANULADO</span>}
+                                      </div>
+                                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                                           <Calendar className="w-3 h-3" />
                                           {new Date(venta.fechaVenta).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                       </p>
                                   </div>
                               </div>
                               <div className="text-right">
-                                  <span className="block font-black text-slate-900">S/ {Number(venta.total).toFixed(2)}</span>
-                                  <span className="text-xs px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-600 inline-flex items-center gap-1 mt-1">
+                                  <span className="block font-black text-slate-900 text-xl">S/ {Number(venta.total).toFixed(2)}</span>
+                                  <span className="text-[10px] px-2 py-1 rounded-lg bg-white border border-gray-200 text-gray-600 inline-flex items-center gap-1 mt-1 shadow-sm font-medium">
                                       <CreditCard className="w-3 h-3" /> {venta.metodoPago}
                                   </span>
                               </div>
                           </div>
 
-                          {/* Items */}
-                          <div className="p-4 bg-white">
+                          {/* Items Detallados */}
+                          <div className="p-2">
                               <table className="w-full text-sm">
                                   <tbody className="divide-y divide-gray-50">
                                       {venta.items.map(item => (
-                                          <tr key={item.id} className="group">
-                                              <td className="py-2 pl-2 w-12">
-                                                  {item.variante.producto.imagenes?.[0]?.url ? (
-                                                      // eslint-disable-next-line @next/next/no-img-element
-                                                      <img src={item.variante.producto.imagenes[0].url} className="w-8 h-8 rounded object-cover border" alt="" />
-                                                  ) : (
-                                                      <div className="w-8 h-8 bg-gray-100 rounded border"></div>
-                                                  )}
+                                          <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                              <td className="py-3 pl-4 w-16">
+                                                  <div className="w-10 h-10 bg-gray-100 rounded-lg border border-gray-200 overflow-hidden relative">
+                                                      {item.variante.producto.imagenes?.[0]?.url ? (
+                                                          // eslint-disable-next-line @next/next/no-img-element
+                                                          <img src={item.variante.producto.imagenes[0].url} className="w-full h-full object-cover" alt="" />
+                                                      ) : (
+                                                          <div className="flex items-center justify-center h-full text-gray-300 text-[8px]">IMG</div>
+                                                      )}
+                                                  </div>
                                               </td>
-                                              <td className="py-2">
-                                                  <p className="font-medium text-gray-900">{item.variante.producto.nombre}</p>
-                                                  <p className="text-xs text-gray-500">{item.variante.talla.nombre} • {item.variante.color.nombre}</p>
+                                              <td className="py-3">
+                                                  <p className="font-bold text-gray-800 text-sm">{item.variante.producto.nombre}</p>
+                                                  <div className="flex items-center gap-2 mt-0.5">
+                                                      <span className="text-[10px] bg-gray-100 px-1.5 rounded text-gray-600 border border-gray-200">{item.variante.talla.nombre}</span>
+                                                      <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                                                          <span className="w-2 h-2 rounded-full border border-gray-300 shadow-sm" style={{ backgroundColor: item.variante.color.hex || '#eee' }}></span>
+                                                          {item.variante.color.nombre}
+                                                      </span>
+                                                  </div>
                                               </td>
-                                              <td className="py-2 text-center text-gray-600">x{item.cantidad}</td>
-                                              <td className="py-2 text-right font-medium text-gray-900">S/ {Number(item.precioFinal).toFixed(2)}</td>
+                                              <td className="py-3 text-center text-gray-600 font-medium text-xs">x{item.cantidad}</td>
+                                              <td className="py-3 pr-6 text-right font-bold text-gray-900 text-sm">S/ {Number(item.precioFinal).toFixed(2)}</td>
                                           </tr>
                                       ))}
                                   </tbody>
@@ -138,7 +197,3 @@ export default async function HistorialClientePage({ params }: { params: Promise
     </div>
   );
 }
-
-// Iconos Auxiliares
-function PhoneIcon() { return <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>; }
-function HistoryIcon() { return <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>; }

@@ -3,18 +3,26 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Save, Loader2, ArrowLeft, MapPin, User } from "lucide-react";
+import { Save, Loader2, ArrowLeft, MapPin, User, Building2, Mail } from "lucide-react";
 import Link from "next/link";
+import ClientesClient from "./clientes-client";
 
 type Props = {
-  initialData?: any; // Si llega, es EDICIÓN
+  initialData?: any; // Si existe, estamos en modo EDICIÓN
 };
 
+/**
+ * ============================================================================
+ * FORMULARIO DE CLIENTE (CREAR / EDITAR)
+ * ============================================================================
+ * Formulario unificado para gestionar la información de clientes.
+ * Maneja datos personales, fiscales (DNI/RUC) y de ubicación para delivery.
+ */
 export default function ClienteForm({ initialData }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  // Estado único para todos los campos
+  // Estado único para el formulario
   const [form, setForm] = useState({
     nombre: initialData?.nombre || "",
     dni: initialData?.dni || "",
@@ -33,9 +41,16 @@ export default function ClienteForm({ initialData }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.nombre.trim()) return toast.error("El nombre es obligatorio");
+    
+    // Validaciones básicas
+    if (!form.nombre.trim()) {
+        toast.error("Campo obligatorio", { description: "El nombre del cliente es requerido." });
+        return;
+    }
     
     setLoading(true);
+    
+    // Determinar si es Crear (POST) o Editar (PUT)
     const url = initialData ? `/api/admin/clientes/${initialData.id}` : "/api/admin/clientes";
     const method = initialData ? "PUT" : "POST";
 
@@ -48,100 +63,200 @@ export default function ClienteForm({ initialData }: Props) {
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Error al guardar");
+      if (!res.ok) throw new Error(data.error || "Error al procesar la solicitud");
 
-      toast.success(initialData ? "Cliente actualizado" : "Cliente creado");
+      toast.success(initialData ? "Cliente actualizado" : "Cliente registrado con éxito");
       router.push("/admin/clientes");
       router.refresh();
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error("Ocurrió un error", { description: error.message });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-4xl mx-auto space-y-6">
+    <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-8 pb-20">
       
-      {/* Encabezado */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-            <Link href="/admin/clientes" className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
+      {/* --- HEADER --- */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-gray-200 pb-6">
+        <div className="flex items-center gap-4 w-full sm:w-auto">
+            <Link 
+                href="/admin/clientes" 
+                className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors shadow-sm"
+            >
                 <ArrowLeft className="w-5 h-5" />
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">
-                {initialData ? "Editar Cliente" : "Nuevo Cliente"}
-            </h1>
+            <div>
+                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+                    {initialData ? "Editar Cliente" : "Nuevo Cliente"}
+                </h1>
+                <p className="text-sm text-gray-500">
+                    {initialData ? `Actualizando datos de ${initialData.nombre}` : "Registra un nuevo contacto en tu cartera."}
+                </p>
+            </div>
         </div>
-        <button
-            type="submit"
-            disabled={loading}
-            className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
-        >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Guardar
-        </button>
+        
+        <div className="flex gap-3 w-full sm:w-auto">
+            <Link 
+               href="/admin/clientes"
+               className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 font-bold hover:bg-gray-50 transition-colors text-center flex-1 sm:flex-none"
+            >
+               Cancelar
+            </Link>
+            <button
+                type="submit"
+                disabled={loading}
+                className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg hover:shadow-slate-900/20 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed flex-1 sm:flex-none active:scale-95"
+            >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-emerald-400" />}
+                Guardar Cambios
+            </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* 1. Datos Personales */}
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4 h-fit">
-              <h3 className="font-bold text-gray-900 border-b pb-3 flex items-center gap-2">
-                  <User className="w-4 h-4 text-blue-600" /> Datos Personales
-              </h3>
-              
-              <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">Nombre Completo *</label>
-                  <input name="nombre" required value={form.nombre} onChange={handleChange} className="w-full border p-2.5 rounded-lg mt-1 focus:ring-2 ring-slate-900 outline-none" placeholder="Ej: Juan Pérez" />
+          {/* === SECCIÓN 1: DATOS PERSONALES (7 cols) === */}
+          <div className="lg:col-span-7 space-y-6">
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-3 mb-4 flex items-center gap-2">
+                      <User className="w-4 h-4 text-blue-600" /> Información General
+                  </h3>
+                  
+                  <div className="space-y-5">
+                      <div>
+                          <label className="text-xs font-bold text-gray-500 uppercase ml-1">Nombre Completo <span className="text-red-500">*</span></label>
+                          <input 
+                             name="nombre" 
+                             required 
+                             value={form.nombre} 
+                             onChange={handleChange} 
+                             className="w-full border border-gray-200 p-3 rounded-xl mt-1 focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-gray-300 font-medium" 
+                             placeholder="Ej: Juan Pérez" 
+                          />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                          <div>
+                              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Documento (DNI/RUC)</label>
+                              <div className="relative mt-1">
+                                  <Building2 className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                                  <input 
+                                     name="dni" 
+                                     value={form.dni} 
+                                     onChange={handleChange} 
+                                     className="w-full border border-gray-200 pl-10 pr-3 py-3 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none transition-all font-mono" 
+                                     placeholder="00000000" 
+                                  />
+                              </div>
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Teléfono / WhatsApp</label>
+                              <div className="relative mt-1">
+                                  <span className="absolute left-3 top-3 text-gray-400 text-xs font-bold">+51</span>
+                                  <input 
+                                     name="telefono" 
+                                     value={form.telefono} 
+                                     onChange={handleChange} 
+                                     className="w-full border border-gray-200 pl-10 pr-3 py-3 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none transition-all font-mono" 
+                                     placeholder="999 999 999" 
+                                  />
+                              </div>
+                          </div>
+                      </div>
+
+                      <div>
+                          <label className="text-xs font-bold text-gray-500 uppercase ml-1">Correo Electrónico</label>
+                          <div className="relative mt-1">
+                              <Mail className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                              <input 
+                                 name="email" 
+                                 type="email" 
+                                 value={form.email} 
+                                 onChange={handleChange} 
+                                 className="w-full border border-gray-200 pl-10 pr-3 py-3 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none transition-all placeholder:text-gray-300" 
+                                 placeholder="cliente@ejemplo.com" 
+                              />
+                          </div>
+                      </div>
+                  </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase">DNI / RUC</label>
-                      <input name="dni" value={form.dni} onChange={handleChange} className="w-full border p-2.5 rounded-lg mt-1 focus:ring-2 ring-slate-900 outline-none" placeholder="00000000" />
+              {/* Zona de Peligro (Solo Edición) */}
+              {initialData && (
+                  <div className="pt-4">
+                      <h3 className="text-xs font-bold text-red-500 uppercase tracking-wide mb-3 ml-1">Zona de Peligro</h3>
+                      <ClientesClient id={initialData.id} ventasCount={initialData._count?.ventas || 0} />
                   </div>
-                  <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase">Teléfono</label>
-                      <input name="telefono" value={form.telefono} onChange={handleChange} className="w-full border p-2.5 rounded-lg mt-1 focus:ring-2 ring-slate-900 outline-none" placeholder="999..." />
-                  </div>
-              </div>
-
-              <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">Email (Opcional)</label>
-                  <input name="email" type="email" value={form.email} onChange={handleChange} className="w-full border p-2.5 rounded-lg mt-1 focus:ring-2 ring-slate-900 outline-none" placeholder="cliente@email.com" />
-              </div>
+              )}
           </div>
 
-          {/* 2. Dirección y Delivery */}
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4 h-fit">
-              <h3 className="font-bold text-gray-900 border-b pb-3 flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-red-600" /> Ubicación (Delivery)
-              </h3>
+          {/* === SECCIÓN 2: UBICACIÓN (5 cols) === */}
+          <div className="lg:col-span-5 space-y-6">
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm h-full">
+                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-3 mb-4 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-red-500" /> Dirección de Entrega
+                  </h3>
 
-              <div className="grid grid-cols-3 gap-3">
-                  <div>
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Departamento</label>
-                      <input name="departamento" value={form.departamento} onChange={handleChange} className="w-full border p-2 rounded-lg mt-1 text-sm" placeholder="Ica" />
-                  </div>
-                  <div>
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Provincia</label>
-                      <input name="provincia" value={form.provincia} onChange={handleChange} className="w-full border p-2 rounded-lg mt-1 text-sm" placeholder="Ica" />
-                  </div>
-                  <div>
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Distrito</label>
-                      <input name="distrito" value={form.distrito} onChange={handleChange} className="w-full border p-2 rounded-lg mt-1 text-sm" placeholder="Parcona" />
-                  </div>
-              </div>
+                  <div className="space-y-5">
+                      <div className="grid grid-cols-1 gap-4">
+                          <div>
+                              <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Departamento</label>
+                              <input 
+                                 name="departamento" 
+                                 value={form.departamento} 
+                                 onChange={handleChange} 
+                                 className="w-full border border-gray-200 p-2.5 rounded-lg mt-1 text-sm focus:ring-2 focus:ring-slate-900 outline-none" 
+                                 placeholder="Ej: Lima" 
+                              />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Provincia</label>
+                                  <input 
+                                     name="provincia" 
+                                     value={form.provincia} 
+                                     onChange={handleChange} 
+                                     className="w-full border border-gray-200 p-2.5 rounded-lg mt-1 text-sm focus:ring-2 focus:ring-slate-900 outline-none" 
+                                     placeholder="Ej: Lima" 
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Distrito</label>
+                                  <input 
+                                     name="distrito" 
+                                     value={form.distrito} 
+                                     onChange={handleChange} 
+                                     className="w-full border border-gray-200 p-2.5 rounded-lg mt-1 text-sm focus:ring-2 focus:ring-slate-900 outline-none" 
+                                     placeholder="Ej: Miraflores" 
+                                  />
+                              </div>
+                          </div>
+                      </div>
 
-              <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">Dirección Exacta</label>
-                  <input name="direccion" value={form.direccion} onChange={handleChange} className="w-full border p-2.5 rounded-lg mt-1 focus:ring-2 ring-slate-900 outline-none" placeholder="Av. Principal 123" />
-              </div>
+                      <div>
+                          <label className="text-xs font-bold text-gray-500 uppercase ml-1">Dirección Exacta</label>
+                          <input 
+                             name="direccion" 
+                             value={form.direccion} 
+                             onChange={handleChange} 
+                             className="w-full border border-gray-200 p-3 rounded-xl mt-1 focus:ring-2 focus:ring-slate-900 outline-none transition-all" 
+                             placeholder="Av. Larco 123, Dpto 401" 
+                          />
+                      </div>
 
-              <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">Referencia</label>
-                  <input name="referencia" value={form.referencia} onChange={handleChange} className="w-full border p-2.5 rounded-lg mt-1 focus:ring-2 ring-slate-900 outline-none" placeholder="Ej: Portón negro, frente al parque" />
+                      <div>
+                          <label className="text-xs font-bold text-gray-500 uppercase ml-1">Referencia</label>
+                          <input 
+                             name="referencia" 
+                             value={form.referencia} 
+                             onChange={handleChange} 
+                             className="w-full border border-gray-200 p-3 rounded-xl mt-1 focus:ring-2 focus:ring-slate-900 outline-none transition-all placeholder:text-gray-300 text-sm" 
+                             placeholder="Ej: Frente al parque, portón negro..." 
+                          />
+                      </div>
+                  </div>
               </div>
           </div>
       </div>

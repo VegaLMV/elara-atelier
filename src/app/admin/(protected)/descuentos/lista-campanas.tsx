@@ -21,15 +21,14 @@ interface ProductoMini {
 }
 
 interface Campana {
-  idRef: string;
+  id: string; // ID real de la Campana
   nombre: string;
   descripcion: string | null;
   tipo: "PORCENTAJE" | "MONTO";
   valor: number;
   inicio: Date;
   fin: Date;
-  estadoCalculado: "ACTIVO" | "PROGRAMADO" | "FINALIZADO" | "CANCELADO";
-  idsDescuentos: string[];
+  estadoCalculado: string; // Viene del Enum
   productos: ProductoMini[];
 }
 
@@ -41,34 +40,21 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
   const [campanaSeleccionada, setCampanaSeleccionada] = useState<Campana | null>(null);
   const [imagenZoom, setImagenZoom] = useState<string | null>(null);
 
-  // --- LÓGICA DE ORDENAMIENTO ---
-  const campañasOrdenadas = [...campañas].sort((a, b) => {
-    // 1. Prioridad absoluta: Estado ACTIVO
-    const esActivoA = a.estadoCalculado === 'ACTIVO';
-    const esActivoB = b.estadoCalculado === 'ACTIVO';
-
-    if (esActivoA && !esActivoB) return -1; // A va primero
-    if (!esActivoA && esActivoB) return 1;  // B va primero
-
-    // 2. Secundaria: Fecha de Inicio Descendente (Lo más nuevo/futuro arriba)
-    // Esto asegura que PROGRAMADO salga antes que FINALIZADO, y los finalizados recientes antes que los antiguos.
-    return new Date(b.inicio).getTime() - new Date(a.inicio).getTime();
-  });
-
-  const cancelarCampaña = async (ids: string[]) => {
-    if (!confirm("¿Estás seguro de cancelar esta campaña?")) return;
+  const cancelarCampaña = async (id: string) => {
+    if (!confirm("¿Estás seguro de cancelar esta campaña? Se revertirán los precios de los productos.")) return;
     try {
-      setLoading(ids[0]);
+      setLoading(id);
       const res = await fetch("/api/admin/descuentos/cancelar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify({ id }), // Enviamos ID de Campaña
       });
+      
       if (!res.ok) throw new Error();
-      toast.success("Campaña cancelada");
+      toast.success("Campaña cancelada correctamente");
       router.refresh();
     } catch {
-      toast.error("Error al cancelar");
+      toast.error("Error al cancelar la campaña");
     } finally {
       setLoading(null);
       setMenuAbierto(null);
@@ -78,9 +64,9 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
   return (
     <>
       <div className="grid gap-6">
-        {campañasOrdenadas.map((c) => (
+        {campañas.map((c) => (
           <div 
-            key={c.idRef} 
+            key={c.id} 
             className={`bg-white rounded-2xl p-6 border transition-all hover:shadow-md relative ${
               c.estadoCalculado === 'ACTIVO' ? 'border-green-200 shadow-green-50/50' : 
               c.estadoCalculado === 'CANCELADO' ? 'border-red-100 opacity-75' : 
@@ -112,24 +98,24 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
                   
                   {/* Menú Acciones */}
                   <div className="relative">
-                    <button onClick={() => setMenuAbierto(menuAbierto === c.idRef ? null : c.idRef)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <button onClick={() => setMenuAbierto(menuAbierto === c.id ? null : c.id)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                       <MoreHorizontal className="h-5 w-5 text-gray-500" />
                     </button>
-                    {menuAbierto === c.idRef && (
+                    {menuAbierto === c.id && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setMenuAbierto(null)}></div>
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-20 py-1 text-sm overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                           <button
-                            disabled={c.estadoCalculado === 'FINALIZADO'}
-                            onClick={() => router.push(`/admin/descuentos/${c.idRef}`)}
+                            disabled={c.estadoCalculado === 'FINALIZADO' || c.estadoCalculado === 'CANCELADO'}
+                            onClick={() => router.push(`/admin/descuentos/${c.id}`)}
                             className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
                           >
                             <Pencil className="h-4 w-4 text-blue-600" /> Editar
                           </button>
                           <div className="h-px bg-gray-100 my-1"></div>
                           <button
-                            disabled={loading === c.idRef || c.estadoCalculado === 'FINALIZADO' || c.estadoCalculado === 'CANCELADO'}
-                            onClick={() => cancelarCampaña(c.idsDescuentos)}
+                            disabled={loading === c.id || c.estadoCalculado === 'FINALIZADO' || c.estadoCalculado === 'CANCELADO'}
+                            onClick={() => cancelarCampaña(c.id)}
                             className="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-600 flex items-center gap-2 disabled:opacity-50"
                           >
                             <Ban className="h-4 w-4" /> Cancelar
@@ -192,7 +178,7 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
             </div>
           </div>
         ))}
-        {campañasOrdenadas.length === 0 && (
+        {campañas.length === 0 && (
            <div className="text-center py-12 text-gray-400">
               <Tag className="w-12 h-12 mx-auto mb-3 opacity-20" />
               <p>No hay campañas registradas.</p>
@@ -200,12 +186,13 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
         )}
       </div>
 
-      {/* MODAL */}
+      {/* MODAL (Sin cambios mayores, solo tipado) */}
       {campanaSeleccionada && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-200">
             <div className="w-full md:w-1/2 bg-gray-100 p-8 flex items-center justify-center relative min-h-[300px]">
               {imagenZoom ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img src={imagenZoom} alt="Zoom" className="max-w-full max-h-[50vh] md:max-h-full object-contain rounded-lg shadow-sm" />
               ) : (
                 <div className="flex flex-col items-center text-gray-400">
@@ -247,6 +234,7 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
                   >
                     <div className="w-10 h-10 rounded-md bg-white border border-gray-200 overflow-hidden flex-shrink-0">
                       {prod.imagen ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={prod.imagen} alt="" className="w-full h-full object-cover" />
                       ) : (
                           <div className="w-full h-full flex items-center justify-center bg-gray-50 text-[8px]">IMG</div>
@@ -257,15 +245,6 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
                     </span>
                   </div>
                 ))}
-              </div>
-              <div className="p-4 bg-gray-50 border-t border-gray-100 text-right">
-                <button 
-                   onClick={() => router.push(`/admin/descuentos/${campanaSeleccionada.idRef}`)}
-                   disabled={campanaSeleccionada.estadoCalculado === 'FINALIZADO'}
-                   className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
-                >
-                  Editar Campaña Completa
-                </button>
               </div>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
+import { Prisma } from "@prisma/client"; // <--- IMPORTANTE: Faltaba esto
 
 export async function POST(request: Request) {
   const admin = await sesionAdmin();
@@ -8,26 +9,32 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { clienteId, metodoPago, items, empaques } = body; // Recibimos empaques
+    const { clienteId, metodoPago, items, empaques } = body;
 
+    // --- 1. Validaciones Iniciales ---
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return new NextResponse("El carrito está vacío", { status: 400 });
+      return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
     }
 
-    // 1. Validar Stock PRODUCTOS
+    // --- 2. Validar Stock PRODUCTOS ---
     const variantesIds = items.map((i: any) => i.varianteId);
     const variantesDb = await prisma.variante.findMany({
         where: { id: { in: variantesIds } },
-        select: { id: true, stockActual: true, producto: { select: { nombre: true } } }
+        select: { id: true, stockActual: true, producto: { select: { nombre: true } }, talla: true, color: true }
     });
 
     for (const item of items) {
         const dbVar = variantesDb.find(v => v.id === item.varianteId);
-        if (!dbVar) return new NextResponse(`Variante no encontrada`, { status: 400 });
-        if (dbVar.stockActual < item.cantidad) return new NextResponse(`Stock insuficiente: ${dbVar.producto.nombre}`, { status: 409 });
+        if (!dbVar) return NextResponse.json({ error: `Variante no encontrada (ID: ${item.varianteId})` }, { status: 400 });
+        
+        if (dbVar.stockActual < item.cantidad) {
+            return NextResponse.json({ 
+                error: `Stock insuficiente para "${dbVar.producto.nombre}" (${dbVar.talla.nombre}/${dbVar.color.nombre}). Solicitado: ${item.cantidad}, Disponible: ${dbVar.stockActual}` 
+            }, { status: 409 });
+        }
     }
 
-    // 2. Validar Stock EMPAQUES (Si se enviaron)
+    // --- 3. Validar Stock EMPAQUES ---
     if (empaques && Array.isArray(empaques) && empaques.length > 0) {
         const empaqueIds = empaques.map((e: any) => e.tipoEmpaqueId);
         const empaquesDb = await prisma.tipoEmpaque.findMany({
@@ -37,56 +44,67 @@ export async function POST(request: Request) {
 
         for (const emp of empaques) {
             const dbEmp = empaquesDb.find(e => e.id === emp.tipoEmpaqueId);
-            if (!dbEmp) return new NextResponse(`Empaque no encontrado`, { status: 400 });
-            if (dbEmp.stock < emp.cantidad) return new NextResponse(`Sin stock de empaque: ${dbEmp.nombre}`, { status: 409 });
+            if (!dbEmp) return NextResponse.json({ error: `Empaque no encontrado` }, { status: 400 });
+            
+            if (dbEmp.stock < emp.cantidad) {
+                return NextResponse.json({ 
+                    error: `Sin stock de empaque "${dbEmp.nombre}". Disponible: ${dbEmp.stock}` 
+                }, { status: 409 });
+            }
         }
     }
 
-    // 3. Cálculos
+    // --- 4. Cálculos Financieros ---
     let subtotalVenta = 0;
     let descuentoTotalVenta = 0;
     let totalVenta = 0;
 
     const itemsProcesados = items.map((item: any) => {
-        const sub = Number(item.precioFinal) * Number(item.cantidad);
-        subtotalVenta += Number(item.precioUnitario) * Number(item.cantidad);
-        descuentoTotalVenta += Number(item.descuentoAplicado || 0) * Number(item.cantidad);
-        totalVenta += sub;
-        return { ...item, subtotal: sub };
+        const precioUnit = Number(item.precioUnitario);
+        const precioFinal = Number(item.precioFinal);
+        const cantidad = Number(item.cantidad);
+        const descuentoUnit = Number(item.descuentoAplicado || 0);
+
+        const subtotalLinea = precioFinal * cantidad; // Lo que paga el cliente
+        
+        subtotalVenta += precioUnit * cantidad; // Precio original total
+        descuentoTotalVenta += descuentoUnit * cantidad;
+        totalVenta += subtotalLinea;
+
+        return { 
+            varianteId: item.varianteId,
+            cantidad: cantidad,
+            precioUnitario: precioUnit,
+            precioFinal: precioFinal,
+            subtotal: subtotalLinea,
+            tieneDescuento: descuentoUnit > 0,
+            descuentoMonto: descuentoUnit,
+            descuentoRazon: item.descuentoRazon || (descuentoUnit > 0 ? "Oferta POS" : null)
+        };
     });
 
-    // 4. TRANSACCIÓN
+    // --- 5. TRANSACCIÓN ATÓMICA ---
     const ventaCreada = await prisma.$transaction(async (tx) => {
         
         // A. Crear Venta
         const venta = await tx.venta.create({
             data: {
                 clienteId: clienteId || null,
+                clienteNombre: !clienteId ? "Público General" : null,
                 metodoPago: metodoPago || "EFECTIVO",
                 subtotal: subtotalVenta,
                 descuentoTotal: descuentoTotalVenta,
                 total: totalVenta,
                 items: {
-                    create: itemsProcesados.map((i: any) => ({
-                        varianteId: i.varianteId,
-                        cantidad: i.cantidad,
-                        precioUnitario: i.precioUnitario,
-                        precioFinal: i.precioFinal,
-                        subtotal: i.subtotal,
-                        tieneDescuento: i.descuentoAplicado > 0,
-                        descuentoMonto: i.descuentoAplicado,
-                        descuentoRazon: i.descuentoAplicado > 0 ? "Oferta POS" : null
-                    }))
+                    create: itemsProcesados
                 }
             }
         });
 
-        // B. Registrar Empaques (Si los hay)
+        // B. Registrar Empaques
         if (empaques && empaques.length > 0) {
             for (const emp of empaques) {
-                // Obtener costo unitario actual para registro histórico
                 const dataEmp = await tx.tipoEmpaque.findUnique({ where: { id: emp.tipoEmpaqueId } });
-                
                 await tx.usoEmpaque.create({
                     data: {
                         ventaId: venta.id,
@@ -95,8 +113,6 @@ export async function POST(request: Request) {
                         costoTotal: Number(dataEmp?.costoUnitario || 0) * emp.cantidad
                     }
                 });
-
-                // Restar Stock Empaque
                 await tx.tipoEmpaque.update({
                     where: { id: emp.tipoEmpaqueId },
                     data: { stock: { decrement: emp.cantidad } }
@@ -104,7 +120,7 @@ export async function POST(request: Request) {
             }
         }
 
-        // C. Restar Stock Productos y Kardex
+        // C. Kardex & Stock Productos
         for (const item of itemsProcesados) {
             await tx.variante.update({
                 where: { id: item.varianteId },
@@ -115,7 +131,7 @@ export async function POST(request: Request) {
                     varianteId: item.varianteId,
                     tipo: "VENTA",
                     cambioCantidad: -item.cantidad,
-                    costoUnitario: item.precioFinal,
+                    costoUnitario: new Prisma.Decimal(item.precioFinal.toString()),
                     ventaId: venta.id,
                     nota: `Venta POS #${venta.codigo}`
                 }
@@ -125,10 +141,10 @@ export async function POST(request: Request) {
         return venta;
     });
 
-    return NextResponse.json({ success: true, codigo: ventaCreada.codigo });
+    return NextResponse.json({ success: true, codigo: ventaCreada.codigo, id: ventaCreada.id });
 
   } catch (error) {
-    console.error(error);
-    return new NextResponse("Error interno", { status: 500 });
+    console.error("Error en POST Ventas:", error);
+    return NextResponse.json({ error: "Error interno al procesar la venta" }, { status: 500 });
   }
 }

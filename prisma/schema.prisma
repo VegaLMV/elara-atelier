@@ -57,6 +57,17 @@ enum EstadoVenta {
   ANULADO
 }
 
+enum TipoDevolucion {
+  CLIENTE
+  PROVEEDOR
+}
+
+enum AccionDevolucion {
+  CAMBIO          // Se lleva otra prenda
+  SALDO_A_FAVOR   // Crédito para el futuro
+  REEMBOLSO       // Se le devuelve el dinero (solo fallas)
+}
+
 // --- MODELOS ---
 
 model Usuario {
@@ -215,6 +226,7 @@ model Variante {
   movimientos MovimientoInventario[]
   itemsCompra ItemCompra[]
   itemsVenta  ItemVenta[]
+  devoluciones DevolucionItem[]
 
   @@unique([productoId, tallaId, colorId])
 }
@@ -268,6 +280,7 @@ model Compra {
 
   items       ItemCompra[]
   movimientos MovimientoInventario[]
+  devoluciones Devolucion[]
   creadoEn    DateTime               @default(now())
 }
 
@@ -309,6 +322,7 @@ model Venta {
   empaques UsoEmpaque[]
 
   movimientos   MovimientoInventario[]
+  devoluciones Devolucion[]
   creadoEn      DateTime               @default(now())
   actualizadoEn DateTime               @updatedAt
 }
@@ -366,8 +380,38 @@ model Cliente {
   distrito     String?
   direccion    String?
   referencia   String?
+  saldoAFavor  Decimal  @default(0)
 
   ventas        Venta[]
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
+}
+
+model Devolucion {
+  id          String           @id @default(cuid())
+  tipo        TipoDevolucion
+  accion      AccionDevolucion
+  motivo      String
+  
+  ventaId     String?
+  venta       Venta?           @relation(fields: [ventaId], references: [id])
+  
+  compraId    String?
+  compra      Compra?          @relation(fields: [compraId], references: [id])
+
+  items       DevolucionItem[]
+  
+  montoTotal  Decimal          @default(0)
+  creadoEn    DateTime         @default(now())
+}
+
+model DevolucionItem {
+  id            String     @id @default(cuid())
+  devolucionId  String
+  devolucion    Devolucion @relation(fields: [devolucionId], references: [id])
+  
+  varianteId    String
+  variante      Variante   @relation(fields: [varianteId], references: [id])
+  
+  cantidad      Int
 }

@@ -23,29 +23,21 @@ export default function BuscadorProveedores() {
   };
 
   return (
-    <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-sm flex gap-2">
-      <div className="relative flex-1 group">
-        <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400 group-focus-within:text-slate-800 transition-colors" />
+    <div className="bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-2 focus-within:ring-2 focus-within:ring-slate-900/10 transition-all w-full">
+      <div className="p-3 text-slate-400">
+         <Search className="w-5 h-5" />
+      </div>
+      <div className="relative flex-1">
         <input
-          className="w-full pl-10 pr-4 py-2.5 text-sm bg-transparent outline-none placeholder:text-slate-400 text-slate-700"
-          placeholder="Buscar por nombre, ruc, razón social..."
+          className="w-full py-2.5 text-sm bg-transparent outline-none placeholder:text-slate-400 text-slate-700 font-medium"
+          placeholder="Buscar por nombre, RUC, razón social o teléfono..."
           defaultValue={searchParams.get("q")?.toString()}
           onChange={(e) => {
-            // Debounce manual simple (espera 300ms antes de buscar)
             const value = e.target.value;
             const timeoutId = setTimeout(() => handleSearch(value), 300);
             return () => clearTimeout(timeoutId);
           }}
-          // Mejor experiencia: evitar que el timeout se ejecute múltiples veces si escribes rápido
-          onInput={(e: React.ChangeEvent<HTMLInputElement>) => {
-             // Limpiamos timeouts anteriores si existen (truco rápido para debounce sin estados complejos)
-             // Nota: En producción idealmente usarías use-debounce, pero esto funciona nativo:
-             e.target.setAttribute("data-last-val", e.target.value);
-          }}
         />
-      </div>
-      <div className="hidden sm:block px-4 py-2 text-xs font-bold text-slate-400 bg-slate-50 rounded-xl border border-slate-100 flex items-center">
-         AUTO
       </div>
     </div>
   );

@@ -3,81 +3,107 @@ import { sesionAdmin } from "@/lib/sesion";
 import { redirect } from "next/navigation";
 import PosClient from "./pos-client";
 
-export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic"; // Siempre datos frescos para evitar vender sin stock
 
-// Recibimos searchParams para leer ?clienteId=...
-type Props = {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
-};
-
-export default async function NuevaVentaPage({ searchParams }: Props) {
+/**
+ * ============================================================================
+ * PÁGINA: PUNTO DE VENTA (POS)
+ * ============================================================================
+ * Carga inicial de datos maestros para la interfaz de venta rápida.
+ * Optimizado para traer solo productos con stock > 0.
+ */
+export default async function NuevaVentaPage() {
   const admin = await sesionAdmin();
   if (!admin) redirect("/admin/login");
 
-  // Leer ID del cliente si viene en la URL
-  const sp = await searchParams;
-  const prefillClienteId = typeof sp.clienteId === 'string' ? sp.clienteId : undefined;
-
-  // Cargar datos
-  const [categorias, productos, clientes, tiposEmpaque] = await Promise.all([
-    prisma.categoria.findMany({ orderBy: { nombre: 'asc' }, select: { id: true, nombre: true } }),
+  // Carga paralela de datos maestros
+  const [productosDb, clientesDb, empaquesDb, categoriasDb] = await Promise.all([
+    // 1. Productos (Solo activos y con stock en alguna variante)
     prisma.producto.findMany({
-      where: { estado: 'ACTIVO' },
+      where: { 
+        estado: "ACTIVO",
+        variantes: { some: { stockActual: { gt: 0 }, activa: true } } 
+      },
       select: {
-        id: true, nombre: true, precio: true, categoriaId: true,
-        descuentoActivo: true, descuentoTipo: true, descuentoValor: true,
-        imagenes: { where: { esPortada: true }, take: 1, select: { url: true } },
+        id: true,
+        nombre: true,
+        precio: true,
+        categoriaId: true,
+        // Datos de descuento vigentes
+        descuentoActivo: true,
+        descuentoTipo: true,
+        descuentoValor: true,
+        imagenes: { 
+            where: { esPortada: true }, 
+            take: 1, 
+            select: { url: true } 
+        },
         variantes: {
-          where: { activa: true },
-          select: { id: true, talla: { select: { nombre: true } }, color: { select: { nombre: true, hex: true } }, stockActual: true, sku: true }
+            where: { stockActual: { gt: 0 }, activa: true },
+            select: {
+                id: true,
+                talla: { select: { nombre: true } },
+                color: { select: { nombre: true, hex: true } },
+                stockActual: true,
+            },
+            orderBy: { talla: { orden: 'asc' } }
         }
       },
-      orderBy: { nombre: 'asc' }
+      orderBy: { nombre: "asc" }
     }),
-    prisma.cliente.findMany({ orderBy: { nombre: 'asc' }, select: { id: true, nombre: true, dni: true } }),
+
+    // 2. Clientes (Para buscador rápido)
+    prisma.cliente.findMany({
+        orderBy: { nombre: "asc" },
+        select: { id: true, nombre: true, dni: true, email: true }
+    }),
+
+    // 3. Empaques (Insumos)
     prisma.tipoEmpaque.findMany({
         where: { activo: true, stock: { gt: 0 } },
-        select: { id: true, nombre: true, costoUnitario: true, stock: true }
+        select: { id: true, nombre: true, stock: true, costoUnitario: true, imagenUrl: true }
+    }),
+
+    // 4. Categorías (Para filtros)
+    prisma.categoria.findMany({
+        orderBy: { nombre: "asc" },
+        select: { id: true, nombre: true }
     })
   ]);
 
-  // Formatear Decimales
-  const empaquesFormateados = tiposEmpaque.map(e => ({
-      ...e, costoUnitario: Number(e.costoUnitario)
+  // Transformación ligera para el cliente
+  const productos = productosDb.map(p => ({
+      id: p.id,
+      nombre: p.nombre,
+      precioBase: Number(p.precio),
+      categoriaId: p.categoriaId,
+      imagen: p.imagenes[0]?.url || null,
+      descuento: p.descuentoActivo ? {
+          tipo: p.descuentoTipo,
+          valor: Number(p.descuentoValor)
+      } : null,
+      variantes: p.variantes.map(v => ({
+          id: v.id,
+          talla: v.talla.nombre,
+          color: v.color.nombre,
+          hex: v.color.hex,
+          stock: v.stockActual
+      }))
   }));
 
-  const productosFormateados = productos.map(p => {
-     const stockTotal = p.variantes.reduce((acc, v) => acc + v.stockActual, 0);
-     let precioFinal = Number(p.precio);
-     
-     if (p.descuentoActivo && p.descuentoValor) {
-        if (p.descuentoTipo === 'PORCENTAJE') {
-           precioFinal = precioFinal - (precioFinal * (Number(p.descuentoValor) / 100));
-        } else {
-           precioFinal = precioFinal - Number(p.descuentoValor);
-        }
-     }
-
-     return {
-       ...p,
-       precio: Number(p.precio),
-       descuentoValor: p.descuentoValor ? Number(p.descuentoValor) : 0,
-       stockTotal,
-       precioFinal,
-       imagen: p.imagenes[0]?.url || "/placeholder.png"
-     };
-  });
+  const empaques = empaquesDb.map(e => ({
+      ...e,
+      costo: Number(e.costoUnitario)
+  }));
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-100 overflow-hidden">
+    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
        <PosClient 
-          productosIniciales={productosFormateados} 
-          categorias={categorias}
-          clientes={clientes}
-          tiposEmpaque={empaquesFormateados}
-          vendedorId={(admin as any).id}
-          // Pasamos el cliente pre-seleccionado
-          initialClienteId={prefillClienteId} 
+          productosIniciales={productos}
+          clientesIniciales={clientesDb}
+          empaquesIniciales={empaques}
+          categorias={categoriasDb}
        />
     </div>
   );

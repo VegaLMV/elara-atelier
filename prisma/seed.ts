@@ -1,15 +1,44 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
 
-const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
-if (!connectionString) throw new Error("Falta DIRECT_URL o DATABASE_URL en .env");
+// NOTA: Usamos la conexión estándar para evitar conflictos de versiones con adaptadores
+const prisma = new PrismaClient();
 
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+// --- DATA DE UBIGEO (Ejemplo para usar en Clientes/Proveedores) ---
+// Esto no se guarda en BD porque tu schema usa Strings, pero sirve para crear data realista.
+const DATA_UBIGEO = [
+  // LIMA
+  { dep: "Lima", prov: "Lima", dist: "Miraflores" },
+  { dep: "Lima", prov: "Lima", dist: "San Isidro" },
+  { dep: "Lima", prov: "Lima", dist: "La Victoria" }, // Gamarra
+  { dep: "Lima", prov: "Lima", dist: "Santiago de Surco" },
+  { dep: "Lima", prov: "Lima", dist: "Los Olivos" },
+  { dep: "Lima", prov: "Lima", dist: "San Juan de Lurigancho" },
+  // CALLAO
+  { dep: "Callao", prov: "Callao", dist: "Callao" },
+  { dep: "Callao", prov: "Callao", dist: "Ventanilla" },
+  // AREQUIPA
+  { dep: "Arequipa", prov: "Arequipa", dist: "Cercado" },
+  { dep: "Arequipa", prov: "Arequipa", dist: "Cayma" },
+  { dep: "Arequipa", prov: "Arequipa", dist: "Yanahuara" },
+  // LA LIBERTAD
+  { dep: "La Libertad", prov: "Trujillo", dist: "Trujillo" },
+  { dep: "La Libertad", prov: "Trujillo", dist: "Victor Larco Herrera" },
+  // CUSCO
+  { dep: "Cusco", prov: "Cusco", dist: "Cusco" },
+  { dep: "Cusco", prov: "Cusco", dist: "Wanchaq" },
+  // ICA
+  { dep: "Ica", prov: "Ica", dist: "Ica" },
+  { dep: "Ica", prov: "Ica", dist: "Parcona" },
+  // PIURA
+  { dep: "Piura", prov: "Piura", dist: "Piura" },
+  { dep: "Piura", prov: "Sullana", dist: "Sullana" },
+  // JUNIN
+  { dep: "Junín", prov: "Huancayo", dist: "Huancayo" },
+  // LAMBAYEQUE
+  { dep: "Lambayeque", prov: "Chiclayo", dist: "Chiclayo" },
+];
 
 function slugify(s: string) {
   return s
@@ -21,71 +50,70 @@ function slugify(s: string) {
 }
 
 async function main() {
-  // 1) Tallas
-  const tallas = ["XS", "S", "M", "L", "XL"];
-  for (let i = 0; i < tallas.length; i++) {
-    await prisma.talla.upsert({
-      where: { nombre: tallas[i] },
-      update: { orden: i + 1 },
-      create: { nombre: tallas[i], orden: i + 1 },
+  console.log("🌱 Iniciando Seed...");
+
+  // --------------------------------------------------------
+  // 1. USUARIO ADMIN
+  // --------------------------------------------------------
+  const correo = process.env.ADMIN_CORREO;
+  const clave = process.env.ADMIN_CLAVE;
+
+  if (correo && clave) {
+    const hash = await bcrypt.hash(clave, 10);
+    await prisma.usuario.upsert({
+      where: { correo },
+      update: { clave: hash, rol: "ADMIN" },
+      create: { correo, clave: hash, rol: "ADMIN" },
     });
+    console.log("✅ Admin configurado");
   }
 
-  // 2) Colores
-  const colores = [
+  // --------------------------------------------------------
+  // 2. COLORES (Datos Maestros)
+  // --------------------------------------------------------
+const colores = [
     { nombre: "Negro", hex: "#000000" },
     { nombre: "Blanco", hex: "#FFFFFF" },
+    { nombre: "Rojo Intenso", hex: "#DC2626" },
+    { nombre: "Azul Marino", hex: "#1E3A8A" },
+    { nombre: "Verde Oliva", hex: "#3F6212" },
+    { nombre: "Rosa Palo", hex: "#FCE7F3" },
     { nombre: "Beige", hex: "#F5F5DC" },
-    { nombre: "Azul", hex: "#1E3A8A" },
-    { nombre: "Rojo", hex: "#B91C1C" },
+    { nombre: "Gris Melange", hex: "#9CA3AF" },
+    { nombre: "Vino", hex: "#881337" },
   ];
+
   for (const c of colores) {
     await prisma.color.upsert({
       where: { nombre: c.nombre },
       update: { hex: c.hex },
-      create: { nombre: c.nombre, hex: c.hex },
+      create: c,
     });
   }
+  console.log("✅ Colores creados");
 
-  // 3) Categorías
-  const categorias = ["Polos", "Pantalones", "Casacas", "Vestidos", "Faldas", "Accesorios","Blusas"];
-  for (const nombre of categorias) {
-    await prisma.categoria.upsert({
-      where: { slug: slugify(nombre) },
-      update: { nombre },
-      create: { nombre, slug: slugify(nombre) },
-    });
-  }
-
-  // 4) Tipos de empaque
-  const empaques = [
-    { nombre: "Bolsa chica", costoUnitario: "0.30" },
-    { nombre: "Bolsa grande", costoUnitario: "0.50" },
-    { nombre: "Caja", costoUnitario: "2.00" },
-    { nombre: "Etiqueta", costoUnitario: "0.10" },
+  // --------------------------------------------------------
+  // 3. TALLAS (Datos Maestros)
+  // --------------------------------------------------------
+  const tallas = [
+    { nombre: "XS", orden: 1 },
+    { nombre: "S", orden: 2 },
+    { nombre: "M", orden: 3 },
+    { nombre: "L", orden: 4 },
+    { nombre: "XL", orden: 5 },
+    { nombre: "Estándar", orden: 6 },
   ];
-  for (const e of empaques) {
-    await prisma.tipoEmpaque.upsert({
-      where: { nombre: e.nombre },
-      update: { costoUnitario: e.costoUnitario },
-      create: { nombre: e.nombre, costoUnitario: e.costoUnitario, activo: true },
+
+  for (const t of tallas) {
+    await prisma.talla.upsert({
+      where: { nombre: t.nombre },
+      update: { orden: t.orden },
+      create: t,
     });
   }
+  console.log("✅ Tallas creadas");
 
-  // 5) Usuario ADMIN
-  const correo = process.env.ADMIN_CORREO;
-  const clave = process.env.ADMIN_CLAVE;
-  if (!correo || !clave) throw new Error("Falta ADMIN_CORREO o ADMIN_CLAVE en .env");
-
-  const hash = await bcrypt.hash(clave, 10);
-
-  await prisma.usuario.upsert({
-    where: { correo },
-    update: { clave: hash, rol: "ADMIN" },
-    create: { correo, clave: hash, rol: "ADMIN" },
-  });
-
-  console.log("✅ Seed completado: tallas, colores, categorías, empaques y admin.");
+  console.log("🚀 Seed finalizado con éxito.");
 }
 
 main()
@@ -95,5 +123,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-    await pool.end();
   });

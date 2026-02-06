@@ -2,7 +2,16 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
 import { redirect } from "next/navigation";
-import { Eye, Plus } from "lucide-react";
+import { 
+  Eye, 
+  Plus, 
+  ShoppingCart, 
+  DollarSign, 
+  Calendar, 
+  TrendingUp, 
+  Users,
+  CreditCard
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -10,90 +19,148 @@ export default async function VentasPage() {
   const admin = await sesionAdmin();
   if (!admin) redirect("/admin/login");
 
-  // Obtener ventas (últimas 100 por rendimiento)
+  // Obtener ventas (últimas 50)
   const ventas = await prisma.venta.findMany({
-    take: 100,
+    take: 50,
     orderBy: { fechaVenta: 'desc' },
     include: {
       cliente: { select: { nombre: true } }
     }
   });
 
+  // Métricas rápidas del listado actual
+  const totalIngresos = ventas.reduce((acc, v) => acc + Number(v.total), 0);
+  const ticketPromedio = ventas.length > 0 ? totalIngresos / ventas.length : 0;
+
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-6 md:p-10 max-w-[1600px] mx-auto space-y-10 bg-gray-50/50 min-h-screen">
       
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Header Superior */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-200 pb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Historial de Ventas</h1>
-          <p className="text-sm text-gray-500 mt-1">Registro de transacciones y caja.</p>
+          <div className="flex items-center gap-3 mb-2">
+             <div className="p-2.5 bg-slate-900 text-white rounded-2xl shadow-xl shadow-slate-900/20">
+                <ShoppingCart className="w-6 h-6" />
+             </div>
+             <h1 className="text-4xl font-black text-gray-900 tracking-tight">Ventas</h1>
+          </div>
+          <p className="text-gray-500 text-sm ml-1 max-w-md">
+             Monitorea el flujo de ingresos, gestiona facturación por WhatsApp y analiza el historial de caja.
+          </p>
         </div>
         <Link
           href="/admin/ventas/nueva"
-          className="bg-slate-900 text-white rounded-xl px-5 py-3 text-sm font-bold hover:bg-slate-800 transition shadow-md flex items-center gap-2"
+          className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 flex items-center gap-3 active:scale-95 group"
         >
-          <Plus className="w-4 h-4" /> Nueva Venta (POS)
+          <Plus className="w-5 h-5 text-emerald-400 group-hover:rotate-90 transition-transform" /> 
+          <span>Nueva Venta (POS)</span>
         </Link>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* KPI Cards (Resumen Estratégico) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatCard 
+            label="Ingresos" 
+            value={`S/ ${totalIngresos.toFixed(2)}`} 
+            icon={<DollarSign className="w-5 h-5 text-emerald-600" />}
+            color="bg-emerald-50"
+          />
+          <StatCard 
+            label="Ticket Promedio" 
+            value={`S/ ${ticketPromedio.toFixed(2)}`} 
+            icon={<TrendingUp className="w-5 h-5 text-blue-600" />}
+            color="bg-blue-50"
+          />
+          <StatCard 
+            label="Volumen de Ventas" 
+            value={`${ventas.length} Ops.`} 
+            icon={<Users className="w-5 h-5 text-purple-600" />}
+            color="bg-purple-50"
+          />
+      </div>
+
+      {/* Tabla de Resultados */}
+      <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden min-h-[400px]">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
+          <table className="w-full text-sm text-left border-collapse">
+            <thead className="bg-gray-50/80 text-gray-400 font-black text-[10px] uppercase tracking-[0.15em] border-b border-gray-100">
               <tr>
-                <th className="px-6 py-4">Código</th>
-                <th className="px-6 py-4">Fecha</th>
-                <th className="px-6 py-4">Cliente</th>
-                <th className="px-6 py-4">Pago</th>
-                <th className="px-6 py-4 text-right">Total</th>
-                <th className="px-6 py-4 text-center">Estado</th>
-                <th className="px-6 py-4 text-right">Acción</th>
+                <th className="px-8 py-5">Código / Fecha</th>
+                <th className="px-8 py-5">Cliente</th>
+                <th className="px-8 py-5 text-center">Pago</th>
+                <th className="px-8 py-5 text-right">Total Neto</th>
+                <th className="px-8 py-5 text-center">Estado</th>
+                <th className="px-8 py-5 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-50">
               {ventas.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
-                    No hay ventas registradas aún.
+                  <td colSpan={7} className="px-6 py-32 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                       <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center border border-dashed border-gray-200">
+                          <ShoppingCart className="w-8 h-8 text-gray-200" />
+                       </div>
+                       <p className="text-gray-400 font-medium italic">No se registran transacciones recientes en el sistema.</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 ventas.map((v) => (
-                  <tr key={v.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-mono font-medium text-slate-700">
-                      #{v.codigo.slice(-6).toUpperCase()}
+                  <tr key={v.id} className="hover:bg-blue-50/30 transition-all group">
+                    <td className="px-8 py-6">
+                      <div className="flex flex-col">
+                        <span className="font-black text-gray-900 font-mono text-xs uppercase tracking-tighter">
+                          #{v.codigo.slice(-6).toUpperCase()}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-bold mt-1 flex items-center gap-1 uppercase">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(v.fechaVenta).toLocaleDateString('es-PE', { 
+                            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' 
+                          })}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {new Date(v.fechaVenta).toLocaleDateString('es-PE', { 
-                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' 
-                      })}
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400 text-xs shadow-inner">
+                          {(v.cliente?.nombre || v.clienteNombre || "P")[0].toUpperCase()}
+                        </div>
+                        <span className="font-bold text-gray-900 line-clamp-1">
+                          {v.cliente?.nombre || v.clienteNombre || "Público General"}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {v.cliente?.nombre || v.clienteNombre || "Público General"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                    <td className="px-8 py-6 text-center">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-600 border border-gray-200 shadow-sm">
+                        <CreditCard className="w-3 h-3 opacity-50" />
                         {v.metodoPago}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right font-bold text-slate-900">
-                      S/ {Number(v.total).toFixed(2)}
+                    <td className="px-8 py-6 text-right">
+                      <span className="font-black text-slate-900 text-base font-mono">
+                        S/ {Number(v.total).toFixed(2)}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-8 py-6 text-center">
                        {v.estado === 'COMPLETADO' ? (
-                          <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">Exitoso</span>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100">
+                             <div className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />
+                             Exitoso
+                          </span>
                        ) : (
-                          <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-lg">{v.estado}</span>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-50 text-red-700 border border-red-100 opacity-60">
+                             ✕ {v.estado}
+                          </span>
                        )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-8 py-6 text-right">
                       <Link 
                         href={`/admin/ventas/${v.id}`}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-slate-900 hover:text-white transition-all"
-                        title="Ver detalle"
+                        className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-white border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-lg transition-all active:scale-90"
+                        title="Ver ticket detallado"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-5 h-5" />
                       </Link>
                     </td>
                   </tr>
@@ -105,4 +172,19 @@ export default async function VentasPage() {
       </div>
     </div>
   );
+}
+
+// Subcomponente de Métrica
+function StatCard({ label, value, icon, color }: { label: string, value: string, icon: React.ReactNode, color: string }) {
+    return (
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-200 shadow-sm flex items-center gap-5">
+            <div className={`w-12 h-12 ${color} rounded-2xl flex items-center justify-center shadow-inner`}>
+                {icon}
+            </div>
+            <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{label}</p>
+                <p className="text-2xl font-black text-gray-900">{value}</p>
+            </div>
+        </div>
+    )
 }
