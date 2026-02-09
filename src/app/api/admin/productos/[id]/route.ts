@@ -127,6 +127,9 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
       descuentoValor: desc.descuentoValor,
       descuentoInicio: desc.descuentoInicio,
       descuentoFin: desc.descuentoFin,
+      nuevoHasta: body?.nuevo !== undefined
+        ? (body.nuevo ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : null)
+        : undefined,
     },
   });
 

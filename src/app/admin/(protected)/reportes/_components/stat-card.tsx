@@ -10,7 +10,7 @@ interface StatCardProps {
 
 export function StatCard({ label, value, icon, color, trend }: StatCardProps) {
     return (
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-200 shadow-sm flex items-center gap-5">
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-5 transition-shadow hover:shadow-md">
             <div className={`w-14 h-14 ${color} rounded-2xl flex items-center justify-center shadow-inner`}>
                 {icon}
             </div>

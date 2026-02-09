@@ -7,7 +7,10 @@ import { Prisma } from "@prisma/client";
 
 function esHex(v: string | null) {
   if (!v) return true;
-  return /^#([0-9a-fA-F]{6})$/.test(v.trim());
+  const parts = v.split(",").map(p => p.trim()).filter(Boolean);
+  if (parts.length === 0) return false;
+  const hexRegex = /^#([0-9a-fA-F]{6})$/;
+  return parts.every(part => hexRegex.test(part));
 }
 
 // PUT: Para editar Nombre y Hex (Edición completa)
@@ -29,9 +32,9 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
   if (!esHex(hex)) return NextResponse.json({ error: "HEX inválido (usa #RRGGBB)" }, { status: 400 });
 
   try {
-    const updated = await prisma.color.update({ 
-      where: { id }, 
-      data: { nombre, hex: hex || null } 
+    const updated = await prisma.color.update({
+      where: { id },
+      data: { nombre, hex: hex || null }
     });
     return NextResponse.json(updated);
   } catch (e: any) {

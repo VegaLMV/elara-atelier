@@ -30,7 +30,14 @@ export async function GET() {
         const todasVariantes = await prisma.variante.findMany({
             where: { activa: true },
             include: {
-                producto: { select: { nombre: true, precio: true, estado: true } },
+                producto: {
+                    select: {
+                        nombre: true,
+                        precio: true,
+                        estado: true,
+                        imagenes: { select: { url: true }, take: 1 }
+                    }
+                },
                 talla: { select: { nombre: true } },
                 color: { select: { nombre: true, hex: true } },
             },
@@ -62,7 +69,19 @@ export async function GET() {
             stock,
         }));
 
-        // 3. Valorización del inventario
+        // 3. Stock total por producto (Top 10)
+        const stockPorProducto: Record<string, number> = {};
+        productosConCategoria.forEach((p) => {
+            const stockTotal = p.variantes.reduce((sum, v) => sum + v.stockActual, 0);
+            stockPorProducto[p.nombre] = (stockPorProducto[p.nombre] || 0) + stockTotal;
+        });
+
+        const productos = Object.entries(stockPorProducto)
+            .map(([producto, stock]) => ({ producto, stock }))
+            .sort((a, b) => b.stock - a.stock)
+            .slice(0, 10);
+
+        // 4. Valorización del inventario
         const valorizacion = todasVariantes.reduce((acc, v) => {
             if (v.producto.estado === "ACTIVO") {
                 const precio = Number(v.producto.precio);
@@ -75,16 +94,51 @@ export async function GET() {
         const variantesActivas = todasVariantes.filter((v) => v.producto.estado === "ACTIVO").length;
         const variantesSinStock = todasVariantes.filter((v) => v.stockActual === 0).length;
 
-        // 4. Preparar datos de stock bajo para respuesta
-        const alertasStock = stockBajo.map((v) => ({
-            producto: v.producto.nombre,
-            talla: v.talla.nombre,
-            color: v.color.nombre,
-            colorHex: v.color.hex || "#ccc",
-            stockActual: v.stockActual,
-            stockMinimo: v.stockMinimo,
-            valorUnitario: Number(v.producto.precio),
-        }));
+        // 5. Preparar datos de stock bajo con información del proveedor (Optimizado para evitar MaxClientsInSessionMode)
+        const variantIds = stockBajo.map(v => v.id);
+
+        // Obtener de golpe todas las compras recibidas que contienen estos items
+        const comprasRecientes = await prisma.itemCompra.findMany({
+            where: {
+                varianteId: { in: variantIds },
+                compra: { estado: "RECIBIDO" }
+            },
+            include: {
+                compra: {
+                    include: { proveedor: true }
+                }
+            },
+            orderBy: {
+                compra: { fechaCompra: "desc" }
+            }
+        });
+
+        const alertasStock = stockBajo.map((v) => {
+            // Encontrar la compra más reciente para esta variante específica en el set ya cargado
+            const itemCompra = comprasRecientes.find((it: any) => it.varianteId === v.id);
+            const proveedor = itemCompra?.compra?.proveedor;
+
+            return {
+                id: v.id,
+                producto: v.producto.nombre,
+                talla: v.talla.nombre,
+                color: v.color.nombre,
+                colorHex: v.color.hex || "#ccc",
+                stockActual: v.stockActual,
+                stockMinimo: v.stockMinimo,
+                valorUnitario: Number(v.producto.precio),
+                imagenUrl: v.producto.imagenes[0]?.url || null,
+                proveedor: proveedor ? {
+                    nombre: proveedor.nombre,
+                    ruc: proveedor.ruc,
+                    razonSocial: proveedor.razonSocial,
+                    telefono: proveedor.telefono,
+                    provincia: proveedor.provincia,
+                    distrito: proveedor.distrito,
+                    direccion: proveedor.direccion,
+                } : null
+            };
+        });
 
         return NextResponse.json({
             resumen: {
@@ -95,6 +149,7 @@ export async function GET() {
                 alertasStockBajo: stockBajo.length,
             },
             stockPorCategoria: categorias,
+            stockPorProducto: productos,
             alertasStock,
         });
     } catch (error) {

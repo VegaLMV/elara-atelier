@@ -2,287 +2,300 @@ import { obtenerSesion } from "@/lib/sesion";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { 
-  Package, 
-  AlertTriangle, 
-  Tag, 
-  Zap, 
-  ShoppingCart, 
-  ClipboardList, 
-  TicketPercent, 
-  Truck, 
-  Ruler, 
-  Palette, 
-  ExternalLink, 
-  Plus, 
-  LayoutGrid,
-  Box,
-  TrendingDown
+import {
+    Package,
+    AlertTriangle,
+    Tag,
+    Zap,
+    ShoppingCart,
+    ClipboardList,
+    TicketPercent,
+    Truck,
+    Ruler,
+    Palette,
+    ExternalLink,
+    Plus,
+    LayoutGrid,
+    Box,
+    TrendingDown,
+    ArrowUpRight,
+    ArrowDownRight,
+    Clock,
+    History,
+    BarChart4
 } from "lucide-react";
+import { ChartCard } from "./(protected)/reportes/_components/chart-card";
+import { StatCard } from "./(protected)/reportes/_components/stat-card";
+import { formatMoney } from "@/lib/precios";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
-  const sesion = await obtenerSesion();
-  if (!sesion) redirect("/admin/login");
+    const sesion = await obtenerSesion();
+    if (!sesion) redirect("/admin/login");
 
-  // --- DATOS REALES PARA EL DASHBOARD ---
-  const [
-    totalProductos, 
-    productosSinStock,
-    totalCategorias,
-    campanasActivas
-  ] = await Promise.all([
-    // 1. Productos Activos
-    prisma.producto.count({ where: { estado: 'ACTIVO' } }),
-    
-    // 2. Alertas de Stock (Variantes con stock <= 2)
-    prisma.variante.count({ where: { stockActual: { lte: 2 } } }),
-    
-    // 3. Total Categorías
-    prisma.categoria.count(),
-    
-    // 4. Campañas Activas (CORREGIDO: Usamos prisma.campana)
-    prisma.campana.count({ 
-        where: { 
-            // Buscamos campañas que NO estén muertas y que estén en fecha
-            estado: { notIn: ['CANCELADO', 'FINALIZADO'] }, 
-            startsAt: { lte: new Date() }, 
-            endsAt: { gte: new Date() }    
-        } 
-    })
-  ]);
+    // --- DATOS REALES PARA EL DASHBOARD ---
+    const [
+        totalProductos,
+        productosSinStock,
+        totalCategorias,
+        campanasActivas,
+        ultimasVentas,
+        ventasHoy
+    ] = await Promise.all([
+        // 1. Productos Activos
+        prisma.producto.count({ where: { estado: 'ACTIVO' } }),
 
-  return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-10 bg-gray-50/50 min-h-screen">
-      
-      {/* 1. Header de Bienvenida */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-6 border-b border-gray-200">
-        <div>
-            <div className="flex items-center gap-2 mb-1">
-               <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs font-bold border border-slate-200 uppercase tracking-wider">
-                 Panel de Control
-               </span>
-            </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
-                Hola, {sesion.rol === 'ADMIN' ? 'Administrador' : 'Colaborador'} 👋
-            </h1>
-            <p className="text-gray-500 mt-2 max-w-lg text-sm">
-                Bienvenido a <b>Elara Atelier</b>. Aquí tienes el resumen operativo de tu tienda en tiempo real.
-            </p>
-        </div>
-        <div className="flex gap-3">
-             <Link 
-                href="/" 
-                target="_blank" 
-                className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm flex items-center gap-2"
-             >
-                <ExternalLink className="w-4 h-4" /> Ver Tienda
-             </Link>
-             <Link 
-                href="/admin/productos/nuevo" 
-                className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 flex items-center gap-2 hover:translate-y-[-1px]"
-             >
-                <Plus className="w-4 h-4" /> Nuevo Producto
-             </Link>
-        </div>
-      </div>
+        // 2. Alertas de Stock (Variantes con stock <= 2)
+        prisma.variante.count({ where: { stockActual: { lte: 2 } } }),
 
-      {/* 2. KPIs (Indicadores Clave) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-         <KpiCard 
-            title="Productos Activos" 
-            value={totalProductos} 
-            icon={<Package className="w-6 h-6 text-blue-600" />}
-            bgColor="bg-blue-50"
-            borderColor="border-blue-100"
-            textColor="text-blue-700"
-         />
-         <KpiCard 
-            title="Alertas de Stock" 
-            value={productosSinStock} 
-            label="Variantes con < 3 uds."
-            icon={<AlertTriangle className={`w-6 h-6 ${productosSinStock > 0 ? 'text-red-600' : 'text-emerald-600'}`} />} 
-            bgColor={productosSinStock > 0 ? "bg-red-50" : "bg-emerald-50"}
-            borderColor={productosSinStock > 0 ? "border-red-100" : "border-emerald-100"}
-            textColor={productosSinStock > 0 ? "text-red-700" : "text-emerald-700"}
-         />
-         <KpiCard 
-            title="Campañas Activas" 
-            value={campanasActivas} 
-            icon={<Zap className="w-6 h-6 text-purple-600" />} 
-            bgColor="bg-purple-50"
-            borderColor="border-purple-100"
-            textColor="text-purple-700"
-         />
-         <KpiCard 
-            title="Categorías" 
-            value={totalCategorias} 
-            icon={<Tag className="w-6 h-6 text-slate-600" />} 
-            bgColor="bg-white"
-            borderColor="border-gray-200"
-            textColor="text-slate-700"
-         />
-      </div>
+        // 3. Total Categorías
+        prisma.categoria.count(),
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-         
-         {/* 3. Accesos Rápidos (Columna Principal) */}
-         <div className="lg:col-span-2 space-y-8">
-            <div>
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-4">
-                    <LayoutGrid className="w-5 h-5 text-gray-400" />
-                    Gestión Rápida
-                </h2>
-                
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <QuickLink 
-                        href="/admin/compras" 
-                        title="Registrar Compra" 
-                        desc="Ingreso de mercadería"
-                        icon={<ShoppingCart className="w-6 h-6 text-emerald-600" />} 
-                        color="hover:border-emerald-200 hover:bg-emerald-50/30"
-                    />
-                    <QuickLink 
-                        href="/admin/kardex" 
-                        title="Ver Inventario" 
-                        desc="Movimientos y stock"
-                        icon={<ClipboardList className="w-6 h-6 text-blue-600" />} 
-                        color="hover:border-blue-200 hover:bg-blue-50/30"
-                    />
-                    <QuickLink 
-                        href="/admin/descuentos/nuevo" 
-                        title="Crear Oferta" 
-                        desc="Lanzar campaña masiva"
-                        icon={<TicketPercent className="w-6 h-6 text-purple-600" />} 
-                        color="hover:border-purple-200 hover:bg-purple-50/30"
-                    />
-                    <QuickLink 
-                        href="/admin/proveedores" 
-                        title="Proveedores" 
-                        desc="Directorio de contactos"
-                        icon={<Truck className="w-6 h-6 text-amber-600" />} 
-                        color="hover:border-amber-200 hover:bg-amber-50/30"
-                    />
-                    <QuickLink 
-                        href="/admin/tallas" 
-                        title="Tallas y Medidas" 
-                        desc="Configurar variantes"
-                        icon={<Ruler className="w-6 h-6 text-slate-600" />} 
-                        color="hover:border-slate-300 hover:bg-slate-50"
-                    />
-                     <QuickLink 
-                        href="/admin/colores" 
-                        title="Colores" 
-                        desc="Paleta de productos"
-                        icon={<Palette className="w-6 h-6 text-pink-600" />} 
-                        color="hover:border-pink-200 hover:bg-pink-50/30"
-                    />
+        // 4. Campañas Activas
+        prisma.campana.count({
+            where: {
+                estado: { notIn: ['CANCELADO', 'FINALIZADO'] },
+                startsAt: { lte: new Date() },
+                endsAt: { gte: new Date() }
+            }
+        }),
+
+        // 5. Últimas 5 Ventas (Actividad Reciente)
+        prisma.venta.findMany({
+            take: 5,
+            orderBy: { fechaVenta: 'desc' },
+            include: { cliente: { select: { nombre: true } } }
+        }),
+
+        // 6. Ventas de Hoy (Total)
+        prisma.venta.aggregate({
+            _sum: { total: true },
+            where: { fechaVenta: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } }
+        })
+    ]);
+
+    const totalVentasHoy = Number(ventasHoy._sum.total || 0);
+
+    return (
+        <div className="p-6 md:p-10 max-w-[1600px] mx-auto space-y-8 bg-white min-h-screen">
+
+            {/* 1. Header de Bienvenida con Fecha */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-6 border-b border-slate-200 animate-in fade-in slide-in-from-top-4 duration-700">
+                <div>
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black border border-indigo-100 uppercase tracking-widest flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                            Panel de Control
+                        </span>
+                        <span className="text-xs text-gray-400 font-medium flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> {new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        </span>
+                    </div>
+                    <h1 className="text-3xl md:text-5xl font-serif font-medium text-slate-900 tracking-tight">
+                        Hola, {sesion.rol === 'ADMIN' ? 'Admin' : 'Colaborador'}
+                    </h1>
+                    <p className="text-gray-500 mt-2 text-sm md:text-base font-light">
+                        Aquí tienes el pulso de <b>Elara Atelier</b> en tiempo real.
+                    </p>
+                </div>
+                <div className="flex gap-3">
+                    <Link
+                        href="/"
+                        target="_blank"
+                        className="px-5 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
+                    >
+                        <ExternalLink className="w-4 h-4" /> Tienda
+                    </Link>
+                    <Link
+                        href="/admin/ventas/nueva"
+                        className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-sm font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 flex items-center gap-2 hover:-translate-y-0.5 active:translate-y-0"
+                    >
+                        <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" /> Nueva Venta
+                    </Link>
                 </div>
             </div>
 
-            {/* Banner Promocional Interno */}
-            {productosSinStock > 0 && (
-                <div className="bg-slate-900 rounded-2xl p-8 text-white relative overflow-hidden shadow-xl flex items-center justify-between">
-                    <div className="relative z-10 max-w-md">
-                        <div className="flex items-center gap-2 mb-2 text-red-300">
-                            <TrendingDown className="w-5 h-5" />
-                            <span className="text-xs font-bold uppercase tracking-wide">Alerta de Inventario</span>
+            {/* 2. BENTO GRID - KPIs Principales */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
+                <StatCard
+                    label="Ventas Hoy"
+                    value={formatMoney(totalVentasHoy)}
+                    icon={<TicketPercent className="w-6 h-6 text-white" />}
+                    color="bg-slate-900 text-white shadow-xl shadow-slate-900/20"
+                    trend={{ value: 12, label: "vs ayer" }} // Mock up trend
+                />
+                <StatCard
+                    label="Productos Activos"
+                    value={totalProductos.toString()}
+                    icon={<Package className="w-6 h-6 text-white" />}
+                    color="bg-indigo-600 text-white shadow-xl shadow-indigo-600/20"
+                />
+                <StatCard
+                    label="Alertas Stock"
+                    value={productosSinStock.toString()}
+                    icon={<AlertTriangle className="w-6 h-6 text-white" />}
+                    color={productosSinStock > 0 ? "bg-red-500 text-white shadow-xl shadow-red-500/20" : "bg-emerald-500 text-white shadow-xl shadow-emerald-500/20"}
+                />
+                <StatCard
+                    label="Campañas"
+                    value={campanasActivas.toString()}
+                    icon={<Zap className="w-6 h-6 text-white" />}
+                    color="bg-purple-600 text-white shadow-xl shadow-purple-600/20"
+                />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
+
+                {/* 3. Columna Principal: Accesos y Feed */}
+                <div className="lg:col-span-2 space-y-8">
+
+                    {/* Accesos Rápidos (Grid estilo App iOS) */}
+                    <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+                        <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                            <LayoutGrid className="w-4 h-4" /> Accesos Directos
+                        </h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                            <QuickActionButton
+                                href="/admin/productos"
+                                icon={<Package className="w-6 h-6 text-indigo-600" />}
+                                label="Productos"
+                                color="bg-indigo-50 border-indigo-100 hover:border-indigo-300"
+                            />
+                            <QuickActionButton
+                                href="/admin/ventas"
+                                icon={<ShoppingCart className="w-6 h-6 text-emerald-600" />}
+                                label="Historial Ventas"
+                                color="bg-emerald-50 border-emerald-100 hover:border-emerald-300"
+                            />
+                            <QuickActionButton
+                                href="/admin/devoluciones"
+                                icon={<History className="w-6 h-6 text-orange-600" />}
+                                label="Devoluciones"
+                                color="bg-orange-50 border-orange-100 hover:border-orange-300"
+                            />
+                            <QuickActionButton
+                                href="/admin/clientes"
+                                icon={<Box className="w-6 h-6 text-blue-600" />}
+                                label="Clientes"
+                                color="bg-blue-50 border-blue-100 hover:border-blue-300"
+                            />
+                            <QuickActionButton
+                                href="/admin/compras"
+                                icon={<Truck className="w-6 h-6 text-slate-600" />}
+                                label="Compras"
+                                color="bg-slate-50 border-slate-100 hover:border-slate-300"
+                            />
+                            <QuickActionButton
+                                href="/admin/descuentos"
+                                icon={<TicketPercent className="w-6 h-6 text-purple-600" />}
+                                label="Ofertas"
+                                color="bg-purple-50 border-purple-100 hover:border-purple-300"
+                            />
+                            <QuickActionButton
+                                href="/admin/reportes"
+                                icon={<BarChart4 className="w-6 h-6 text-rose-600" />}
+                                label="Reportes"
+                                color="bg-rose-50 border-rose-100 hover:border-rose-300"
+                            />
                         </div>
-                        <h3 className="text-2xl font-bold mb-2">¿Necesitas reabastecer?</h3>
-                        <p className="text-slate-300 text-sm mb-6 leading-relaxed">
-                            Hemos detectado <b>{productosSinStock} variantes</b> con niveles de stock crítico (menos de 3 unidades). Evita perder ventas revisando el reporte.
-                        </p>
-                        <Link 
-                            href="/admin/kardex/stock-bajo"
-                            className="inline-flex items-center bg-white text-slate-900 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-100 transition-all shadow-md active:scale-95"
-                        >
-                            Revisar Reporte <ExternalLink className="w-3 h-3 ml-2" />
-                        </Link>
                     </div>
-                    {/* Decoración de fondo */}
-                    <div className="absolute -right-6 -bottom-10 opacity-10 rotate-12">
-                        <TrendingDown className="w-64 h-64" />
-                    </div>
-                </div>
-            )}
-         </div>
 
-         {/* 4. Estado del Sistema (Sidebar) */}
-         <div className="space-y-6">
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-6 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Estado del Sistema
-                </h3>
-                <div className="space-y-5">
-                    <StatusItem label="Base de Datos" status="Conectado" color="green" />
-                    <StatusItem label="Rol de Usuario" status={sesion.rol} color="blue" />
-                    <StatusItem label="Versión" status="v1.0.2 (Beta)" color="gray" />
-                </div>
-                
-                <div className="mt-8 pt-6 border-t border-gray-100">
-                    <p className="text-xs font-medium text-gray-500 mb-3">Configuración de Logística</p>
-                    <div className="flex gap-2 flex-wrap">
-                        <Link href="/admin/empaques" className="text-xs bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 hover:border-gray-300 text-gray-600 transition-all flex items-center gap-1 font-medium">
-                            <Box className="w-3 h-3" /> Empaques
-                        </Link>
-                         <Link href="/admin/categorias" className="text-xs bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 hover:border-gray-300 text-gray-600 transition-all flex items-center gap-1 font-medium">
-                            <Tag className="w-3 h-3" /> Categorías
-                        </Link>
+                    {/* Actividad Reciente (Feed) */}
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+                            <h2 className="text-sm font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                                <History className="w-4 h-4" /> Actividad Reciente
+                            </h2>
+                            <Link href="/admin/ventas" className="text-xs font-bold text-indigo-600 hover:underline">Ver Todo</Link>
+                        </div>
+                        <div className="divide-y divide-gray-50">
+                            {ultimasVentas.length === 0 ? (
+                                <p className="p-8 text-center text-gray-400 text-sm italic">No hay actividad registrada aún.</p>
+                            ) : (
+                                ultimasVentas.map((venta) => (
+                                    <div key={venta.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-default">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs">
+                                                V
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-900 text-sm">Venta #{venta.codigo}</p>
+                                                <p className="text-xs text-gray-500">{venta.clienteNombre || venta.cliente?.nombre || "Público General"} • {new Date(venta.fechaVenta).toLocaleTimeString()}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-bold text-gray-900 text-sm">{formatMoney(Number(venta.total))}</p>
+                                            <p className="text-[10px] font-bold text-emerald-600 uppercase bg-emerald-50 px-2 py-0.5 rounded-full inline-block">Completado</p>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
                 </div>
+
+                {/* 4. Estado Sidebar & Chart Lateral */}
+                <div className="space-y-6">
+
+                    {/* Chart Card Simplificada */}
+                    <ChartCard title="Resumen Semanal" description="Tendencia de ventas vs objetivo" className="h-80">
+                        <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
+                            <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center">
+                                <TrendingDown className="w-8 h-8 text-indigo-300 transform rotate-180" />
+                            </div>
+                            <p className="text-gray-400 text-xs px-8">
+                                Visualización gráfica de métricas disponible en el módulo completo de reportes.
+                            </p>
+                            <Link href="/admin/reportes/ventas" className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-colors">
+                                Ver Reporte Detallado
+                            </Link>
+                        </div>
+                    </ChartCard>
+
+                    {/* Configuración Rápida */}
+                    <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
+                        <div className="relative z-10 space-y-4">
+                            <h3 className="text-lg font-serif">Configuración</h3>
+                            <div className="space-y-2">
+                                <ConfigLink href="/admin/tallas" label="Tallas" />
+                                <ConfigLink href="/admin/colores" label="Colores" />
+                                <ConfigLink href="/admin/categorias" label="Categorías" />
+                            </div>
+                        </div>
+                        {/* Decoración */}
+                        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-indigo-500 rounded-full blur-[80px] opacity-20" />
+                    </div>
+
+                </div>
+
             </div>
-         </div>
-
-      </div>
-    </div>
-  );
-}
-
-// --- SUBCOMPONENTES VISUALES ---
-
-function KpiCard({ title, value, icon, bgColor, borderColor, textColor, label }: any) {
-    return (
-        <div className={`p-5 rounded-2xl border ${borderColor} ${bgColor} transition-all hover:shadow-sm`}>
-            <div className="flex justify-between items-start mb-3">
-                <div className="p-2 bg-white rounded-xl shadow-sm border border-white/50">
-                    {icon}
-                </div>
-            </div>
-            <p className={`text-3xl font-bold mb-1 ${textColor}`}>{value}</p>
-            <p className={`text-xs font-bold uppercase tracking-wide opacity-70 ${textColor}`}>{title}</p>
-            {label && <p className={`text-[10px] mt-1 font-medium opacity-60 ${textColor}`}>{label}</p>}
         </div>
-    )
+    );
 }
 
-function QuickLink({ href, title, desc, icon, color }: any) {
+// --- SUBCOMPONENTES ---
+
+function QuickActionButton({ href, icon, label, color }: any) {
     return (
-        <Link href={href} className={`flex flex-col p-5 bg-white border border-gray-200 rounded-2xl transition-all group ${color}`}>
-            <div className="mb-3 transform group-hover:scale-110 transition-transform origin-left">
+        <Link
+            href={href}
+            className={`flex flex-col items-center justify-center p-6 rounded-2xl border transition-all hover:scale-[1.02] active:scale-95 shadow-sm group ${color}`}
+        >
+            <div className="mb-3 transform group-hover:-translate-y-1 transition-transform duration-300">
                 {icon}
             </div>
-            <span className="font-bold text-gray-900 text-sm">{title}</span>
-            <span className="text-xs text-gray-500 mt-1">{desc}</span>
+            <span className="font-bold text-slate-700 text-xs text-center">{label}</span>
         </Link>
     )
 }
 
-function StatusItem({ label, status, color }: any) {
-    const colorClasses: any = {
-        green: "bg-emerald-100 text-emerald-700 border-emerald-200",
-        blue: "bg-blue-100 text-blue-700 border-blue-200",
-        gray: "bg-slate-100 text-slate-700 border-slate-200"
-    };
-
+function ConfigLink({ href, label }: any) {
     return (
-        <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500 font-medium">{label}</span>
-            <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border uppercase tracking-wide ${colorClasses[color] || colorClasses.gray}`}>
-                {status}
-            </span>
-        </div>
+        <Link href={href} className="flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group">
+            <span className="text-sm font-medium text-slate-300 group-hover:text-white">{label}</span>
+            <ArrowUpRight className="w-3 h-3 text-slate-500 group-hover:text-white" />
+        </Link>
     )
 }

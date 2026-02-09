@@ -14,14 +14,16 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { 
+    const {
       tipo,          // "CLIENTE" | "PROVEEDOR"
       accion,        // "CAMBIO" | "SALDO_A_FAVOR" | "REEMBOLSO"
       referenciaId,  // ID de Venta o de Compra
       items,         // Array de { varianteId, cantidad }
       motivo,        // Texto explicativo
       montoTotal,    // Valor monetario de la devolución
-      clienteId      // Opcional: Para asignar saldo a favor
+      clienteId,     // Opcional: Para asignar saldo a favor
+      itemsNuevos,   // [NUEVO] Array de { varianteId, cantidad } para cambio directo
+      metodoPagoDiferencia // [NUEVO] Como paga la diferencia si hay
     } = body;
 
     // Validación mínima
@@ -31,7 +33,7 @@ export async function POST(req: Request) {
 
     // --- INICIO DE TRANSACCIÓN ---
     const resultado = await prisma.$transaction(async (tx) => {
-      
+
       // 2. Crear el registro histórico de la Devolución
       const nuevaDevolucion = await tx.devolucion.create({
         data: {
@@ -75,8 +77,93 @@ export async function POST(req: Request) {
         });
       }
 
-      // 4. Lógica Financiera: Saldo a Favor
-      // Si el cliente no quiere cambio ni dinero, se le guarda crédito para el futuro.
+      // 4. Lógica de Intercambio (Venta Automática)
+      let idVentaCambio = null;
+
+      if (tipo === "CLIENTE" && accion === "CAMBIO" && itemsNuevos && itemsNuevos.length > 0) {
+        // Calcular totales de la nueva venta
+        let totalNuevo = new Prisma.Decimal(0);
+
+        // Obtenemos precios actuales de los nuevos productos
+        const variantesNuevasIds = itemsNuevos.map((i: any) => i.varianteId);
+        const variantesDb = await tx.variante.findMany({
+          where: { id: { in: variantesNuevasIds } },
+          include: { producto: true }
+        });
+
+        const itemsVenta = [];
+
+        for (const itemNuevo of itemsNuevos) {
+          const dbVar = variantesDb.find(v => v.id === itemNuevo.varianteId);
+          if (!dbVar) throw new Error(`Variante ${itemNuevo.varianteId} no encontrada`);
+
+          // Validar Stock
+          if (dbVar.stockActual < itemNuevo.cantidad) {
+            throw new Error(`Sin stock suficiente para ${dbVar.producto.nombre}`);
+          }
+
+          const precioUnit = dbVar.producto.precio; // Precio base (sin descuento complejo por ahora, o pasar desde front)
+          // NOTA: Para MVP tomamos precio base. En producción ideal pasar precio calculado.
+          const subtotal = new Prisma.Decimal(precioUnit).mul(itemNuevo.cantidad);
+
+          totalNuevo = totalNuevo.plus(subtotal);
+
+          // Reducir Stock
+          await tx.variante.update({
+            where: { id: itemNuevo.varianteId },
+            data: { stockActual: { decrement: itemNuevo.cantidad } }
+          });
+
+          // Registrar Kardex Salida
+          await tx.movimientoInventario.create({
+            data: {
+              varianteId: itemNuevo.varianteId,
+              tipo: "VENTA",
+              cambioCantidad: -itemNuevo.cantidad,
+              costoUnitario: precioUnit, // Aprox
+              nota: `Cambio por Devolución #${nuevaDevolucion.id.slice(-5)}`
+            }
+          });
+
+          itemsVenta.push({
+            varianteId: itemNuevo.varianteId,
+            cantidad: itemNuevo.cantidad,
+            precioUnitario: precioUnit,
+            precioFinal: precioUnit,
+            subtotal: subtotal
+          });
+        }
+
+        // Crear la Venta de Cambio
+        const diferencia = totalNuevo.minus(new Prisma.Decimal(montoTotal || 0));
+
+        const nuevaVenta = await tx.venta.create({
+          data: {
+            clienteId: clienteId || null,
+            clienteNombre: "Cambio / Devolución",
+            metodoPago: metodoPagoDiferencia || "EFECTIVO", // Si hay diferencia positiva, el cliente paga
+            subtotal: totalNuevo,
+            total: totalNuevo,
+            notas: `Generada automáticamente por Cambio de Dev. ${nuevaDevolucion.id}`,
+            items: {
+              create: itemsVenta
+            }
+          }
+        });
+
+        idVentaCambio = nuevaVenta.id;
+
+        // Si sobro saldo a favor del cliente (Diferencia negativa: Devolucion > Nuevo)
+        if (diferencia.isNegative() && clienteId) {
+          await tx.cliente.update({
+            where: { id: clienteId },
+            data: { saldoAFavor: { increment: diferencia.abs() } }
+          });
+        }
+      }
+
+      // 5. Lógica Financiera: Saldo a Favor (Solo si NO hubo cambio directo o fue explícito)
+      // Si fue CAMBIO, la lógica financiera ya se manejó arriba con la diferencia
       if (tipo === "CLIENTE" && accion === "SALDO_A_FAVOR" && clienteId) {
         await tx.cliente.update({
           where: { id: clienteId },
@@ -88,10 +175,11 @@ export async function POST(req: Request) {
     });
 
     // Respuesta exitosa
-    return NextResponse.json({ 
-      success: true, 
-      mensaje: "Proceso completado", 
-      id: resultado.id 
+    return NextResponse.json({
+      success: true,
+      mensaje: "Proceso completado",
+      id: resultado.id,
+      ventaCambioId: (resultado as any).ventaCambioId
     });
 
   } catch (error: any) {

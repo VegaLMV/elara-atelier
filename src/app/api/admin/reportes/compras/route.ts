@@ -41,7 +41,15 @@ export async function GET(request: NextRequest) {
             },
             include: {
                 proveedor: { select: { nombre: true } },
-                items: { select: { cantidad: true, costoUnitario: true } },
+                items: {
+                    include: {
+                        variante: {
+                            include: {
+                                producto: { select: { nombre: true } }
+                            }
+                        }
+                    }
+                },
             },
         });
 
@@ -66,7 +74,26 @@ export async function GET(request: NextRequest) {
             .sort((a, b) => b.total - a.total)
             .slice(0, 10);
 
-        // 2. Total general de compras
+        // 2. Compras por producto
+        const productoTotales: Record<string, { nombre: string; total: number; cantidad: number }> = {};
+        compras.forEach((c) => {
+            c.items.forEach((item) => {
+                const prodNombre = item.variante?.producto.nombre || "N/A";
+                const totalItem = item.cantidad * Number(item.costoUnitario);
+
+                if (!productoTotales[prodNombre]) {
+                    productoTotales[prodNombre] = { nombre: prodNombre, total: 0, cantidad: 0 };
+                }
+                productoTotales[prodNombre].total += totalItem;
+                productoTotales[prodNombre].cantidad += item.cantidad;
+            });
+        });
+
+        const productos = Object.values(productoTotales)
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 10);
+
+        // 3. Total general de compras
         const totalCompras = compras.reduce((acc, c) => {
             const totalCompra = c.items.reduce(
                 (sum, item) => sum + item.cantidad * Number(item.costoUnitario),
@@ -75,7 +102,7 @@ export async function GET(request: NextRequest) {
             return acc + totalCompra;
         }, 0);
 
-        // 3. Historial de costos (últimas 50 compras con detalle)
+        // 4. Historial de costos (con detalle de proveedor y más items)
         const itemsRecientes = await prisma.itemCompra.findMany({
             where: {
                 compra: {
@@ -85,24 +112,31 @@ export async function GET(request: NextRequest) {
                 variante: { isNot: null },
             },
             include: {
-                compra: { select: { fechaCompra: true } },
+                compra: {
+                    select: {
+                        fechaCompra: true,
+                        proveedor: { select: { nombre: true } }
+                    }
+                },
                 variante: {
                     include: {
                         producto: { select: { nombre: true } },
                         talla: { select: { nombre: true } },
-                        color: { select: { nombre: true } },
+                        color: { select: { nombre: true, hex: true } },
                     },
                 },
             },
             orderBy: { compra: { fechaCompra: "desc" } },
-            take: 50,
+            take: 100, // Aumentado para mejor búsqueda
         });
 
         const historialCostos = itemsRecientes.map((item) => ({
             fecha: item.compra.fechaCompra,
+            proveedor: item.compra.proveedor?.nombre || "Sin Proveedor",
             producto: item.variante?.producto.nombre || "N/A",
             talla: item.variante?.talla.nombre || "",
             color: item.variante?.color.nombre || "",
+            colorHex: item.variante?.color.hex || "",
             cantidad: item.cantidad,
             costoUnitario: Number(item.costoUnitario),
         }));
@@ -112,8 +146,10 @@ export async function GET(request: NextRequest) {
                 totalCompras,
                 cantidadCompras: compras.length,
                 proveedoresActivos: Object.keys(proveedorTotales).length,
+                productosComprados: Object.keys(productoTotales).length,
             },
             comprasPorProveedor: proveedores,
+            comprasPorProducto: productos,
             historialCostos,
             filtros: { from: from.toISOString(), to: to.toISOString() },
         });

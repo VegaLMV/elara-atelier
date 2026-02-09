@@ -22,6 +22,7 @@ import {
 import { ChartCard } from "../_components/chart-card";
 import { StatCard } from "../_components/stat-card";
 import { ExportButtons } from "../_components/export-buttons";
+import { ReportCustomizer } from "../_components/report-customizer";
 
 interface ReporteClientes {
     resumen: {
@@ -48,9 +49,22 @@ interface ReporteClientes {
     }[];
 }
 
+const ALL_COLUMNS = [
+    { id: "nombre", label: "Cliente", enabled: true },
+    { id: "telefono", label: "Teléfono", enabled: true },
+    { id: "email", label: "Email", enabled: true },
+    { id: "departamento", label: "Departamento", enabled: true },
+    { id: "totalCompras", label: "Total Compras", enabled: true },
+    { id: "cantidadVentas", label: "Nº Ventas", enabled: true },
+];
+
 export default function ClientesReportePage() {
     const [data, setData] = useState<ReporteClientes | null>(null);
     const [loading, setLoading] = useState(true);
+
+    // Estados para personalización
+    const [columns, setColumns] = useState(ALL_COLUMNS);
+    const [note, setNote] = useState("");
 
     useEffect(() => {
         const fetchData = async () => {
@@ -76,15 +90,28 @@ export default function ClientesReportePage() {
         return <div className="p-6 text-center text-gray-500">Error al cargar los datos.</div>;
     }
 
-    const exportHeaders = ["Cliente", "Teléfono", "Email", "Departamento", "Total Compras", "Nº Ventas"];
-    const exportData = data.topClientes.map((c) => [
-        c.nombre,
-        c.telefono,
-        c.email,
-        c.departamento,
-        c.totalCompras.toFixed(2),
-        c.cantidadVentas,
-    ]);
+    // Preparar datos para exportación dinámicamente
+    const enabledColumns = columns.filter(c => c.enabled);
+    const exportHeaders = enabledColumns.map(c => c.label);
+
+    const exportData = data.topClientes.map((c) => {
+        const row: (string | number)[] = [];
+        if (columns.find(col => col.id === "nombre")?.enabled) row.push(c.nombre);
+        if (columns.find(col => col.id === "telefono")?.enabled) row.push(c.telefono || "");
+        if (columns.find(col => col.id === "email")?.enabled) row.push(c.email || "");
+        if (columns.find(col => col.id === "departamento")?.enabled) row.push(c.departamento || "");
+        if (columns.find(col => col.id === "totalCompras")?.enabled) row.push(c.totalCompras.toFixed(2));
+        if (columns.find(col => col.id === "cantidadVentas")?.enabled) row.push(c.cantidadVentas);
+        return row;
+    });
+
+    const exportMetadata = {
+        note,
+        filters: {
+            "Tipo": "Reporte de Clientes TOP",
+            "Fecha": new Date().toLocaleDateString("es-PE")
+        }
+    };
 
     return (
         <div className="p-6 md:p-10 max-w-[1600px] mx-auto space-y-8 bg-gray-50/50 min-h-screen">
@@ -109,13 +136,21 @@ export default function ClientesReportePage() {
                 </Link>
             </div>
 
-            {/* Exportar */}
-            <div className="flex justify-end">
+            {/* Exportar y Personalizar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-end gap-4 bg-white p-4 rounded-3xl border border-gray-200 shadow-sm">
+                <ReportCustomizer
+                    columns={columns}
+                    onColumnsChange={setColumns}
+                    onNoteChange={setNote}
+                    currentNote={note}
+                />
+                <div className="w-px h-8 bg-gray-100 hidden md:block" />
                 <ExportButtons
-                    title="Reporte de Clientes - ELARA ATELIER"
+                    title="Reporte de Clientes"
                     headers={exportHeaders}
                     data={exportData}
                     filename="clientes-top"
+                    metadata={exportMetadata}
                 />
             </div>
 
@@ -154,7 +189,7 @@ export default function ClientesReportePage() {
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={data.distribucionGeografica} layout="vertical">
                                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                <XAxis type="number" tick={{ fontSize: 11 }} />
+                                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => v.toString()} />
                                 <YAxis type="category" dataKey="departamento" tick={{ fontSize: 11 }} width={100} />
                                 <Tooltip />
                                 <Bar dataKey="cantidad" fill="#8b5cf6" radius={[0, 4, 4, 0]} />

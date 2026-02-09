@@ -11,7 +11,7 @@ interface ChartCardProps {
 
 export function ChartCard({ title, description, children, className = "" }: ChartCardProps) {
     return (
-        <div className={`bg-white rounded-[2rem] border border-gray-200 shadow-sm overflow-hidden ${className}`}>
+        <div className={`bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden ${className}`}>
             <div className="px-6 py-5 border-b border-gray-100">
                 <h3 className="text-base font-bold text-gray-900">{title}</h3>
                 {description && (

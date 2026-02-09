@@ -171,7 +171,7 @@ export default function CampanasReportePage() {
                                     cx="50%"
                                     cy="50%"
                                     labelLine={false}
-                                    label={({ estado, percent }: { estado: string; percent: number }) => `${estado} ${(percent * 100).toFixed(0)}%`}
+                                    label={(props: any) => `${props.name} ${(props.percent * 100).toFixed(0)}%`}
                                     outerRadius={80}
                                     fill="#8884d8"
                                     dataKey="cantidad"

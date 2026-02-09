@@ -30,6 +30,7 @@ import { ChartCard } from "../_components/chart-card";
 import { StatCard } from "../_components/stat-card";
 import { DateRangePicker } from "../_components/date-range-picker";
 import { ExportButtons } from "../_components/export-buttons";
+import { ReportCustomizer } from "../_components/report-customizer";
 
 interface ReporteVentas {
     resumen: {
@@ -51,12 +52,34 @@ interface ReporteVentas {
     canales: { canal: string; total: number; cantidad: number }[];
 }
 
+const ALL_COLUMNS = [
+    { id: "producto", label: "Producto", enabled: true },
+    { id: "talla", label: "Talla", enabled: true },
+    { id: "color", label: "Color", enabled: true },
+    { id: "cantidad", label: "Cantidad", enabled: true },
+    { id: "ingresos", label: "Ingresos (S/)", enabled: true },
+];
+
 const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#8b5cf6", "#ec4899"];
+
+function getColorStyle(hex: string | null) {
+    if (!hex) return { backgroundColor: '#fff' };
+    const codes = hex.split(",").map(c => c.trim()).filter(Boolean);
+    if (codes.length <= 1) return { backgroundColor: codes[0] || '#fff' };
+
+    const percentage = 100 / codes.length;
+    const stops = codes.map((c, i) => `${c} ${i * percentage}% ${(i + 1) * percentage}%`).join(", ");
+    return { background: `linear-gradient(135deg, ${stops})` };
+}
 
 function VentasReporteContent() {
     const searchParams = useSearchParams();
     const [data, setData] = useState<ReporteVentas | null>(null);
     const [loading, setLoading] = useState(true);
+
+    // Estados para personalización
+    const [columns, setColumns] = useState(ALL_COLUMNS);
+    const [note, setNote] = useState("");
 
     const from = searchParams.get("from") || "";
     const to = searchParams.get("to") || "";
@@ -95,27 +118,51 @@ function VentasReporteContent() {
         );
     }
 
-    // Preparar datos para exportación
-    const exportHeaders = ["Producto", "Talla", "Color", "Cantidad", "Ingresos (S/)"];
-    const exportData = data.productosTop.map((p) => [
-        p.producto,
-        p.talla,
-        p.color,
-        p.cantidad,
-        p.ingresos.toFixed(2),
-    ]);
+    // Preparar datos para exportación dinámicamente
+    const enabledColumns = columns.filter(c => c.enabled);
+    const exportHeaders = enabledColumns.map(c => c.label);
+
+    const exportData = data.productosTop.map((p) => {
+        const row: (string | number)[] = [];
+        if (columns.find(c => c.id === "producto")?.enabled) row.push(p.producto);
+        if (columns.find(c => c.id === "talla")?.enabled) row.push(p.talla);
+        if (columns.find(c => c.id === "color")?.enabled) row.push(p.color);
+        if (columns.find(c => c.id === "cantidad")?.enabled) row.push(p.cantidad);
+        if (columns.find(c => c.id === "ingresos")?.enabled) row.push(p.ingresos.toFixed(2));
+        return row;
+    });
+
+    const exportMetadata = {
+        note,
+        filters: {
+            "Desde": from || "Inicio",
+            "Hasta": to || "Hoy",
+            "Tipo": "Reporte de Ventas"
+        }
+    };
 
     return (
         <div className="space-y-8">
-            {/* Filtros */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Filtros y Personalización */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-gray-200 shadow-sm">
                 <DateRangePicker basePath="/admin/reportes/ventas" />
-                <ExportButtons
-                    title="Reporte de Ventas - ELARA ATELIER"
-                    headers={exportHeaders}
-                    data={exportData}
-                    filename={`ventas-${from || "todo"}-${to || "todo"}`}
-                />
+
+                <div className="flex items-center gap-3">
+                    <ReportCustomizer
+                        columns={columns}
+                        onColumnsChange={setColumns}
+                        onNoteChange={setNote}
+                        currentNote={note}
+                    />
+                    <div className="w-px h-8 bg-gray-100 hidden md:block" />
+                    <ExportButtons
+                        title="Reporte de Ventas"
+                        headers={exportHeaders}
+                        data={exportData}
+                        filename={`ventas-${from || "todo"}-${to || "todo"}`}
+                        metadata={exportMetadata}
+                    />
+                </div>
             </div>
 
             {/* KPIs */}
@@ -161,18 +208,18 @@ function VentasReporteContent() {
                                 <XAxis
                                     dataKey="fecha"
                                     tick={{ fontSize: 11, fill: "#6b7280" }}
-                                    tickFormatter={(v) => {
+                                    tickFormatter={(v: string) => {
                                         const d = new Date(v);
                                         return `${d.getDate()}/${d.getMonth() + 1}`;
                                     }}
                                 />
                                 <YAxis
                                     tick={{ fontSize: 11, fill: "#6b7280" }}
-                                    tickFormatter={(v) => `S/${v}`}
+                                    tickFormatter={(v: number) => `S/${v}`}
                                 />
                                 <Tooltip
-                                    formatter={(value: number) => [`S/ ${value.toFixed(2)}`, "Ingresos"]}
-                                    labelFormatter={(label) => new Date(label).toLocaleDateString("es-PE")}
+                                    formatter={(value: any) => [`S/ ${Number(value).toFixed(2)}`, "Ingresos"]}
+                                    labelFormatter={(label: any) => new Date(label).toLocaleDateString("es-PE")}
                                 />
                                 <Line
                                     type="monotone"
@@ -197,7 +244,7 @@ function VentasReporteContent() {
                                     cx="50%"
                                     cy="50%"
                                     labelLine={false}
-                                    label={({ metodo, percent }) => `${metodo} ${(percent * 100).toFixed(0)}%`}
+                                    label={(props: any) => `${props.name} ${(props.percent * 100).toFixed(0)}%`}
                                     outerRadius={100}
                                     fill="#8884d8"
                                     dataKey="total"
@@ -207,7 +254,7 @@ function VentasReporteContent() {
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
-                                <Tooltip formatter={(value: number) => `S/ ${value.toFixed(2)}`} />
+                                <Tooltip formatter={(value: any) => `S/ ${Number(value).toFixed(2)}`} />
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
@@ -219,9 +266,9 @@ function VentasReporteContent() {
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={data.canales} layout="vertical">
                                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                <XAxis type="number" tickFormatter={(v) => `S/${v}`} tick={{ fontSize: 11 }} />
+                                <XAxis type="number" tickFormatter={(v: number) => `S/${v}`} tick={{ fontSize: 11 }} />
                                 <YAxis type="category" dataKey="canal" tick={{ fontSize: 11 }} width={80} />
-                                <Tooltip formatter={(value: number) => `S/ ${value.toFixed(2)}`} />
+                                <Tooltip formatter={(value: any) => `S/ ${Number(value).toFixed(2)}`} />
                                 <Bar dataKey="total" fill="#3b82f6" radius={[0, 4, 4, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
@@ -252,8 +299,8 @@ function VentasReporteContent() {
                                             <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">{p.talla}</span>
                                             <span className="flex items-center gap-1 text-xs text-gray-500">
                                                 <span
-                                                    className="w-3 h-3 rounded-full border border-gray-200"
-                                                    style={{ backgroundColor: p.colorHex }}
+                                                    className="w-3 h-3 rounded-full border border-gray-200 shadow-sm"
+                                                    style={getColorStyle(p.colorHex)}
                                                 />
                                                 {p.color}
                                             </span>

@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { obtenerSesion } from "@/lib/sesion";
+import { sesionAdmin } from "@/lib/sesion";
 import { Prisma } from "@prisma/client";
 
 // Tipado actualizado para aceptar items híbridos
@@ -22,8 +22,8 @@ type BodyCompra = {
 };
 
 export async function GET(req: Request) {
-  const sesion = await obtenerSesion();
-  if (!sesion || sesion.rol !== "ADMIN") {
+  const sesion = await sesionAdmin();
+  if (!sesion) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -33,11 +33,11 @@ export async function GET(req: Request) {
   const compras = await prisma.compra.findMany({
     where: q
       ? {
-          OR: [
-            { notas: { contains: q, mode: "insensitive" } },
-            { proveedor: { is: { nombre: { contains: q, mode: "insensitive" } } } },
-          ],
-        }
+        OR: [
+          { notas: { contains: q, mode: "insensitive" } },
+          { proveedor: { is: { nombre: { contains: q, mode: "insensitive" } } } },
+        ],
+      }
       : undefined,
     include: {
       proveedor: true,
@@ -56,8 +56,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const sesion = await obtenerSesion();
-  if (!sesion || sesion.rol !== "ADMIN") {
+  const sesion = await sesionAdmin();
+  if (!sesion) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -73,25 +73,26 @@ export async function POST(req: Request) {
   for (const it of items) {
     if (!it?.id) return NextResponse.json({ error: "Falta ID del ítem" }, { status: 400 });
     if (!it?.tipo || (it.tipo !== "PRODUCTO" && it.tipo !== "EMPAQUE")) {
-       // Si viene del código antiguo sin 'tipo', asumimos PRODUCTO por compatibilidad, 
-       // pero el frontend nuevo siempre envía tipo.
-       if (!it.tipo) it.tipo = "PRODUCTO"; 
-       else return NextResponse.json({ error: "Tipo de ítem inválido" }, { status: 400 });
+      // Si viene del código antiguo sin 'tipo', asumimos PRODUCTO por compatibilidad
+      if (!it.tipo) it.tipo = "PRODUCTO";
+      else return NextResponse.json({ error: "Tipo de ítem inválido" }, { status: 400 });
     }
-    
+
     if (!Number.isFinite(Number(it.cantidad)) || Number(it.cantidad) <= 0) {
       return NextResponse.json({ error: "Cantidad inválida" }, { status: 400 });
     }
+    // Permitimos 0 si es un regalo, pero debe ser número
     if (it.costoUnitario === undefined || it.costoUnitario === null || isNaN(Number(it.costoUnitario))) {
       return NextResponse.json({ error: "Costo unitario inválido" }, { status: 400 });
     }
   }
 
-  const estado = body.estado ?? "RECIBIDO"; 
+  const estado = body.estado ?? "RECIBIDO";
   const fechaCompra = body.fechaCompra ? new Date(body.fechaCompra) : new Date();
 
-  const costoEnvio = body.costoEnvio === null || body.costoEnvio === undefined ? null : String(body.costoEnvio);
-  const otrosCostos = body.otrosCostos === null || body.otrosCostos === undefined ? null : String(body.otrosCostos);
+  // Convertimos a string o Decimal seguro
+  const costoEnvio = body.costoEnvio ? new Prisma.Decimal(String(body.costoEnvio)) : null;
+  const otrosCostos = body.otrosCostos ? new Prisma.Decimal(String(body.otrosCostos)) : null;
 
   const proveedorId = body.proveedorId ? String(body.proveedorId) : null;
   const notas = body.notas ? String(body.notas) : null;
@@ -105,22 +106,26 @@ export async function POST(req: Request) {
           proveedorId,
           estado,
           fechaCompra,
-          costoEnvio: costoEnvio ? new Prisma.Decimal(costoEnvio) : null,
-          otrosCostos: otrosCostos ? new Prisma.Decimal(otrosCostos) : null,
+          costoEnvio,
+          otrosCostos,
           notas,
         },
       });
 
-      // 2. Crear Ítems (Mapeando según el tipo)
+      // 2. Crear Ítems
+      // Preparamos los datos con Decimal para bulk insert (createMany si soportado, o loop)
+      // Prisma createMany soporta Decimal si el input type lo permite.
+
+      const itemsData = items.map((it) => ({
+        compraId: compra.id,
+        varianteId: it.tipo === "PRODUCTO" ? it.id : null,
+        tipoEmpaqueId: it.tipo === "EMPAQUE" ? it.id : null,
+        cantidad: Number(it.cantidad), // Cantidad suele ser Int/Float
+        costoUnitario: new Prisma.Decimal(String(it.costoUnitario)),
+      }));
+
       await tx.itemCompra.createMany({
-        data: items.map((it) => ({
-          compraId: compra.id,
-          // Lógica condicional para guardar el ID en la columna correcta
-          varianteId: it.tipo === "PRODUCTO" ? it.id : null,
-          tipoEmpaqueId: it.tipo === "EMPAQUE" ? it.id : null,
-          cantidad: Number(it.cantidad),
-          costoUnitario: new Prisma.Decimal(String(it.costoUnitario)),
-        })),
+        data: itemsData,
       });
 
       // 3. Actualizar Stock + Movimientos (Solo si es RECIBIDO)
@@ -136,7 +141,7 @@ export async function POST(req: Request) {
               data: { stockActual: { increment: cant } },
             });
 
-            // Registro en Kardex (MovimientoInventario está ligado a variantes)
+            // Registro en Kardex 
             await tx.movimientoInventario.create({
               data: {
                 varianteId: it.id,
@@ -154,8 +159,6 @@ export async function POST(req: Request) {
               where: { id: it.id },
               data: { stock: { increment: cant } },
             });
-            // Nota: Los empaques no tienen tabla 'MovimientoInventario' en el schema actual,
-            // solo actualizamos el stock directo.
           }
         }
       }

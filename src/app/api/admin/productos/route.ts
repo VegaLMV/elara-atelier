@@ -107,7 +107,7 @@ export async function POST(req: Request) {
       slug,
       descripcion: descripcion || null,
       precio: String(precio),
-      estado: "ACTIVO",
+      estado: "INACTIVO",
       destacado: false,
       categoriaId: body?.categoriaId ? String(body.categoriaId) : null,
       descuentoActivo: desc.descuentoActivo,

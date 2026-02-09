@@ -4,7 +4,11 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import ProductoCard from "./producto-card"; // <--- IMPORTAMOS EL NUEVO COMPONENTE
+import ProductoCard from "./producto-card";
+import HeroSection from "./hero-section";
+import FilterSidebar from "./filter-sidebar";
+import { Search } from "lucide-react";
+import Pagination from "@/components/pagination";
 
 // Cálculo de precios (backend)
 function calcularPrecioFinal(precio: number, tipo: string | null, valor: number | null) {
@@ -16,12 +20,22 @@ function calcularPrecioFinal(precio: number, tipo: string | null, valor: number 
 type SP = {
   q?: string;
   categoria?: string;
+  orden?: "recientes" | "precio_asc" | "precio_desc";
+  min?: string;
+  max?: string;
+  page?: string;
 };
 
 export default async function CatalogoPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = (await searchParams) ?? {};
   const q = (sp.q ?? "").trim();
   const categoriaSlug = (sp.categoria ?? "").trim();
+  const orden = (sp.orden ?? "recientes") as SP["orden"];
+  const minPrice = Number(sp.min) || 0;
+  const maxPrice = Number(sp.max) || 0;
+  const currentPage = Number(sp.page) || 1;
+  const ITEMS_PER_PAGE = 12;
+  const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
   const where: Prisma.ProductoWhereInput = { estado: "ACTIVO" };
 
@@ -36,21 +50,36 @@ export default async function CatalogoPage({ searchParams }: { searchParams: Pro
     where.categoria = { slug: categoriaSlug };
   }
 
-  const [productosRaw, categorias] = await Promise.all([
+  if (minPrice > 0 || maxPrice > 0) {
+    where.precio = {};
+    if (minPrice > 0) where.precio.gte = minPrice;
+    if (maxPrice > 0) where.precio.lte = maxPrice;
+  }
+
+  const orderBy: Prisma.ProductoOrderByWithRelationInput =
+    orden === "precio_asc" ? { precio: "asc" } :
+    orden === "precio_desc" ? { precio: "desc" } :
+    { creadoEn: "desc" };
+
+  const [totalProductos, productosRaw, categorias] = await Promise.all([
+    prisma.producto.count({ where }),
     prisma.producto.findMany({
       where,
       include: {
         categoria: true,
-        // MEJORA: Traemos hasta 5 imágenes para el carrusel
         imagenes: { orderBy: [{ esPortada: "desc" }, { orden: "asc" }], take: 5 },
       },
-      orderBy: { creadoEn: "desc" },
+      orderBy,
+      take: ITEMS_PER_PAGE,
+      skip,
     }),
     prisma.categoria.findMany({
       orderBy: { nombre: "asc" },
       where: { productos: { some: { estado: "ACTIVO" } } }
     }),
   ]);
+
+  const totalPages = Math.ceil(totalProductos / ITEMS_PER_PAGE);
 
   const ahora = new Date();
   const productos = productosRaw.map((p) => {
@@ -59,7 +88,7 @@ export default async function CatalogoPage({ searchParams }: { searchParams: Pro
     const finValido = !p.descuentoFin || new Date(p.descuentoFin) >= ahora;
     const tieneDescuento = p.descuentoActivo && inicioValido && finValido;
 
-    const precioFinal = tieneDescuento 
+    const precioFinal = tieneDescuento
       ? calcularPrecioFinal(precioOriginal, p.descuentoTipo, Number(p.descuentoValor))
       : precioOriginal;
 
@@ -72,65 +101,74 @@ export default async function CatalogoPage({ searchParams }: { searchParams: Pro
       precioOriginal,
       precioFinal,
       tieneDescuento,
-      porcentaje: p.descuentoTipo === 'PORCENTAJE' ? Number(p.descuentoValor) : null
+      porcentaje: p.descuentoTipo === 'PORCENTAJE' ? Number(p.descuentoValor) : null,
+      esNuevo: p.nuevoHasta ? new Date(p.nuevoHasta) >= ahora : false,
+      stock: p.stock,
+      destacado: p.destacado,
     };
   });
 
+  const categoriaActualNombre = categorias.find(c => c.slug === categoriaSlug)?.nombre;
+
   return (
     <div className="bg-white min-h-screen">
-      <section className="bg-slate-50 py-12 md:py-16 border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <h1 className="text-3xl md:text-4xl font-serif font-light text-slate-900 mb-3 tracking-tight">
-            Colección {categoriaSlug ? categorias.find(c => c.slug === categoriaSlug)?.nombre : "Exclusiva"}
-          </h1>
-          <p className="text-slate-500 max-w-xl mx-auto font-light text-sm md:text-base">
-            Piezas diseñadas para resaltar tu esencia con elegancia y confort.
-          </p>
-        </div>
-      </section>
 
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        <div className="flex flex-col lg:flex-row gap-10">
-          <aside className="lg:w-60 shrink-0 space-y-8">
-            <div className="space-y-3">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Buscar</h3>
-              <form action="/catalogo" className="relative group">
-                <input name="q" defaultValue={q} placeholder="Buscar..." className="w-full bg-slate-50 border border-transparent rounded-lg px-4 py-2.5 text-sm focus:bg-white focus:border-slate-200 transition-all outline-none" />
-                <button className="absolute right-3 top-2.5 text-slate-300 group-focus-within:text-slate-500">
-                   <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </button>
+      {/* 1. HERO SECTION PREMIUM */}
+      <HeroSection categoriaNombre={categoriaActualNombre} />
+
+      <div className="max-w-[1600px] mx-auto px-6 py-16" id="catalogo-grid">
+        <div className="flex flex-col lg:flex-row gap-16">
+
+          {/* 2. SIDEBAR FILTERS (Sticky) */}
+          <div className="hidden lg:block sticky top-8 self-start h-fit">
+            <FilterSidebar categorias={categorias} />
+          </div>
+
+          <main className="flex-1 space-y-8">
+            {/* Header Móvil y Buscador */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-6 border-b border-gray-100">
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">{productos.length} Productos Encontrados</p>
+
+              <form action="/catalogo" className="w-full md:w-auto relative group">
+                <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                <input
+                  name="q"
+                  defaultValue={q}
+                  placeholder="Buscar prenda..."
+                  className="w-full md:w-80 bg-slate-50 border border-slate-200 rounded-full px-10 py-2.5 text-sm focus:bg-white focus:border-indigo-300 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
+                />
               </form>
             </div>
-            <div className="space-y-3">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Categorías</h3>
-              <div className="flex flex-col gap-1">
-                <Link href="/catalogo" className={`text-sm px-3 py-2 rounded-lg transition-colors ${!categoriaSlug ? 'bg-slate-900 text-white font-medium' : 'text-slate-600 hover:bg-slate-50'}`}>Ver Todo</Link>
-                {categorias.map(cat => (
-                  <Link key={cat.id} href={`/catalogo?categoria=${cat.slug}`} className={`text-sm px-3 py-2 rounded-lg transition-colors ${categoriaSlug === cat.slug ? 'bg-slate-900 text-white font-medium' : 'text-slate-600 hover:bg-slate-50'}`}>{cat.nombre}</Link>
-                ))}
-              </div>
-            </div>
-          </aside>
 
-          <main className="flex-1">
-            <div className="flex items-center justify-between mb-6">
-               <p className="text-slate-400 text-xs font-medium uppercase tracking-wide">{productos.length} Productos</p>
-            </div>
-
+            {/* GRID PRODUCTOS */}
             {productos.length === 0 ? (
-              <div className="py-20 text-center space-y-4 border-2 border-dashed border-slate-100 rounded-2xl">
-                 <div className="text-4xl opacity-20">🛍️</div>
-                 <p className="text-slate-500 font-light">No encontramos productos con esos filtros.</p>
-                 <Link href="/catalogo" className="text-sm font-bold text-slate-900 underline">Ver todo el catálogo</Link>
+              <div className="py-32 text-center space-y-6 animate-in fade-in zoom-in-95">
+                <div className="text-6xl opacity-10 grayscale">🛍️</div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-serif font-medium text-slate-900">No encontramos coincidencias</h3>
+                  <p className="text-slate-500 font-light">Intenta con otros términos o explora todas las categorías.</p>
+                </div>
+                <Link
+                  href="/catalogo"
+                  className="inline-block bg-slate-900 text-white px-8 py-3 rounded-full font-bold text-sm hover:bg-indigo-600 transition-all shadow-xl hover:shadow-indigo-500/30"
+                >
+                  Ver Todo
+                </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-10">
-                {productos.map((p) => (
-                  // Usamos el nuevo componente Client-Side
-                  <ProductoCard key={p.id} producto={p} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-12">
+                {productos.map((p, idx) => (
+                  <div key={p.id} className="animate-in fade-in slide-in-from-bottom-8 duration-700" style={{ animationDelay: `${idx * 50}ms` }}>
+                    <ProductoCard producto={p} />
+                  </div>
                 ))}
               </div>
             )}
+
+            {/* PAGINACIÓN */}
+            <div className="flex justify-center pt-8 border-t border-gray-50/50">
+               <Pagination totalPages={totalPages} />
+            </div>
           </main>
         </div>
       </div>

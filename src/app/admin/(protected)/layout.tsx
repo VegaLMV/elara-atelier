@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { obtenerSesion } from "@/lib/sesion";
+import { sesionAdmin } from "@/lib/sesion";
 import AdminTopbar from "../topbar";
 
 export default async function ProtectedAdminLayout({
@@ -8,7 +8,7 @@ export default async function ProtectedAdminLayout({
   children: React.ReactNode;
 }) {
   // ✅ Usamos sesionAdmin en lugar de obtenerSesion
-  const admin = await obtenerSesion();
+  const admin = await sesionAdmin();
 
   if (!admin) {
     redirect("/admin/login");

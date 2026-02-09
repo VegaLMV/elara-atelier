@@ -7,7 +7,10 @@ import { Prisma } from "@prisma/client";
 
 function esHex(v: string | null) {
   if (!v) return true;
-  return /^#([0-9a-fA-F]{6})$/.test(v.trim());
+  const parts = v.split(",").map(p => p.trim()).filter(Boolean);
+  if (parts.length === 0) return false;
+  const hexRegex = /^#([0-9a-fA-F]{6})$/;
+  return parts.every(part => hexRegex.test(part));
 }
 
 export async function GET() {

@@ -28,7 +28,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         imagenes: { orderBy: { orden: 'asc' } },
         imagenesColor: { include: { color: true } },
         variantes: { include: { talla: true, color: true } },
-        
+
         // ✅ CORRECCIÓN: Usamos la relación correcta 'participacionesCampana'
         // para obtener el historial de campañas donde participó este producto.
         participacionesCampana: {
@@ -61,15 +61,16 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         estado: producto.estado,
         destacado: producto.destacado,
         categoriaId: producto.categoriaId ?? "",
-        
+
         // Campos de descuento manual (Legacy/Directo)
         descuentoActivo: producto.descuentoActivo,
         descuentoTipo: (producto.descuentoTipo ?? "PORCENTAJE") as any,
         descuentoValor: producto.descuentoValor?.toString?.() ?? "",
         descuentoInicio: producto.descuentoInicio ? producto.descuentoInicio.toISOString().slice(0, 10) : "",
         descuentoFin: producto.descuentoFin ? producto.descuentoFin.toISOString().slice(0, 10) : "",
+        nuevoHasta: producto.nuevoHasta?.toISOString() ?? null,
       },
-      
+
       // ✅ MAPEO CORREGIDO: Transformamos Campaña -> DescuentoItem
       descuentosHistorial: producto.participacionesCampana.map((p) => ({
         id: p.campana.id,
@@ -90,20 +91,20 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         stockActual: v.stockActual,
         activa: v.activa,
       })),
-      
+
       referencias: {
         categorias: categorias.map((c) => ({ id: c.id, nombre: c.nombre })),
         tallas: tallas.map((t) => ({ id: t.id, nombre: t.nombre })),
         colores: colores.map((c) => ({ id: c.id, nombre: c.nombre, hex: c.hex })),
       },
-      
+
       imagenes: producto.imagenes.map((img) => ({
         id: img.id,
         url: img.url,
         esPortada: img.esPortada,
         orden: img.orden,
       })),
-      
+
       imagenesColor: producto.imagenesColor.map((x) => ({
         id: x.id,
         url: x.url,
