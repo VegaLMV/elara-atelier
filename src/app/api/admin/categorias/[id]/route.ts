@@ -26,6 +26,28 @@ export async function PUT(
   }
 }
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const admin = await sesionAdmin();
+  if (!admin) return new NextResponse("No autorizado", { status: 401 });
+  const { id } = await params;
+
+  try {
+    const body = await request.json();
+
+    const categoria = await prisma.categoria.update({
+      where: { id },
+      data: body
+    });
+
+    return NextResponse.json(categoria);
+  } catch (error) {
+    return NextResponse.json({ error: "Error actualizando" }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

@@ -58,6 +58,8 @@ export default function AdminTopbar() {
 
                         {/* GRUPO 3: CONFIGURACIÓN */}
                         <DropdownMenu title="Ajustes">
+                            <DropdownItem href="/admin/tienda">🛠️ Tienda</DropdownItem>
+                            <div className="h-px bg-gray-100 my-1"></div>
                             <DropdownItem href="/admin/tallas">📏 Tallas</DropdownItem>
                             <DropdownItem href="/admin/colores">🎨 Colores</DropdownItem>
                             <DropdownItem href="/admin/empaques">🛍️ Empaques</DropdownItem>

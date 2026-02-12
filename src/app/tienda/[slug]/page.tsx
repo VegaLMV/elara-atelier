@@ -38,14 +38,54 @@ export default async function ProductoPage({ params }: { params: Promise<{ slug:
   const ahora = new Date();
   const inicioValido = !producto.descuentoInicio || new Date(producto.descuentoInicio) <= ahora;
   const finValido = !producto.descuentoFin || new Date(producto.descuentoFin) >= ahora;
-  
-  const tieneDescuento = 
+
+  const tieneDescuento =
     producto.descuentoActivo && inicioValido && finValido;
 
   const precioOriginal = Number(producto.precio);
-  const precioFinal = tieneDescuento 
+  const precioFinal = tieneDescuento
     ? calcularPrecioFinal(precioOriginal, producto.descuentoTipo, Number(producto.descuentoValor))
     : precioOriginal;
+
+  // 2. Fetch de Productos Similares
+  const productosSimilaresRaw = await prisma.producto.findMany({
+    where: {
+      estado: "ACTIVO",
+      categoriaId: producto.categoriaId,
+      NOT: { id: producto.id }
+    },
+    take: 8,
+    include: {
+      categoria: true,
+      imagenes: { orderBy: [{ esPortada: "desc" }, { orden: "asc" }], take: 1 },
+      variantes: { select: { stockActual: true } }
+    }
+  });
+
+  const productosSimilares = productosSimilaresRaw.map(p => {
+    const precioOriginal = Number(p.precio);
+    const inicioValido = !p.descuentoInicio || new Date(p.descuentoInicio) <= ahora;
+    const finValido = !p.descuentoFin || new Date(p.descuentoFin) >= ahora;
+    const tieneDescuento = p.descuentoActivo && inicioValido && finValido;
+    const precioFinal = tieneDescuento
+      ? calcularPrecioFinal(precioOriginal, p.descuentoTipo, Number(p.descuentoValor))
+      : precioOriginal;
+
+    return {
+      id: p.id,
+      nombre: p.nombre,
+      slug: p.slug,
+      categoria: p.categoria?.nombre || "Colección",
+      imagenes: p.imagenes.map(i => i.url),
+      precioOriginal,
+      precioFinal,
+      tieneDescuento,
+      porcentaje: p.descuentoTipo === 'PORCENTAJE' ? Number(p.descuentoValor) : null,
+      esNuevo: p.nuevoHasta ? new Date(p.nuevoHasta) >= ahora : false,
+      stock: p.variantes.reduce((acc, v) => acc + v.stockActual, 0),
+      destacado: p.destacado
+    };
+  });
 
   // 3. Transformación de datos
   const data = {
@@ -61,8 +101,8 @@ export default async function ProductoPage({ params }: { params: Promise<{ slug:
     imagenes: producto.imagenes.map(img => img.url),
     // MEJORA: Mapeamos las imágenes de color para fácil acceso en el cliente
     imagenesColor: producto.imagenesColor.map(ic => ({
-        colorNombre: ic.color.nombre, // Usamos nombre para matchear con el selector
-        url: ic.url
+      colorNombre: ic.color.nombre, // Usamos nombre para matchear con el selector
+      url: ic.url
     })),
     variantes: producto.variantes.map(v => ({
       id: v.id,
@@ -70,7 +110,8 @@ export default async function ProductoPage({ params }: { params: Promise<{ slug:
       color: v.color.nombre,
       hex: v.color.hex,
       stock: v.stockActual
-    }))
+    })),
+    similares: productosSimilares
   };
 
   return (
@@ -78,11 +119,11 @@ export default async function ProductoPage({ params }: { params: Promise<{ slug:
       <nav className="max-w-7xl mx-auto px-6 py-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-400 border-b border-slate-50">
         <Link href="/" className="hover:text-slate-900 transition-colors">Inicio</Link>
         <span>/</span>
-        <Link href="/catalogo" className="hover:text-slate-900 transition-colors">Catálogo</Link>
+        <Link href="/tienda/catalogo" className="hover:text-slate-900 transition-colors">Catálogo</Link>
         {data.categoriaSlug && (
           <>
             <span>/</span>
-            <Link href={`/catalogo?categoria=${data.categoriaSlug}`} className="hover:text-slate-900 transition-colors">
+            <Link href={`/tienda/catalogo?categoria=${data.categoriaSlug}`} className="hover:text-slate-900 transition-colors">
               {data.categoria}
             </Link>
           </>

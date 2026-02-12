@@ -17,29 +17,29 @@ export async function GET(request: Request) {
     if (!sesion || sesion.rol !== "ADMIN") return new NextResponse("No autorizado", { status: 401 });
 
     const now = new Date();
-    
+
     // -----------------------------------------------------------------------
     // A. PROCESO DE ACTIVACIÓN (Programado -> Activo)
     // -----------------------------------------------------------------------
     const campanasParaActivar = await prisma.campana.findMany({
-      where: { 
-        estado: "PROGRAMADO", 
-        startsAt: { lte: now }, 
-        endsAt: { gte: now } 
+      where: {
+        estado: "PROGRAMADO",
+        startsAt: { lte: now },
+        endsAt: { gte: now }
       },
-      include: { detalles: true } 
+      include: { detalles: true }
     });
 
     for (const campana of campanasParaActivar) {
       // 1. Activar Campaña Padre
-      await prisma.campana.update({ 
-        where: { id: campana.id }, 
-        data: { estado: "ACTIVO" } 
+      await prisma.campana.update({
+        where: { id: campana.id },
+        data: { estado: "ACTIVO" }
       });
 
       // 2. Actualizar Productos Masivamente
       const productoIds = campana.detalles.map(d => d.productoId);
-      
+
       if (productoIds.length > 0) {
         await prisma.producto.updateMany({
           where: { id: { in: productoIds } },
@@ -58,28 +58,28 @@ export async function GET(request: Request) {
     // B. PROCESO DE FINALIZACIÓN (Activo -> Finalizado)
     // -----------------------------------------------------------------------
     const campanasParaFinalizar = await prisma.campana.findMany({
-      where: { 
-        estado: "ACTIVO", 
-        endsAt: { lt: now } 
+      where: {
+        estado: "ACTIVO",
+        endsAt: { lt: now }
       },
       include: { detalles: true }
     });
 
     for (const campana of campanasParaFinalizar) {
       // 1. Finalizar Campaña Padre
-      await prisma.campana.update({ 
-        where: { id: campana.id }, 
-        data: { estado: "FINALIZADO" } 
+      await prisma.campana.update({
+        where: { id: campana.id },
+        data: { estado: "FINALIZADO" }
       });
-      
+
       // 2. Limpiar Productos
       const productoIds = campana.detalles.map(d => d.productoId);
 
       if (productoIds.length > 0) {
         await prisma.producto.updateMany({
-          where: { 
-             id: { in: productoIds },
-             descuentoActivo: true 
+          where: {
+            id: { in: productoIds },
+            descuentoActivo: true
           },
           data: {
             descuentoActivo: false,
@@ -92,10 +92,10 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      activadas: campanasParaActivar.length, 
-      finalizadas: campanasParaFinalizar.length 
+    return NextResponse.json({
+      success: true,
+      activadas: campanasParaActivar.length,
+      finalizadas: campanasParaFinalizar.length
     });
 
   } catch (error) {
@@ -114,22 +114,23 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const sesion = await obtenerSesion();
   if (!sesion || sesion.rol !== "ADMIN") return new NextResponse("No autorizado", { status: 401 });
-  
+
   // --- CORRECCIÓN: Extracción segura del ID ---
   const adminId = (sesion as any).id || (sesion as any).sub || null;
 
   try {
     const body = await request.json();
-    const { 
-      nombre, 
-      descripcion, 
-      tipo, 
-      valor, 
-      startsAt, 
-      endsAt, 
-      aplicarA, 
-      productoIds, 
-      categoriaId 
+    const {
+      nombre,
+      descripcion,
+      tipo,
+      valor,
+      startsAt,
+      endsAt,
+      aplicarA,
+      productoIds,
+      categoriaId,
+      imagenUrl
     } = body;
 
     // --- 1. Validaciones Básicas ---
@@ -140,33 +141,33 @@ export async function POST(request: Request) {
     // --- 2. Lógica de Fechas ---
     const fechaInicio = new Date(startsAt);
     const fechaFin = new Date(endsAt);
-    fechaFin.setHours(23, 59, 59, 999); 
+    fechaFin.setHours(23, 59, 59, 999);
 
     const hoySinHora = new Date();
     hoySinHora.setHours(0, 0, 0, 0);
     const inicioCheck = new Date(startsAt);
-    inicioCheck.setHours(0,0,0,0);
+    inicioCheck.setHours(0, 0, 0, 0);
 
     if (inicioCheck < hoySinHora) {
-        return NextResponse.json({ error: "⚠️ No puedes crear una campaña con fecha de inicio en el pasado." }, { status: 400 });
+      return NextResponse.json({ error: "⚠️ No puedes crear una campaña con fecha de inicio en el pasado." }, { status: 400 });
     }
     if (fechaFin < fechaInicio) {
-        return NextResponse.json({ error: "⚠️ La fecha de fin no puede ser anterior a la de inicio" }, { status: 400 });
+      return NextResponse.json({ error: "⚠️ La fecha de fin no puede ser anterior a la de inicio" }, { status: 400 });
     }
 
     // --- 3. Identificar Productos Objetivo ---
     let idsObjetivo: string[] = [];
-    
+
     if (aplicarA === "TODOS") {
-      const todos = await prisma.producto.findMany({ 
-        where: { estado: "ACTIVO" }, 
-        select: { id: true } 
+      const todos = await prisma.producto.findMany({
+        where: { estado: "ACTIVO" },
+        select: { id: true }
       });
       idsObjetivo = todos.map(p => p.id);
     } else if (aplicarA === "CATEGORIA" && categoriaId) {
-      const deCategoria = await prisma.producto.findMany({ 
-        where: { categoriaId, estado: "ACTIVO" }, 
-        select: { id: true } 
+      const deCategoria = await prisma.producto.findMany({
+        where: { categoriaId, estado: "ACTIVO" },
+        select: { id: true }
       });
       idsObjetivo = deCategoria.map(p => p.id);
     } else if (aplicarA === "SELECCION" && Array.isArray(productoIds)) {
@@ -174,7 +175,7 @@ export async function POST(request: Request) {
     }
 
     if (idsObjetivo.length === 0) {
-        return NextResponse.json({ error: "No hay productos seleccionados para esta campaña" }, { status: 400 });
+      return NextResponse.json({ error: "No hay productos seleccionados para esta campaña" }, { status: 400 });
     }
 
     // --- 4. 🛡️ DETECCIÓN DE CONFLICTOS ---
@@ -200,9 +201,9 @@ export async function POST(request: Request) {
       const p = conflictos.producto;
       const fInicio = new Date(c.startsAt).toLocaleDateString();
       const fFin = new Date(c.endsAt).toLocaleDateString();
-      
-      return NextResponse.json({ 
-        error: `⚠️ CONFLICTO: El producto "${p.nombre}" ya está en la campaña "${c.nombre}" (${c.estado}) del ${fInicio} al ${fFin}.` 
+
+      return NextResponse.json({
+        error: `⚠️ CONFLICTO: El producto "${p.nombre}" ya está en la campaña "${c.nombre}" (${c.estado}) del ${fInicio} al ${fFin}.`
       }, { status: 409 });
     }
 
@@ -222,6 +223,7 @@ export async function POST(request: Request) {
         endsAt: fechaFin,
         estado: estadoInicial as any,
         creadorId: adminId,
+        imagenUrl: imagenUrl || null,
         detalles: {
           create: idsObjetivo.map((pid: string) => ({
             productoId: pid

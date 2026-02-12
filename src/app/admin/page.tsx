@@ -22,7 +22,8 @@ import {
     ArrowDownRight,
     Clock,
     History,
-    BarChart4
+    BarChart4,
+    Settings
 } from "lucide-react";
 import { ChartCard } from "./(protected)/reportes/_components/chart-card";
 import { StatCard } from "./(protected)/reportes/_components/stat-card";
@@ -38,7 +39,6 @@ export default async function AdminHome() {
     // --- DATOS REALES PARA EL DASHBOARD ---
     const [
         totalProductos,
-        productosSinStock,
         totalCategorias,
         campanasActivas,
         ultimasVentas,
@@ -47,13 +47,10 @@ export default async function AdminHome() {
         // 1. Productos Activos
         prisma.producto.count({ where: { estado: 'ACTIVO' } }),
 
-        // 2. Alertas de Stock (Variantes con stock <= 2)
-        prisma.variante.count({ where: { stockActual: { lte: 2 } } }),
-
-        // 3. Total Categorías
+        // 2. Total Categorías
         prisma.categoria.count(),
 
-        // 4. Campañas Activas
+        // 3. Campañas Activas
         prisma.campana.count({
             where: {
                 estado: { notIn: ['CANCELADO', 'FINALIZADO'] },
@@ -62,19 +59,29 @@ export default async function AdminHome() {
             }
         }),
 
-        // 5. Últimas 5 Ventas (Actividad Reciente)
+        // 4. Últimas 5 Ventas (Actividad Reciente)
         prisma.venta.findMany({
             take: 5,
             orderBy: { fechaVenta: 'desc' },
             include: { cliente: { select: { nombre: true } } }
         }),
 
-        // 6. Ventas de Hoy (Total)
+        // 5. Ventas de Hoy (Total)
         prisma.venta.aggregate({
             _sum: { total: true },
             where: { fechaVenta: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } }
         })
     ]);
+
+    const variantesParaAlertas = await prisma.variante.findMany({
+        where: { 
+            activa: true, 
+            producto: { estado: 'ACTIVO' } 
+        },
+        select: { stockActual: true, stockMinimo: true }
+    });
+
+    const totalAlertasStock = variantesParaAlertas.filter(v => v.stockActual < v.stockMinimo).length;
 
     const totalVentasHoy = Number(ventasHoy._sum.total || 0);
 
@@ -134,9 +141,9 @@ export default async function AdminHome() {
                 />
                 <StatCard
                     label="Alertas Stock"
-                    value={productosSinStock.toString()}
+                    value={totalAlertasStock.toString()}
                     icon={<AlertTriangle className="w-6 h-6 text-white" />}
-                    color={productosSinStock > 0 ? "bg-red-500 text-white shadow-xl shadow-red-500/20" : "bg-emerald-500 text-white shadow-xl shadow-emerald-500/20"}
+                    color={totalAlertasStock > 0 ? "bg-red-500 text-white shadow-xl shadow-red-500/20" : "bg-emerald-500 text-white shadow-xl shadow-emerald-500/20"}
                 />
                 <StatCard
                     label="Campañas"
@@ -199,6 +206,12 @@ export default async function AdminHome() {
                                 label="Reportes"
                                 color="bg-rose-50 border-rose-100 hover:border-rose-300"
                             />
+                            <QuickActionButton
+                                href="/admin/tienda"
+                                icon={<Settings className="w-6 h-6 text-blue-600" />}
+                                label="Ajustes Tienda"
+                                color="bg-blue-50 border-blue-100 hover:border-blue-300"
+                            />  
                         </div>
                     </div>
 

@@ -19,6 +19,7 @@ import {
     Layers,
     PackageX,
     Users,
+    Image as ImageIcon
 } from "lucide-react";
 import { ChartCard } from "../_components/chart-card";
 import { StatCard } from "../_components/stat-card";
@@ -68,13 +69,16 @@ const ALL_COLUMNS = [
 ];
 
 function getColorStyle(hex: string | null) {
-    if (!hex) return { backgroundColor: '#fff' };
+    if (!hex) return { backgroundColor: '#e2e8f0' }; // slate-200
     const codes = hex.split(",").map(c => c.trim()).filter(Boolean);
-    if (codes.length <= 1) return { backgroundColor: codes[0] || '#fff' };
+    
+    if (codes.length <= 1) return { backgroundColor: codes[0] || '#e2e8f0' };
 
-    const percentage = 100 / codes.length;
-    const stops = codes.map((c, i) => `${c} ${i * percentage}% ${(i + 1) * percentage}%`).join(", ");
-    return { background: `linear-gradient(135deg, ${stops})` };
+    // Si hay dos o más colores, hacemos un corte vertical limpio al 50%
+    // Esto evita sombras o mezclas entre los dos tonos
+    return { 
+        background: `linear-gradient(90deg, ${codes[0]} 0%, ${codes[0]} 50%, ${codes[1]} 50%, ${codes[1]} 100%)` 
+    };
 }
 
 export default function InventarioReportePage() {
@@ -200,7 +204,7 @@ export default function InventarioReportePage() {
                 <div className="w-px h-8 bg-gray-100 hidden md:block" />
                 <ExportButtons
                     title="Reporte de Inventario y Directorio"
-                    filename={`Inventario_Directorio_${new Date().toISOString().split('T')[0]}`}
+                    filename={`Inventario_Reporte_${new Date().toISOString().split('T')[0]}`}
                     metadata={exportMetadata}
                     tables={exportTables}
                 />
@@ -288,7 +292,7 @@ export default function InventarioReportePage() {
                 </div>
             </ChartCard>
 
-            {/* Directorio de Proveedores (Ahora primero por petición del usuario) */}
+            {/* Directorio de Proveedores */}
             <ChartCard
                 title={
                     <span className="flex items-center gap-2">
@@ -359,6 +363,7 @@ export default function InventarioReportePage() {
                         <table className="w-full text-sm">
                             <thead className="text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100">
                                 <tr>
+                                    <th className="text-left py-3 px-2">Imagen</th>
                                     <th className="text-left py-3 px-2">Producto - Proveedor</th>
                                     <th className="text-left py-3 px-2">Variante</th>
                                     <th className="text-right py-3 px-2">Stock Actual</th>
@@ -368,7 +373,18 @@ export default function InventarioReportePage() {
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {data.alertasStock.map((a, i) => (
-                                    <tr key={i} className="hover:bg-red-50/30">
+                                    <tr key={i} className="hover:bg-indigo-50/20 group transition-colors">
+                                        <td className="py-3 px-2">
+                                            <div className="w-10 h-12 rounded-lg bg-white border border-slate-100 overflow-hidden shadow-sm group-hover:scale-110 transition-transform">
+                                                {a.imagenUrl ? (
+                                                    <img src={a.imagenUrl} alt={a.producto} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                                                        <ImageIcon className="w-4 h-4 text-slate-300" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="py-3 px-2 font-bold text-gray-900">
                                             {a.producto}
                                             {a.proveedor && (
@@ -378,15 +394,17 @@ export default function InventarioReportePage() {
                                             )}
                                         </td>
                                         <td className="py-3 px-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">{a.talla}</span>
-                                                <span className="flex items-center gap-1 text-xs text-gray-500">
-                                                    <span
-                                                        className="w-3 h-3 rounded-full border border-gray-200 shadow-sm"
+                                            <div className="flex items-center gap-3">
+                                                <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                                                    {a.talla}
+                                                </span>
+                                                <div className="flex items-center gap-2 px-2.5 py-1 rounded-full border border-slate-200 bg-white shadow-sm">
+                                                    <div
+                                                        className="w-4 h-4 rounded-full border border-black/5 shadow-inner ring-1 ring-slate-100 ring-offset-1"
                                                         style={getColorStyle(a.colorHex)}
                                                     />
-                                                    {a.color}
-                                                </span>
+                                                    <span className="text-[11px] font-bold text-slate-700">{a.color}</span>
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="py-3 px-2 text-right">

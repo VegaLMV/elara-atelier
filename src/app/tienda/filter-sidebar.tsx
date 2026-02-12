@@ -27,11 +27,11 @@ export default function FilterSidebar({ categorias }: { categorias: Categoria[] 
             params.delete(key);
         }
         params.delete("page"); // Reset page when filtering
-        router.push(`/catalogo?${params.toString()}`);
+        router.push(`/tienda/catalogo?${params.toString()}`);
     };
 
     const clearFilters = () => {
-        router.push("/catalogo");
+        router.push("/tienda/catalogo");
     };
 
     return (
@@ -50,7 +50,7 @@ export default function FilterSidebar({ categorias }: { categorias: Categoria[] 
                 <select
                     value={currentOrden}
                     onChange={(e) => updateFilter("orden", e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-300 transition-all appearance-none cursor-pointer"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-[#864d2d] outline-none focus:ring-4 focus:ring-[#864d2d]/10 focus:border-[#864d2d] transition-all appearance-none cursor-pointer"
                 >
                     <option value="recientes">Más Recientes</option>
                     <option value="precio_asc">Precio: Menor a Mayor</option>
@@ -69,14 +69,14 @@ export default function FilterSidebar({ categorias }: { categorias: Categoria[] 
                         placeholder="Min"
                         defaultValue={minPrice}
                         onBlur={(e) => updateFilter("min", e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-300 transition-all font-mono"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-black outline-none focus:border-[#864d2d] transition-all font-mono"
                     />
                     <input
                         type="number"
                         placeholder="Max"
                         defaultValue={maxPrice}
                         onBlur={(e) => updateFilter("max", e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-300 transition-all font-mono"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-black outline-none focus:border-[#864d2d] transition-all font-mono"
                     />
                 </div>
             </div>
@@ -89,8 +89,8 @@ export default function FilterSidebar({ categorias }: { categorias: Categoria[] 
                         onClick={() => updateFilter("categoria", "")}
                         className={`text-sm px-4 py-2 rounded-xl transition-all font-medium flex justify-between items-center group
                         ${!currentCat
-                                ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10'
-                                : 'text-slate-600 hover:bg-slate-50'}`}
+                                ? 'bg-[#3f2f2f] text-white shadow-lg shadow-[#3f2f2f]/20'
+                                : 'text-slate-600 hover:bg-[#e6dad1]/20'}`}
                     >
                         Ver Todo
                         {!currentCat && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -102,8 +102,8 @@ export default function FilterSidebar({ categorias }: { categorias: Categoria[] 
                             onClick={() => updateFilter("categoria", cat.slug)}
                             className={`text-sm px-4 py-2 rounded-xl transition-all font-medium flex justify-between items-center group
                             ${currentCat === cat.slug
-                                    ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10'
-                                    : 'text-slate-600 hover:bg-slate-50'}`}
+                                    ? 'bg-[#3f2f2f] text-white shadow-lg shadow-[#3f2f2f]/20'
+                                    : 'text-slate-600 hover:bg-[#e6dad1]/20'}`}
                         >
                             {cat.nombre}
                             {currentCat === cat.slug && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -116,24 +116,11 @@ export default function FilterSidebar({ categorias }: { categorias: Categoria[] 
             {(currentCat || currentOrden !== "recientes" || minPrice || maxPrice) && (
                 <button
                     onClick={clearFilters}
-                    className="w-full flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-red-500 hover:text-red-600 transition-colors pt-2"
+                    className="w-full flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#864d2d] hover:text-[#3f2f2f] transition-colors pt-2"
                 >
                     <RotateCcw className="w-3 h-3" /> Limpiar Filtros
                 </button>
             )}
-
-            {/* Banner Promocional Lateral (Ejemplo de 'Magic UI' bento item pequeño) */}
-            <div className="hidden lg:block relative overflow-hidden rounded-2xl bg-indigo-600 text-white p-6 aspect-[3/4] flex flex-col justify-end">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/placeholder-promo.jpg" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay" alt="" />
-
-                <div className="relative z-20 space-y-2">
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-indigo-200">Oferta Especial</p>
-                    <p className="font-serif text-2xl leading-none">Envío Gratis</p>
-                    <p className="text-xs text-indigo-100">En compras mayores a S/ 200</p>
-                </div>
-            </div>
         </aside>
     );
 }

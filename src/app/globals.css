@@ -3,6 +3,13 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Brand Defaults */
+  --brand-primary: #3f2f2f;
+  --brand-accent: #864d2d;
+  --brand-bg: #e6dad1;
+  --brand-font-heading: inherit;
+  --brand-font-body: inherit;
 }
 
 @theme inline {
@@ -23,4 +30,25 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background-color: #F5ECDC;
+  color: inherit;
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+::-moz-selection {
+  background-color: #F5ECDC;
+  color: inherit;
 }

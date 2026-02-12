@@ -11,31 +11,19 @@ export async function GET() {
     }
 
     try {
-        // 1. Variantes con stock bajo (stockActual < stockMinimo)
-        const variantesStockBajo = await prisma.variante.findMany({
-            where: {
-                activa: true,
-                stockActual: { lt: prisma.variante.fields.stockMinimo },
-            },
-            include: {
-                producto: { select: { nombre: true, precio: true } },
-                talla: { select: { nombre: true } },
-                color: { select: { nombre: true, hex: true } },
-            },
-            orderBy: { stockActual: "asc" },
-            take: 50,
-        });
-
-        // Alternativa manual para el filtro
+        // 1. Única consulta maestra: Traemos todas las variantes de productos ACTIVOS
+        // Incluimos imagenesColor para poder filtrar la foto por variante más adelante
         const todasVariantes = await prisma.variante.findMany({
-            where: { activa: true },
+            where: { 
+                activa: true,
+                producto: { estado: "ACTIVO" } 
+            },
             include: {
                 producto: {
-                    select: {
-                        nombre: true,
-                        precio: true,
-                        estado: true,
-                        imagenes: { select: { url: true }, take: 1 }
+                    include: {
+                        categoria: { select: { nombre: true } },
+                        imagenes: { select: { url: true }, take: 1 }, // SE AGREGÓ LA COMA AQUÍ
+                        imagenesColor: true // Relación con las fotos por color
                     }
                 },
                 talla: { select: { nombre: true } },
@@ -43,80 +31,50 @@ export async function GET() {
             },
         });
 
+        // 2. Filtrar stock bajo y ORDENAR ALFABÉTICAMENTE por nombre de producto
         const stockBajo = todasVariantes
-            .filter((v) => v.stockActual < v.stockMinimo && v.producto.estado === "ACTIVO")
-            .sort((a, b) => a.stockActual - b.stockActual)
-            .slice(0, 20);
+            .filter((v) => v.stockActual < v.stockMinimo)
+            .sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre));
 
-        // 2. Stock total por categoría
-        const productosConCategoria = await prisma.producto.findMany({
-            where: { estado: "ACTIVO" },
-            include: {
-                categoria: { select: { nombre: true } },
-                variantes: { select: { stockActual: true } },
-            },
-        });
-
+        // 3. Cálculos de resumen en una sola pasada
+        let valorizacionTotal = 0;
+        let stockTotal = 0;
+        let variantesSinStock = 0;
         const stockPorCategoria: Record<string, number> = {};
-        productosConCategoria.forEach((p) => {
-            const cat = p.categoria?.nombre || "Sin Categoría";
-            const stockTotal = p.variantes.reduce((sum, v) => sum + v.stockActual, 0);
-            stockPorCategoria[cat] = (stockPorCategoria[cat] || 0) + stockTotal;
-        });
-
-        const categorias = Object.entries(stockPorCategoria).map(([categoria, stock]) => ({
-            categoria,
-            stock,
-        }));
-
-        // 3. Stock total por producto (Top 10)
         const stockPorProducto: Record<string, number> = {};
-        productosConCategoria.forEach((p) => {
-            const stockTotal = p.variantes.reduce((sum, v) => sum + v.stockActual, 0);
-            stockPorProducto[p.nombre] = (stockPorProducto[p.nombre] || 0) + stockTotal;
+
+        todasVariantes.forEach((v) => {
+            const precio = Number(v.producto.precio);
+            const cantidad = v.stockActual;
+            const catNombre = v.producto.categoria?.nombre || "Sin Categoría";
+            const prodNombre = v.producto.nombre;
+
+            valorizacionTotal += cantidad * precio;
+            stockTotal += cantidad;
+            if (cantidad === 0) variantesSinStock++;
+
+            stockPorCategoria[catNombre] = (stockPorCategoria[catNombre] || 0) + cantidad;
+            stockPorProducto[prodNombre] = (stockPorProducto[prodNombre] || 0) + cantidad;
         });
 
-        const productos = Object.entries(stockPorProducto)
-            .map(([producto, stock]) => ({ producto, stock }))
-            .sort((a, b) => b.stock - a.stock)
-            .slice(0, 10);
-
-        // 4. Valorización del inventario
-        const valorizacion = todasVariantes.reduce((acc, v) => {
-            if (v.producto.estado === "ACTIVO") {
-                const precio = Number(v.producto.precio);
-                return acc + v.stockActual * precio;
-            }
-            return acc;
-        }, 0);
-
-        const stockTotal = todasVariantes.reduce((acc, v) => acc + v.stockActual, 0);
-        const variantesActivas = todasVariantes.filter((v) => v.producto.estado === "ACTIVO").length;
-        const variantesSinStock = todasVariantes.filter((v) => v.stockActual === 0).length;
-
-        // 5. Preparar datos de stock bajo con información del proveedor (Optimizado para evitar MaxClientsInSessionMode)
+        // 4. Preparar datos de stock bajo con imagen por color
         const variantIds = stockBajo.map(v => v.id);
-
-        // Obtener de golpe todas las compras recibidas que contienen estos items
         const comprasRecientes = await prisma.itemCompra.findMany({
             where: {
                 varianteId: { in: variantIds },
                 compra: { estado: "RECIBIDO" }
             },
-            include: {
-                compra: {
-                    include: { proveedor: true }
-                }
-            },
-            orderBy: {
-                compra: { fechaCompra: "desc" }
-            }
+            include: { compra: { include: { proveedor: true } } },
+            orderBy: { compra: { fechaCompra: "desc" } }
         });
 
         const alertasStock = stockBajo.map((v) => {
-            // Encontrar la compra más reciente para esta variante específica en el set ya cargado
-            const itemCompra = comprasRecientes.find((it: any) => it.varianteId === v.id);
+            const itemCompra = comprasRecientes.find((it) => it.varianteId === v.id);
             const proveedor = itemCompra?.compra?.proveedor;
+            
+            // LÓGICA DE IMAGEN: Buscamos en imagenesColor la que coincida con el colorId de la variante
+            const imgPorColor = v.producto.imagenesColor.find(ic => ic.colorId === v.colorId);
+            const imagenFinal = imgPorColor?.url || v.producto.imagenes[0]?.url || null;
 
             return {
                 id: v.id,
@@ -127,7 +85,7 @@ export async function GET() {
                 stockActual: v.stockActual,
                 stockMinimo: v.stockMinimo,
                 valorUnitario: Number(v.producto.precio),
-                imagenUrl: v.producto.imagenes[0]?.url || null,
+                imagenUrl: imagenFinal, // URL de la imagen del color específico
                 proveedor: proveedor ? {
                     nombre: proveedor.nombre,
                     ruc: proveedor.ruc,
@@ -142,16 +100,20 @@ export async function GET() {
 
         return NextResponse.json({
             resumen: {
-                valorizacionTotal: valorizacion,
+                valorizacionTotal,
                 stockTotal,
-                variantesActivas,
+                variantesActivas: todasVariantes.length,
                 variantesSinStock,
                 alertasStockBajo: stockBajo.length,
             },
-            stockPorCategoria: categorias,
-            stockPorProducto: productos,
+            stockPorCategoria: Object.entries(stockPorCategoria).map(([categoria, stock]) => ({ categoria, stock })),
+            stockPorProducto: Object.entries(stockPorProducto)
+                .map(([producto, stock]) => ({ producto, stock }))
+                .sort((a, b) => b.stock - a.stock)
+                .slice(0, 10),
             alertasStock,
         });
+
     } catch (error) {
         console.error("Error en reporte de inventario:", error);
         return NextResponse.json({ error: "Error al generar reporte" }, { status: 500 });

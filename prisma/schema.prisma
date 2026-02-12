@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  // directUrl = env("DIRECT_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // --- ENUMS ---
@@ -69,6 +69,25 @@ enum AccionDevolucion {
   REEMBOLSO       // Se le devuelve el dinero (solo fallas)
 }
 
+enum TipoSeccionHome {
+  HERO
+  BEST_SELLERS
+  FEATURED_COLLECTIONS
+  STORY
+  NEWSLETTER
+  CONTACT
+  BENEFITS
+  FEATURED_CATEGORIES
+  BRAND_ESSENCE
+  PROMO_CAMPAIGN
+}
+
+enum UbicacionNavegacion {
+  HEADER
+  FOOTER
+}
+
+
 // --- MODELOS ---
 
 model Usuario {
@@ -78,15 +97,26 @@ model Usuario {
   rol       Rol      @default(COLABORADOR)
   creadoEn  DateTime @default(now())
 
-  // Relación corregida: El usuario crea Campañas, no detalles sueltos
   campanasCreadas Campana[] @relation("CampanaCreadaPor")
 }
 
 model Categoria {
-  id        String     @id @default(cuid())
+  id        String             @id @default(cuid())
   nombre    String
-  slug      String     @unique
+  slug      String             @unique
+  visible   Boolean            @default(false)
+  orden     Int                @default(0)
+  imagenes  ImagenCategoria[]
   productos Producto[]
+}
+
+model ImagenCategoria {
+  id          String    @id @default(cuid())
+  categoriaId String
+  categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  url         String
+  esPortada   Boolean   @default(false)
+  orden       Int       @default(0)
 }
 
 model Producto {
@@ -142,6 +172,8 @@ model Campana {
   // Relación con Usuario (Creador)
   creadorId   String?
   creador     Usuario? @relation("CampanaCreadaPor", fields: [creadorId], references: [id])
+
+  imagenUrl     String?
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -416,4 +448,90 @@ model DevolucionItem {
   variante      Variante   @relation(fields: [varianteId], references: [id])
   
   cantidad      Int
+}
+
+model HeroBanner {
+  id          String   @id @default(cuid())
+  imagenUrl   String  
+  titulo      String?  
+  subtitulo   String?  
+  botonTexto  String?  @default("Ver Colección")
+  enlace      String?  
+  orden       Int      @default(0) 
+  activo      Boolean  @default(true)
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+}
+
+model StoreSettings {
+  id              String   @id @default("default")
+  storeName       String
+  tagline         String?
+  description     String?
+
+  logoUrl         String?
+  faviconUrl      String?
+  ogImageUrl      String?
+
+  primaryColor    String?
+  accentColor     String?
+  backgroundColor String?
+
+  fontHeading     String?
+  fontBody        String?
+
+  contactEmail    String?
+  phone           String?
+  whatsapp        String?
+  address         String?
+
+  currency        String   @default("PEN")
+  locale          String   @default("es-PE")
+
+  creadoEn        DateTime @default(now())
+  actualizadoEn   DateTime @updatedAt
+}
+
+model HomeSection {
+  id            String          @id @default(cuid())
+  type          TipoSeccionHome
+  enabled       Boolean         @default(true)
+  order         Int             @default(0)
+  content       Json
+
+  creadoEn      DateTime        @default(now())
+  actualizadoEn DateTime        @updatedAt
+
+  @@index([order])
+  @@index([enabled])
+  @@index([type])
+}
+
+model NavigationItem {
+  id            String               @id @default(cuid())
+  location      UbicacionNavegacion  @default(HEADER)
+  label         String
+  href          String
+  order         Int                  @default(0)
+  enabled       Boolean              @default(true)
+
+  creadoEn      DateTime             @default(now())
+  actualizadoEn DateTime             @updatedAt
+
+  @@index([location, order])
+  @@index([enabled])
+}
+
+model SocialLink {
+  id            String   @id @default(cuid())
+  platform      String
+  url           String
+  order         Int      @default(0)
+  enabled       Boolean  @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([order])
+  @@index([enabled])
 }

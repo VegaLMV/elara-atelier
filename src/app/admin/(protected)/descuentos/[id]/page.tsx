@@ -21,9 +21,9 @@ export default async function EditarCampanaPage({ params }: PageProps) {
   const campana = await prisma.campana.findUnique({
     where: { id },
     include: {
-        detalles: {
-            select: { productoId: true }
-        }
+      detalles: {
+        select: { productoId: true }
+      }
     }
   });
 
@@ -39,22 +39,22 @@ export default async function EditarCampanaPage({ params }: PageProps) {
 
   // 2. Validación de Estado
   if (campana.estado === 'FINALIZADO' || campana.estado === 'CANCELADO') {
-      return (
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-             <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md text-center border border-gray-100">
-                 <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                     <span className="text-3xl">🔒</span>
-                 </div>
-                 <h1 className="text-xl font-bold text-gray-900 mb-3">Edición Restringida</h1>
-                 <p className="text-gray-500 text-sm leading-relaxed mb-8">
-                     Esta campaña está marcada como <b>{campana.estado}</b>. Por motivos de integridad histórica, no se pueden modificar sus parámetros una vez concluida.
-                 </p>
-                 <Link href="/admin/descuentos" className="inline-block w-full py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors">
-                     ← Volver al listado
-                 </Link>
-             </div>
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md text-center border border-gray-100">
+          <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <span className="text-3xl">🔒</span>
           </div>
-      );
+          <h1 className="text-xl font-bold text-gray-900 mb-3">Edición Restringida</h1>
+          <p className="text-gray-500 text-sm leading-relaxed mb-8">
+            Esta campaña está marcada como <b>{campana.estado}</b>. Por motivos de integridad histórica, no se pueden modificar sus parámetros una vez concluida.
+          </p>
+          <Link href="/admin/descuentos" className="inline-block w-full py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors">
+            ← Volver al listado
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   // 3. Preparar datos maestros para el formulario
@@ -91,34 +91,35 @@ export default async function EditarCampanaPage({ params }: PageProps) {
   // 4. Preparar InitialData (Mapeo Campana -> Formulario)
   const initialData = {
     id: campana.id,
-    nombre: campana.nombre, // Ojo: campo 'nombre' del modelo Campana
+    nombre: campana.nombre,
     descripcion: campana.descripcion,
     tipo: campana.tipo,
     valor: Number(campana.valor),
     startsAt: campana.startsAt,
     endsAt: campana.endsAt,
-    productoIds: campana.detalles.map(d => d.productoId), // Extraemos los IDs
+    productoIds: campana.detalles.map(d => d.productoId),
+    imagenUrl: campana.imagenUrl || "",
   };
 
   return (
     <div className="p-6 md:p-8 max-w-[1600px] mx-auto min-h-screen bg-gray-50/50">
       <div className="flex items-center gap-4 mb-8">
-         <Link 
-            href="/admin/descuentos" 
-            className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors shadow-sm"
-         >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-         </Link>
-         <div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Editar Campaña</h1>
-            <p className="text-sm text-gray-500">Modificando <span className="font-bold text-slate-800">"{campana.nombre}"</span></p>
-         </div>
+        <Link
+          href="/admin/descuentos"
+          className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors shadow-sm"
+        >
+          <ArrowLeft className="w-5 h-5 text-gray-600" />
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Editar Campaña</h1>
+          <p className="text-sm text-gray-500">Modificando <span className="font-bold text-slate-800">"{campana.nombre}"</span></p>
+        </div>
       </div>
 
-      <FormularioCampana 
-          initialData={initialData}
-          categorias={categorias}
-          productos={productosInput}
+      <FormularioCampana
+        initialData={initialData}
+        categorias={categorias}
+        productos={productosInput}
       />
     </div>
   );

@@ -17,6 +17,9 @@ export default async function Page() {
     include: {
       _count: {
         select: { productos: true }
+      },
+      imagenes: {
+        orderBy: { orden: "asc" }
       }
     }
   });

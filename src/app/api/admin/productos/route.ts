@@ -74,7 +74,11 @@ export async function GET() {
 
   const productos = await prisma.producto.findMany({
     orderBy: { creadoEn: "desc" },
-    include: { categoria: true, variantes: true },
+    include: {
+      categoria: true,
+      variantes: true,
+      imagenes: { orderBy: { orden: "asc" } }
+    },
   });
 
   return NextResponse.json(productos);

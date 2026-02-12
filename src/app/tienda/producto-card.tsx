@@ -41,7 +41,7 @@ export default function ProductoCard({ producto }: ProductoCardProps) {
 
   return (
     <Link
-      href={`/catalogo/${producto.slug}`}
+      href={`/tienda/${producto.slug}`}
       className="group relative flex flex-col h-full"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -71,17 +71,17 @@ export default function ProductoCard({ producto }: ProductoCardProps) {
         {/* BADGES */}
         <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start z-10">
           {producto.tieneDescuento && (
-            <span className="bg-emerald-500 text-white text-[9px] font-black px-2 py-1 rounded-md backdrop-blur-md shadow-lg flex items-center gap-1">
+            <span className="bg-[#864d2d] text-white text-[11px] font-black px-3 py-1.5 rounded-md backdrop-blur-md shadow-lg flex items-center gap-1">
               {producto.porcentaje}% OFF
             </span>
           )}
           {producto.esNuevo && (
-            <span className="bg-indigo-600 text-white text-[9px] font-black px-2 py-1 rounded-md backdrop-blur-md shadow-lg">
+            <span className="bg-[#3f2f2f] text-white text-[9px] font-black px-2 py-1 rounded-md backdrop-blur-md shadow-lg">
               NUEVO
             </span>
           )}
           {producto.destacado && (
-            <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-1 rounded-md backdrop-blur-md shadow-lg">
+            <span className="bg-[#e6dad1] text-[#3f2f2f] text-[9px] font-black px-2 py-1 rounded-md backdrop-blur-md shadow-lg">
               ★ TOP
             </span>
           )}
@@ -95,10 +95,10 @@ export default function ProductoCard({ producto }: ProductoCardProps) {
         {/* ACCIONES FLOTANTES (Solo en Hover) */}
         {producto.stock > 0 && (
           <div className="absolute bottom-4 left-4 right-4 flex gap-2 transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 delay-75 pointer-events-auto">
-            <button className="flex-1 bg-white text-slate-900 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-slate-900 hover:text-white transition-colors shadow-lg active:scale-95">
+            <button className="flex-1 bg-white text-[#3f2f2f] py-3 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#3f2f2f] hover:text-[#e6dad1] transition-colors shadow-lg active:scale-95">
               <ShoppingBag className="w-3.5 h-3.5" /> Agregar
             </button>
-            <button className="w-10 h-10 bg-white/20 backdrop-blur-md text-white rounded-xl flex items-center justify-center hover:bg-white hover:text-slate-900 transition-colors shadow-lg active:scale-95">
+            <button className="w-10 h-10 bg-white/20 backdrop-blur-md text-white rounded-xl flex items-center justify-center hover:bg-[#864d2d] hover:text-white transition-colors shadow-lg active:scale-95">
               <Eye className="w-4 h-4" />
             </button>
           </div>
@@ -107,14 +107,14 @@ export default function ProductoCard({ producto }: ProductoCardProps) {
         {/* Overlay Agotado */}
         {producto.stock === 0 && (
           <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
-             <div className="bg-slate-900 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl">Agotado temporalmente</div>
+            <div className="bg-slate-900 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl">Agotado temporalmente</div>
           </div>
         )}
       </div>
 
       {/* --- INFO --- */}
       <div className="space-y-1">
-        <h3 className="font-serif text-lg text-slate-900 leading-tight group-hover:text-indigo-600 transition-colors">
+        <h3 className="font-serif text-lg text-slate-900 leading-tight group-hover:text-[#864d2d] transition-colors">
           {producto.nombre}
         </h3>
         <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">

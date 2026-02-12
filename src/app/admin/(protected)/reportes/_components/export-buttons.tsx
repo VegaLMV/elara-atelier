@@ -25,7 +25,6 @@ interface ExportButtonsProps {
 
 export function ExportButtons({ title, headers, data, filename, metadata, tables }: ExportButtonsProps) {
 
-    // Helper para limpiar datos de colores en Excel e interfaz
     const cleanCellData = (cell: string | number) => {
         if (typeof cell === 'string' && cell.startsWith('#') && cell.includes('|')) {
             return cell.split('|')[1];
@@ -73,19 +72,12 @@ export function ExportButtons({ title, headers, data, filename, metadata, tables
             currentY += 10;
         }
 
-        // Determinar qué tablas exportar
         const listToExport: TableData[] = tables || (headers && data ? [{ headers, data }] : []);
 
-        // 4. Procesar Tablas
         listToExport.forEach((table, index) => {
             if (index > 0) {
                 const finalY = (doc as any).lastAutoTable?.finalY || currentY;
-                if (finalY > 200) {
-                    doc.addPage();
-                    currentY = 20;
-                } else {
-                    currentY = finalY + 15;
-                }
+                currentY = finalY > 200 ? (doc.addPage(), 20) : finalY + 15;
             }
 
             if (table.title) {
@@ -105,45 +97,79 @@ export function ExportButtons({ title, headers, data, filename, metadata, tables
                 alternateRowStyles: { fillColor: [248, 250, 252] },
                 margin: { top: 40 },
                 columnStyles: table.headers.reduce((acc, h, i) => {
-                    if (h.toLowerCase().includes("imagen")) acc[i] = { cellWidth: 20 };
+                    if (h.toLowerCase().includes("imagen")) acc[i] = { cellWidth: 22 };
                     return acc;
                 }, {} as any),
-                didDrawCell: (cellData: any) => {
-                    const header = table.headers[cellData.column.index]?.toLowerCase() || "";
 
-                    // Imágenes
-                    if (cellData.section === 'body' && typeof cellData.cell.raw === 'string' &&
-                        (cellData.cell.raw.startsWith('http') || cellData.cell.raw.startsWith('https'))) {
-                        if (header.includes("imagen")) {
-                            cellData.cell.text = [""];
-                            try {
-                                doc.addImage(cellData.cell.raw, 'JPEG', cellData.cell.x + 2, cellData.cell.y + 2, 16, 16);
-                            } catch (e) { }
-                        }
-                    }
-
-                    // Colores
-                    if (cellData.section === 'body' && header.includes("color") && typeof cellData.cell.raw === 'string' && cellData.cell.raw.includes('|')) {
-                        const [hexRaw] = cellData.cell.raw.split('|');
-                        const firstHex = hexRaw.split(',')[0].trim();
-                        try {
-                            doc.saveGraphicsState();
-                            doc.setFillColor(firstHex);
-                            doc.setDrawColor(180);
-                            doc.setLineWidth(0.1);
-                            doc.circle(cellData.cell.x + 4, cellData.cell.y + (cellData.cell.height / 2), 2.5, "FD");
-                            doc.restoreGraphicsState();
-                        } catch (e) { }
-                    }
-                },
-                didParseCell: (cellData: any) => {
+                didParseCell: (cellData) => {
                     const header = table.headers[cellData.column.index]?.toLowerCase() || "";
                     if (cellData.section === 'body') {
-                        if (header.includes("imagen")) cellData.cell.styles.minCellHeight = 20;
+                        // Limpiar texto de URL para que no salga escrito en el PDF
+                        if (header.includes("imagen")) {
+                            cellData.cell.text = [""]; 
+                            cellData.cell.styles.minCellHeight = 20;
+                        }
+                        // Limpiar color para mostrar solo el nombre
                         if (header.includes("color") && typeof cellData.cell.raw === 'string' && cellData.cell.raw.includes('|')) {
                             const [_, name] = cellData.cell.raw.split('|');
                             cellData.cell.text = [name];
                             cellData.cell.styles.cellPadding = { left: 10, top: 3, right: 3, bottom: 3 };
+                        }
+                    }
+                },
+
+                didDrawCell: (cellData: any) => {
+                    const header = table.headers[cellData.column.index]?.toLowerCase() || "";
+                    const rawValue = cellData.cell.raw;
+
+                    // A. DIBUJAR IMAGEN
+                    if (cellData.section === 'body' && header.includes("imagen") && typeof rawValue === 'string' && rawValue.startsWith('http')) {
+                        try {
+                            doc.addImage(rawValue, 'JPEG', cellData.cell.x + 2, cellData.cell.y + 2, 16, 16);
+                        } catch (e) { }
+                    }
+
+                    // B. DIBUJAR CÍRCULO (Soporte Bicolor real para jsPDF)
+                    if (cellData.section === 'body' && header.includes("color") && typeof rawValue === 'string' && rawValue.includes('|')) {
+                        const [hexRaw] = rawValue.split('|');
+                        const colors = hexRaw.split(',').map(c => c.trim()).filter(Boolean);
+                        
+                        const cx = cellData.cell.x + 5; // Ajustado un poco más a la derecha
+                        const cy = cellData.cell.y + (cellData.cell.height / 2);
+                        const r = 3; // Radio ligeramente más grande para legibilidad
+                        const k = 0.5522847498; // Constante para círculos perfectos con Bezier
+
+                        try {
+                            doc.saveGraphicsState();
+                            doc.setLineWidth(0.05); // Línea de división ultra fina
+                            doc.setDrawColor(220); // Gris muy suave para el borde
+
+                            if (colors.length >= 2) {
+                                // MITAD IZQUIERDA (Color 1)
+                                doc.setFillColor(colors[0]);
+                                doc.moveTo(cx, cy - r);
+                                doc.curveTo(cx - k * r, cy - r, cx - k * r, cy + r, cx, cy + r);
+                                doc.lineTo(cx, cy - r);
+                                doc.fill();
+
+                                // MITAD DERECHA (Color 2)
+                                doc.setFillColor(colors[1]);
+                                doc.moveTo(cx, cy - r);
+                                doc.curveTo(cx + k * r, cy - r, cx + k * r, cy + r, cx, cy + r);
+                                doc.lineTo(cx, cy - r);
+                                doc.fill();
+
+                                // BORDE CIRCULAR EXTERIOR
+                                doc.setDrawColor(200);
+                                doc.circle(cx, cy, r, 'S');
+                            } else {
+                                // Círculo Sólido elegante
+                                doc.setFillColor(colors[0] || "#e2e8f0");
+                                doc.circle(cx, cy, r, "FD");
+                            }
+                            doc.restoreGraphicsState();
+                        } catch (e) {
+                            console.error("Error al dibujar color luxury", e);
                         }
                     }
                 }
@@ -151,15 +177,13 @@ export function ExportButtons({ title, headers, data, filename, metadata, tables
             currentY = (doc as any).lastAutoTable.finalY;
         });
 
-        // 5. Nota final
         if (metadata?.note) {
             const finalY = (doc as any).lastAutoTable.finalY + 10;
             doc.setFontSize(9);
             doc.setFont("helvetica", "italic");
             doc.setTextColor(100);
-            const pHeight = doc.internal.pageSize.getHeight();
-            doc.text("Observaciones:", 14, Math.min(finalY, pHeight - 20));
-            doc.text(metadata.note, 14, Math.min(finalY + 5, pHeight - 15), { maxWidth: pageWidth - 28 });
+            doc.text("Observaciones:", 14, Math.min(finalY, doc.internal.pageSize.getHeight() - 20));
+            doc.text(metadata.note, 14, Math.min(finalY + 5, doc.internal.pageSize.getHeight() - 15), { maxWidth: pageWidth - 28 });
         }
 
         doc.save(`${filename}.pdf`);
@@ -167,49 +191,30 @@ export function ExportButtons({ title, headers, data, filename, metadata, tables
 
     const exportExcel = () => {
         const wb = XLSX.utils.book_new();
-
-        // Hoja 1: Resumen
         const summaryData = [
             ["ELARA ATELIER - REPORTE"],
             ["Título", title],
             ["Fecha", new Date().toLocaleString("es-PE")],
-            [""],
-            ["FILTROS APLICADOS"]
+            [""]
         ];
-        if (metadata?.filters) {
-            Object.entries(metadata.filters).forEach(([key, value]) => {
-                if (value) summaryData.push([key, value]);
-            });
-        }
-        if (metadata?.note) {
-            summaryData.push([""], ["OBSERVACIONES"], [metadata.note]);
-        }
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "Resumen");
 
-        // Hoja(s) de Datos
         const listToExport: TableData[] = tables || (headers && data ? [{ headers, data }] : []);
-
         listToExport.forEach((table, i) => {
             const cleanedData = table.data.map(row => row.map(cleanCellData));
-            const wsData = [table.headers, ...cleanedData];
-            const ws = XLSX.utils.aoa_to_sheet(wsData as any[][]);
-
-            ws["!cols"] = table.headers.map((h, idx) => ({
-                wch: Math.min(Math.max(h.length, ...cleanedData.map(row => String(row[idx] || "").length)) + 4, 50)
-            }));
-
-            XLSX.utils.book_append_sheet(wb, ws, table.title || (i === 0 ? "Datos" : `Datos ${i + 1}`));
+            const ws = XLSX.utils.aoa_to_sheet([table.headers, ...cleanedData]);
+            XLSX.utils.book_append_sheet(wb, ws, table.title || `Datos ${i + 1}`);
         });
 
-        XLSX.writeFile(wb, `${filename}.xlsx`);
+            XLSX.writeFile(wb, `${filename}.xlsx`);
     };
 
     return (
         <div className="flex gap-2">
-            <button onClick={exportPDF} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors border border-red-100">
+            <button onClick={exportPDF} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-xl text-xs font-bold hover:bg-red-100 border border-red-100">
                 <FileText className="w-4 h-4" /> PDF
             </button>
-            <button onClick={exportExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors border border-emerald-100">
+            <button onClick={exportExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 border border-emerald-100">
                 <FileSpreadsheet className="w-4 h-4" /> Excel
             </button>
         </div>
