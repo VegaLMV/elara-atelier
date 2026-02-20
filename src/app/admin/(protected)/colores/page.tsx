@@ -7,21 +7,50 @@ import { sesionAdmin } from "@/lib/sesion";
 import ColoresClient from "./colores-client";
 import { Palette } from "lucide-react";
 
-export default async function Page() {
+type SP = {
+  q?: string;
+  estado?: "todos" | "activos" | "inactivos";
+  page?: string;
+};
+
+export default async function Page({ searchParams }: { searchParams: Promise<SP> }) {
   const sesion = await sesionAdmin();
   if (!sesion) redirect("/admin/login");
 
+  const sp = (await searchParams) ?? {};
+  const q = (sp.q ?? "").trim();
+  const estado = sp.estado ?? "todos";
+  const currentPage = Number(sp.page) || 1;
+  const ITEMS_PER_PAGE = 25;
+  const skip = (currentPage - 1) * ITEMS_PER_PAGE;
+
+  // Filtros
+  const where: any = {};
+
+  if (q) {
+    where.nombre = { contains: q, mode: "insensitive" };
+  }
+
+  if (estado === "activos") where.activo = true;
+  if (estado === "inactivos") where.activo = false;
+
   // Consulta optimizada
-  const colores = await prisma.color.findMany({
-    orderBy: { nombre: "asc" },
-    select: {
-      id: true,
-      nombre: true,
-      hex: true,
-      activo: true,
-      _count: { select: { variantes: true } },
-    },
-  });
+  const [totalColores, colores] = await prisma.$transaction([
+    prisma.color.count({ where }),
+    prisma.color.findMany({
+      where,
+      orderBy: { nombre: "asc" },
+      select: {
+        id: true,
+        nombre: true,
+        hex: true,
+        activo: true,
+        _count: { select: { variantes: true } },
+      },
+      take: ITEMS_PER_PAGE,
+      skip,
+    })
+  ]);
 
   const rows = colores.map((c) => ({
     id: c.id,
@@ -30,6 +59,8 @@ export default async function Page() {
     activo: c.activo,
     usos: c._count.variantes,
   }));
+
+  const totalPages = Math.ceil(totalColores / ITEMS_PER_PAGE);
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 bg-gray-50/50 min-h-screen">
@@ -52,7 +83,7 @@ export default async function Page() {
         <div className="flex items-center gap-4 bg-white px-5 py-3 rounded-xl shadow-sm border border-gray-100">
           <div className="text-right">
             <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total Colores</p>
-            <p className="text-2xl font-bold text-slate-900 leading-none">{rows.length}</p>
+            <p className="text-2xl font-bold text-slate-900 leading-none">{totalColores}</p>
           </div>
           <div className="h-10 w-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 border border-indigo-100">
             <Palette className="w-5 h-5" />
@@ -60,7 +91,11 @@ export default async function Page() {
         </div>
       </div>
 
-      <ColoresClient initialRows={rows} />
+      <ColoresClient
+        initialRows={rows}
+        totalPages={totalPages}
+        initialFilters={{ q, estado }}
+      />
     </div>
   );
 }

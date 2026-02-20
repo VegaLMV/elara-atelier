@@ -53,10 +53,12 @@ export default function CategoriesSection({ categorias }: { categorias: Categori
                                 {/* Imagen de Fondo */}
                                 <div className="relative h-96 overflow-hidden bg-slate-200">
                                     {imagenPortada ? (
-                                        <img
+                                        <Image
                                             src={imagenPortada.url}
                                             alt={categoria.nombre}
-                                            className={`w-full h-full object-cover transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'
+                                            fill
+                                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                            className={`object-cover transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'
                                                 }`}
                                         />
                                     ) : (

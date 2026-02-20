@@ -3,14 +3,10 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import ProductoDetalle from "./producto-detalle";
+import ProductoDetalle from "./_components/producto-detalle";
 import Link from "next/link";
+import { calcularPrecioFinal } from "@/lib/precios";
 
-function calcularPrecioFinal(precio: number, tipo: string | null, valor: number | null) {
-  if (!tipo || !valor) return precio;
-  if (tipo === "PORCENTAJE") return precio * (1 - valor / 100);
-  return Math.max(0, precio - valor);
-}
 
 export default async function ProductoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

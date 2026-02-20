@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useDebouncedCallback } from "@/hooks/use-debounce";
+import Pagination from "@/components/ui/pagination";
 import {
   Palette,
   Search,
@@ -80,12 +82,54 @@ async function copiarAlPortapapeles(text: string) {
   }
 }
 
-export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
-  const router = useRouter();
 
-  // 🔎 Filtros
-  const [buscar, setBuscar] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos">("todos");
+
+export default function ColoresClient({
+  initialRows,
+  totalPages,
+  initialFilters
+}: {
+  initialRows: Row[],
+  totalPages: number,
+  initialFilters: { q: string, estado: "todos" | "activos" | "inactivos" }
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // 🔎 Filtros (Sincronizados con URL)
+  // Estado local para input inmediato, effect para URL
+  const [buscar, setBuscar] = useState(initialFilters.q);
+  const [filtroEstado, setFiltroEstado] = useState(initialFilters.estado);
+
+  // Debounce URL updates
+  const handleSearch = useDebouncedCallback((term: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (term) params.set("q", term);
+    else params.delete("q");
+
+    // Reset page on search
+    params.set("page", "1");
+
+    router.replace(`${pathname}?${params.toString()}`);
+  }, 300);
+
+  const handleEstadoChange = (estado: "todos" | "activos" | "inactivos") => {
+    setFiltroEstado(estado);
+    const params = new URLSearchParams(searchParams);
+    if (estado !== "todos") params.set("estado", estado);
+    else params.delete("estado");
+
+    params.set("page", "1"); // Reset page
+    router.replace(`${pathname}?${params.toString()}`);
+  }
+
+  // Sync Input if URL changes externally
+  useEffect(() => {
+    setBuscar(searchParams.get("q") ?? "");
+    setFiltroEstado((searchParams.get("estado") as any) ?? "todos");
+  }, [searchParams]);
+
 
   // Form
   const [nombre, setNombre] = useState("");
@@ -140,19 +184,8 @@ export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
     [nombre, hexNorm]
   );
 
-  const rowsFiltradas = useMemo(() => {
-    return initialRows.filter((r) => {
-      const q = buscar.trim().toLowerCase();
-      const coincideTexto = !q || (r.nombre ?? "").toLowerCase().includes(q) || normalizarHex(r.hex ?? "").toLowerCase().includes(q);
-
-      const coincideEstado =
-        filtroEstado === "todos" ? true :
-          filtroEstado === "activos" ? r.activo :
-            !r.activo;
-
-      return coincideTexto && coincideEstado;
-    });
-  }, [buscar, filtroEstado, initialRows]);
+  // Use initialRows directly as they are now paginated/filtered from server
+  const rowsFiltradas = initialRows;
 
   const showToast = (msg: string, type: "success" | "error" | "warning" = "success") => {
     setToast({ msg, type });
@@ -532,7 +565,10 @@ export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
               className="w-full pl-10 pr-4 py-2.5 text-sm bg-transparent outline-none placeholder:text-slate-400"
               placeholder="Buscar color..."
               value={buscar}
-              onChange={(e) => setBuscar(e.target.value)}
+              onChange={(e) => {
+                setBuscar(e.target.value);
+                handleSearch(e.target.value);
+              }}
             />
           </div>
 
@@ -540,7 +576,7 @@ export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
             {(['todos', 'activos', 'inactivos'] as const).map((f) => (
               <button
                 key={f}
-                onClick={() => setFiltroEstado(f)}
+                onClick={() => handleEstadoChange(f)}
                 className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all capitalize ${filtroEstado === f
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-500 hover:text-slate-700'
@@ -591,6 +627,11 @@ export default function ColoresClient({ initialRows }: { initialRows: Row[] }) {
               ))
             )}
           </div>
+        </div>
+
+        {/* Paginación */}
+        <div className="flex justify-center pb-8">
+          <Pagination totalPages={totalPages} />
         </div>
       </div>
     </div>

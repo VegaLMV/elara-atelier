@@ -3,31 +3,31 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import HeroSection from "./hero-section";
+import { getCachedHomeSections, getCachedCategoriasVisibles } from "@/lib/cache";
+import HeroSection from "./_components/landing/hero-section";
 import { ArrowRight } from "lucide-react";
 
 // Nuevos Componentes de Landing
-import TrustBar from "./_components/trust-bar";
-import FeaturedCategories from "./_components/featured-categories";
-import BrandValues from "./_components/brand-values";
-import NewsletterSection from "./_components/newsletter-section";
-import NewsletterPopupSection from "./_components/newsletter-popup-section";
-import ProductDualSection from "./_components/product-dual-section";
-import StorySection from "./_components/story-section";
-import PromoCampaignSection from "./_components/promo-campaign-section";
-import ProcessSection from "./_components/process-section";
-import TestimonialsSection from "./_components/testimonials-section";
+import TrustBar from "./_components/landing/trust-bar";
+import FeaturedCategories from "./_components/landing/featured-categories";
+import BrandValues from "./_components/landing/brand-values";
+import NewsletterSection from "./_components/landing/newsletter-section";
+import NewsletterPopupSection from "./_components/landing/newsletter-popup-section";
+import ProductDualSection from "./_components/landing/product-dual-section";
+import StorySection from "./_components/landing/story-section";
+import PromoCampaignSection from "./_components/landing/promo-campaign-section";
+import ProcessSection from "./_components/landing/process-section";
+import TestimonialsSection from "./_components/landing/testimonials-section";
 import ScrollReveal from "@/components/ui/scroll-reveal";
-import CategoriesSection from "./_components/categories-section";
+import CategoriesSection from "./_components/landing/categories-section";
+import BenefitsGrid from "./_components/landing/benefits-grid";
 
 export default async function TiendaPage() {
   const ahora = new Date();
 
+  // OPTIMIZADO: Usar cache para datos que cambian poco
   const [homeSections, totalProductos, activeCampana, categoriasVisibles] = await Promise.all([
-    prisma.homeSection.findMany({
-      where: { enabled: true },
-      orderBy: { order: "asc" }
-    }),
+    getCachedHomeSections(),
     prisma.producto.count({ where: { estado: "ACTIVO" } }),
     prisma.campana.findFirst({
       where: {
@@ -37,54 +37,52 @@ export default async function TiendaPage() {
       },
       orderBy: { creadoEn: "desc" }
     }),
-    prisma.categoria.findMany({
-      where: { visible: true },
-      include: {
-        _count: { select: { productos: true } },
-        imagenes: { orderBy: { orden: "asc" } }
-      },
-      orderBy: { orden: "asc" }
-    })
+    getCachedCategoriasVisibles()
   ]);
 
-  // Pre-fetching para secciones dinámicas
-  const sectionsProcessed = await Promise.all(homeSections.map(async (s) => {
-    const content = s.content as any;
-    if (s.type === "BEST_SELLERS" && content.selectedCampaignId) {
-      const specificCampana = await prisma.campana.findUnique({
-        where: { id: content.selectedCampaignId },
+  // OPTIMIZADO: Resolver N+1 query problem
+  // Extraer todos los campaign IDs de las secciones
+  const campaignIds = homeSections
+    .filter(s => (s.type === "BEST_SELLERS" || s.type === "PROMO_CAMPAIGN"))
+    .map(s => {
+      const content = s.content as any;
+      return content?.selectedCampaignId;
+    })
+    .filter((id): id is string => Boolean(id));
+
+  // Hacer UNA sola query para todas las campañas
+  const campanasData = campaignIds.length > 0 ? await prisma.campana.findMany({
+    where: { id: { in: campaignIds } },
+    include: {
+      detalles: {
         include: {
-          detalles: {
-            include: {
-              producto: {
-                include: {
-                  imagenes: { take: 1, orderBy: { esPortada: "desc" } }
-                }
+          producto: {
+            select: {
+              id: true,
+              nombre: true,
+              imagenes: {
+                select: { url: true },
+                take: 1,
+                orderBy: { esPortada: "desc" as const }
               }
             }
           }
         }
-      });
-      return { ...s, specificCampana };
+      }
     }
-    if (s.type === "PROMO_CAMPAIGN" && content.selectedCampaignId) {
-      const specificCampana = await prisma.campana.findUnique({
-        where: { id: content.selectedCampaignId },
-        select: {
-          nombre: true,
-          descripcion: true,
-          imagenUrl: true,
-          tipo: true,
-          valor: true,
-          startsAt: true,
-          endsAt: true,
-          estado: true
-        }
-      });
-      return { ...s, specificCampana };
+  }) : [];
+
+  // Crear un Map para lookup rápido (O(1) en vez de O(n))
+  const campanasMap = new Map(campanasData.map(c => [c.id, c]));
+
+  // Ahora mapear secciones sin hacer queries adicionales
+  const sectionsProcessed = homeSections.map((s) => {
+    const content = s.content as any;
+    if ((s.type === "BEST_SELLERS" || s.type === "PROMO_CAMPAIGN") && content?.selectedCampaignId) {
+      return { ...s, specificCampana: campanasMap.get(content.selectedCampaignId) };
     }
     return s;
-  }));
+  });
 
   // Fetch productos nuevos y destacados para secciones de vista previa (no grid completo)
   const previewProducts = await prisma.producto.findMany({
@@ -145,6 +143,11 @@ export default async function TiendaPage() {
         const staticTestimonialsSection = (
           <ScrollReveal key="static-testimonials">
             <TestimonialsSection />
+          </ScrollReveal>
+        );
+        const staticBenefitsGrid = (
+          <ScrollReveal key="static-benefits">
+            <BenefitsGrid />
           </ScrollReveal>
         );
         const staticNewsletterPopup = (
@@ -316,6 +319,7 @@ export default async function TiendaPage() {
               </ScrollReveal>
             )}
 
+            {staticBenefitsGrid}
             {staticNewsletterPopup}
           </>
         );

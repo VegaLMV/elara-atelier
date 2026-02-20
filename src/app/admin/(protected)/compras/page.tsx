@@ -14,7 +14,7 @@ import {
     Filter,
     DollarSign
 } from "lucide-react";
-import Pagination from "@/components/pagination";
+import Pagination from "@/components/ui/pagination";
 
 // Helper de formato moneda
 function soles(v: any) {
@@ -70,7 +70,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     // 3. Consulta
     // 3. Consulta
     const currentPage = Number(sp.page) || 1;
-    const ITEMS_PER_PAGE = 50;
+    const ITEMS_PER_PAGE = 25;
     const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
     const [totalCompras, compras] = await prisma.$transaction([

@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 interface BrandValuesProps {
     tagline?: string;
     title?: string;
@@ -36,10 +38,12 @@ export default function BrandValues({ tagline, title, body, imageUrl, quote }: B
 
                     <div className="relative">
                         <div className="aspect-[4/5] rounded-[2rem] overflow-hidden rotate-2 hover:rotate-0 transition-transform duration-700 shadow-2xl shadow-black/50">
-                            <img
+                            <Image
                                 src={imageUrl || "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=800"}
                                 alt="Atelier Essence"
-                                className="w-full h-full object-cover scale-110"
+                                fill
+                                sizes="(max-width: 1024px) 100vw, 50vw"
+                                className="object-cover scale-110"
                             />
                         </div>
                         {quote && (

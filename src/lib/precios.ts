@@ -115,3 +115,18 @@ export const formatMoney = (amount: number | Decimal) => {
         currency: "PEN",
     }).format(val);
 };
+
+/**
+ * Versión simplificada para calcular precio final.
+ * Útil cuando solo necesitas el precio final sin metadata adicional.
+ */
+export function calcularPrecioFinal(
+    precio: number,
+    tipo: string | null,
+    valor: number | null
+): number {
+    if (!tipo || !valor) return precio;
+    if (tipo === "PORCENTAJE") return precio * (1 - valor / 100);
+    return Math.max(0, precio - valor);
+}
+

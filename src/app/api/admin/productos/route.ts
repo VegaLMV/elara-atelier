@@ -72,15 +72,19 @@ export async function GET() {
   const sesion = await obtenerSesion();
   if (!sesion) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
+  // OPTIMIZADO: Usar select específico y _count
   const productos = await prisma.producto.findMany({
-    orderBy: { creadoEn: "desc" },
     include: {
-      categoria: true,
-      variantes: true,
-      imagenes: { orderBy: { orden: "asc" } }
+      categoria: { select: { id: true, nombre: true } },
+      _count: { select: { variantes: true, imagenes: true } },
+      imagenes: {
+        select: { id: true, url: true, esPortada: true },
+        orderBy: { orden: "asc" },
+        take: 1 // Solo la primera imagen para listado
+      }
     },
+    orderBy: { creadoEn: "desc" },
   });
-
   return NextResponse.json(productos);
 }
 

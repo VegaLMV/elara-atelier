@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 
 interface StorySectionProps {
@@ -41,10 +42,13 @@ export default function StorySection({
                         <div className="absolute inset-2 border border-white/20 z-20 pointer-events-none" />
 
                         {imageUrl ? (
-                            <img
+                            <Image
                                 src={imageUrl}
                                 alt={title}
-                                className="w-full h-full object-cover transition-transform duration-[2.5s] ease-out group-hover:scale-105"
+                                fill
+                                sizes="(max-width: 1024px) 100vw, 50vw"
+                                quality={85}
+                                className="object-cover transition-transform duration-[2.5s] ease-out group-hover:scale-105"
                             />
                         ) : (
                             <div className="w-full h-full bg-slate-100 flex items-center justify-center font-serif italic text-slate-400">

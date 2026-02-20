@@ -17,6 +17,7 @@ import {
     FileText
 } from "lucide-react";
 import BuscadorProveedores from "./buscador-proveedores";
+import Pagination from "@/components/ui/pagination";
 
 type SP = { q?: string };
 
@@ -27,13 +28,16 @@ type SP = { q?: string };
  * Muestra la red de suministros en una tabla detallada.
  * Permite filtrar por múltiples campos (Nombre, RUC, Correo, etc.)
  */
-export default async function Page({ searchParams }: { searchParams: Promise<SP> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<SP & { page?: string }> }) {
     // 1. Verificación de Seguridad
     const sesion = await sesionAdmin();
     if (!sesion) redirect("/admin/login");
 
     const sp = (await searchParams) ?? {};
     const q = (sp.q ?? "").trim();
+    const currentPage = Number(sp.page) || 1;
+    const ITEMS_PER_PAGE = 25;
+    const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
     // 2. Filtro Avanzado (Búsqueda en múltiples columnas)
     const where =
@@ -49,22 +53,29 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
             }
             : {};
 
-    const rows = await prisma.proveedor.findMany({
-        where,
-        orderBy: { nombre: "asc" },
-        select: {
-            id: true,
-            nombre: true,
-            razonSocial: true,
-            ruc: true,
-            telefono: true,
-            correo: true,
-            departamento: true,
-            provincia: true,
-            distrito: true,
-            direccion: true
-        },
-    });
+    const [totalProveedores, rows] = await prisma.$transaction([
+        prisma.proveedor.count({ where }),
+        prisma.proveedor.findMany({
+            where,
+            orderBy: { nombre: "asc" },
+            select: {
+                id: true,
+                nombre: true,
+                razonSocial: true,
+                ruc: true,
+                telefono: true,
+                correo: true,
+                departamento: true,
+                provincia: true,
+                distrito: true,
+                direccion: true
+            },
+            take: ITEMS_PER_PAGE,
+            skip
+        })
+    ]);
+
+    const totalPages = Math.ceil(totalProveedores / ITEMS_PER_PAGE);
 
     return (
         <div className="p-6 md:p-8 max-w-[1600px] mx-auto space-y-8 bg-gray-50/50 min-h-screen">
@@ -223,6 +234,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
                     </table>
                 </div>
             </div>
-        </div>
+
+            <div className="flex justify-center pb-8">
+                <Pagination totalPages={totalPages} />
+            </div>
+        </div >
     );
 }

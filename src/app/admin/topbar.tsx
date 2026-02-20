@@ -32,6 +32,7 @@ export default function AdminTopbar() {
 
                         {/* --- NUEVO GRUPO: COMERCIAL (Ventas y Devoluciones) --- */}
                         <DropdownMenu title="Comercial">
+                            <DropdownItem href="/admin/pedidos">📦 Gestión Pedidos</DropdownItem>
                             <DropdownItem href="/admin/ventas/nueva">➕ Nueva Venta (POS)</DropdownItem>
                             <DropdownItem href="/admin/ventas">📋 Historial Ventas</DropdownItem>
                             <div className="h-px bg-gray-100 my-1"></div>

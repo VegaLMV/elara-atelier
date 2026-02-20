@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import SimilarProductsSection from "./similar-products-section";
+import Link from "next/link";
+import Image from "next/image";
 
 type Variante = {
   id: string;
@@ -33,6 +35,7 @@ export default function ProductoDetalle({ producto }: Props) {
   const [colorSel, setColorSel] = useState<string | null>(null);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
 
   const imagenParaMensaje = useMemo(() => {
     if (colorSel) {
@@ -68,17 +71,16 @@ export default function ProductoDetalle({ producto }: Props) {
 
   function contactarWhatsApp() {
     const numero = process.env.NEXT_PUBLIC_WHATSAPP_NUMERO || "51944434054";
+    const currentUrl = typeof window !== "undefined" ? window.location.href : "";
 
-    const variantInfo = varianteElegida
-      ? `\n*Talla:* ${varianteElegida.talla}\n*Color:* ${varianteElegida.color}`
-      : "";
+    const details = [
+      `👗 *Producto:* ${producto.nombre}`,
+      tallaSel ? `📏 *Talla:* ${tallaSel}` : null,
+      colorSel ? `🎨 *Color:* ${colorSel}` : null,
+      `💰 *Precio:* ${soles(producto.precioFinal)}`,
+    ].filter(Boolean).join("\n");
 
-    const texto = `Hola Elara Atelier ✨, estoy interesada en este producto:
-    
-*${producto.nombre}*${variantInfo}
-*Precio:* ${soles(producto.precioFinal)}
-
-Puedes verlo aquí: ${imagenParaMensaje}`;
+    const texto = `✨ *¡Hola Elara Atelier!* 🌸\n\nMe encantó esta prenda y me gustaría recibir más información para mi compra:\n\n${details}\n\n🔗 *Ver en tienda:* ${currentUrl}\n🖼️ *Referencia:* ${imagenParaMensaje}`;
 
     window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, "_blank");
   }
@@ -150,7 +152,14 @@ Puedes verlo aquí: ${imagenParaMensaje}`;
             <button className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-full transition-colors">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
-            <img src={imgActiva} alt="Zoom" className="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl rounded-lg animate-in zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()} />
+            <Image
+              src={imgActiva}
+              alt="Zoom"
+              width={1600}
+              height={2000}
+              className="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl rounded-lg animate-in zoom-in-95 duration-300"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         )}
 
@@ -160,12 +169,29 @@ Puedes verlo aquí: ${imagenParaMensaje}`;
             <div className="flex md:flex-col gap-3 overflow-x-auto md:overflow-y-auto no-scrollbar md:w-20 lg:w-24 shrink-0 py-1">
               {producto.imagenes.map((url, i) => (
                 <button key={i} onMouseEnter={() => setImgActiva(url)} onClick={() => setImgActiva(url)} className={`w-16 md:w-full aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all shrink-0 ${imgActiva === url ? 'border-slate-900 ring-1 ring-slate-900' : 'border-transparent opacity-70 hover:opacity-100'}`}>
-                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <Image
+                    src={url}
+                    alt=""
+                    width={100}
+                    height={133}
+                    className="w-full h-full object-cover"
+                  />
                 </button>
               ))}
             </div>
             <div className="flex-1 aspect-[3/4] bg-slate-50 rounded-2xl overflow-hidden relative cursor-zoom-in group shadow-sm" onClick={() => setIsZoomOpen(true)}>
-              {imgActiva ? <img src={imgActiva} alt={producto.nombre} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300">Sin imagen</div>}
+              {imgActiva ? (
+                <Image
+                  src={imgActiva}
+                  alt={producto.nombre}
+                  fill
+                  priority
+                  className="w-full h-full object-cover"
+                  sizes="(max-width: 1024px) 100vw, 60vw"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-300">Sin imagen</div>
+              )}
               {producto.tieneDescuento && (
                 <div className="absolute top-5 left-5 bg-red-600 text-white text-xs font-black px-4 py-2 rounded shadow-lg border border-red-500 tracking-widest uppercase z-10">
                   {producto.descuentoTag} OFF
@@ -228,10 +254,35 @@ Puedes verlo aquí: ${imagenParaMensaje}`;
               </div>
             </div>
 
+            <div className="mb-6 flex items-start gap-3">
+              <div className="flex items-center h-5">
+                <input
+                  id="terminos"
+                  type="checkbox"
+                  checked={aceptaTerminos}
+                  onChange={(e) => setAceptaTerminos(e.target.checked)}
+                  className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-900 cursor-pointer"
+                />
+              </div>
+              <label htmlFor="terminos" className="text-sm text-slate-600 leading-tight cursor-pointer select-none">
+                He leído y acepto los{" "}
+                <Link
+                  href="/terminos-condiciones"
+                  target="_blank"
+                  className="text-slate-900 font-medium underline underline-offset-2 hover:text-slate-700"
+                >
+                  Términos y Condiciones
+                </Link>
+              </label>
+            </div>
+
             <button
               onClick={contactarWhatsApp}
               disabled={stockActual === 0}
-              className="w-full py-4 bg-slate-900 text-white text-sm font-bold uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all shadow-lg active:scale-[0.99] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+              className={`w-full py-4 text-sm font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg active:scale-[0.99] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none ${aceptaTerminos
+                ? 'bg-slate-900 text-white hover:bg-slate-800'
+                : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+                }`}
             >
               {stockActual === 0 ? 'NO DISPONIBLE' : 'Comprar por WhatsApp'}
             </button>

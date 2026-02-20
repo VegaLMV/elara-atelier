@@ -17,20 +17,23 @@ export default async function EditarClientePage({ params }: { params: Promise<{ 
   if (!admin) redirect("/admin/login");
 
   const { id } = await params;
-  
+
   // Incluimos el conteo de ventas para pasarlo al formulario (para el botón de eliminar)
-  const cliente = await prisma.cliente.findUnique({ 
-      where: { id },
-      include: {
-          _count: { select: { ventas: true } }
-      }
+  const cliente = await prisma.cliente.findUnique({
+    where: { id },
+    include: {
+      _count: { select: { ventas: true } }
+    }
   });
 
   if (!cliente) notFound();
 
   return (
     <div className="p-6 md:p-8 min-h-screen bg-gray-50/50">
-      <ClienteForm initialData={cliente} />
+      <ClienteForm initialData={{
+        ...cliente,
+        saldoAFavor: Number(cliente.saldoAFavor)
+      }} />
     </div>
   );
 }

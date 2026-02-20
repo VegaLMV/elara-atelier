@@ -17,6 +17,7 @@ import {
     Package,
     Wallet
 } from "lucide-react";
+import Pagination from "@/components/ui/pagination";
 
 /**
  * ============================================================================
@@ -31,25 +32,34 @@ import {
 export default async function DevolucionesPage({
     searchParams
 }: {
-    searchParams: Promise<{ tab?: string }>
+    searchParams: Promise<{ tab?: string; page?: string }>
 }) {
     const sesion = await sesionAdmin();
     if (!sesion) redirect("/admin/login");
 
     const sp = await searchParams;
     const modo = sp.tab === "proveedor" ? "PROVEEDOR" : "CLIENTE";
+    const currentPage = Number(sp.page) || 1;
+    const ITEMS_PER_PAGE = 25;
+    const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
     // 1. Consulta de Devoluciones (Filtrada por la pestaña activa)
-    const devoluciones = await prisma.devolucion.findMany({
-        where: { tipo: modo as any },
-        include: {
-            venta: { include: { cliente: { select: { nombre: true } } } },
-            compra: { include: { proveedor: { select: { nombre: true } } } },
-            items: true
-        },
-        orderBy: { creadoEn: "desc" },
-        take: 40
-    });
+    const [totalDevoluciones, devoluciones] = await prisma.$transaction([
+        prisma.devolucion.count({ where: { tipo: modo as any } }),
+        prisma.devolucion.findMany({
+            where: { tipo: modo as any },
+            include: {
+                venta: { include: { cliente: { select: { nombre: true } } } },
+                compra: { include: { proveedor: { select: { nombre: true } } } },
+                items: true
+            },
+            orderBy: { creadoEn: "desc" },
+            take: ITEMS_PER_PAGE,
+            skip
+        })
+    ]);
+
+    const totalPages = Math.ceil(totalDevoluciones / ITEMS_PER_PAGE);
 
     // 2. Cálculo de Stats (Para los cuadros superiores)
     const statsGlobales = await prisma.$transaction([
@@ -103,7 +113,7 @@ export default async function DevolucionesPage({
                     </div>
                     <div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Saldos a Favor (Clientes)</p>
-                        <p className="text-3xl font-black text-gray-900">S/ {statsGlobales[1]._sum.saldoAFavor?.toString() || "0.00"}</p>
+                        <p className="text-3xl font-black text-gray-900">S/ {Number(statsGlobales[1]._sum.saldoAFavor || 0).toFixed(2)}</p>
                     </div>
                 </div>
 
@@ -116,7 +126,7 @@ export default async function DevolucionesPage({
                     </div>
                     <div className="relative z-10">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Últimos 30 días</p>
-                        <p className="text-3xl font-black text-white">{devoluciones.length} Ops.</p>
+                        <p className="text-3xl font-black text-white">{totalDevoluciones} Ops.</p>
                     </div>
                 </div>
             </div>
@@ -141,80 +151,87 @@ export default async function DevolucionesPage({
 
                 {/* Grid de Cards o Tabla */}
                 <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden min-h-[400px]">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-gray-50/80 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-[0.15em]">
-                            <tr>
-                                <th className="px-8 py-5">Fecha / Op.</th>
-                                <th className="px-8 py-5">Sujeto</th>
-                                <th className="px-8 py-5">Resolución</th>
-                                <th className="px-8 py-5">Motivo</th>
-                                <th className="px-8 py-5 text-right">Monto</th>
-                                <th className="px-8 py-5 text-right">Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {devoluciones.length === 0 ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-gray-50/80 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-[0.15em]">
                                 <tr>
-                                    <td colSpan={6} className="px-8 py-20 text-center text-gray-400 italic">
-                                        No hay devoluciones registradas en esta categoría.
-                                    </td>
+                                    <th className="px-8 py-5">Fecha / Op.</th>
+                                    <th className="px-8 py-5">Sujeto</th>
+                                    <th className="px-8 py-5">Resolución</th>
+                                    <th className="px-8 py-5">Motivo</th>
+                                    <th className="px-8 py-5 text-right">Monto</th>
+                                    <th className="px-8 py-5 text-right">Acción</th>
                                 </tr>
-                            ) : (
-                                devoluciones.map((dev) => (
-                                    <tr key={dev.id} className="hover:bg-blue-50/30 transition-all group">
-                                        <td className="px-8 py-6">
-                                            <div className="flex flex-col">
-                                                <span className="font-black text-gray-900 font-mono text-xs uppercase">#{dev.id.slice(-6)}</span>
-                                                <span className="text-[10px] text-gray-400 font-bold mt-1 uppercase">
-                                                    {new Date(dev.creadoEn).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${modo === 'CLIENTE' ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}>
-                                                    {(dev.venta?.cliente?.nombre || dev.compra?.proveedor?.nombre || "P").charAt(0)}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-gray-900 line-clamp-1">
-                                                        {modo === 'CLIENTE' ? (dev.venta?.cliente?.nombre || "Público General") : (dev.compra?.proveedor?.nombre)}
-                                                    </p>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
-                                                        Ref: {modo === 'CLIENTE' ? `#${dev.venta?.codigo}` : `Compra ID`}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${dev.accion === 'CAMBIO' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                                                    dev.accion === 'SALDO_A_FAVOR' ? 'bg-purple-50 text-purple-700 border-purple-100' :
-                                                        'bg-red-50 text-red-700 border-red-100'
-                                                }`}>
-                                                <CheckCircle2 className="w-3 h-3" />
-                                                {dev.accion.replace(/_/g, " ")}
-                                            </span>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <p className="text-gray-500 text-xs line-clamp-1 max-w-[200px]" title={dev.motivo}>
-                                                {dev.motivo}
-                                            </p>
-                                        </td>
-                                        <td className="px-8 py-6 text-right">
-                                            <span className="font-black text-gray-900 font-mono">S/ {dev.montoTotal.toString()}</span>
-                                        </td>
-                                        <td className="px-8 py-6 text-right">
-                                            <Link
-                                                href={`/admin/devoluciones/${dev.id}`}
-                                                className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-400 hover:text-slate-900 hover:border-slate-300 p-2 rounded-xl transition-all shadow-sm"
-                                            >
-                                                <ArrowRight className="w-4 h-4" />
-                                            </Link>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {devoluciones.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-8 py-20 text-center text-gray-400 italic">
+                                            No hay devoluciones registradas en esta categoría.
                                         </td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                ) : (
+                                    devoluciones.map((dev) => (
+                                        <tr key={dev.id} className="hover:bg-blue-50/30 transition-all group">
+                                            <td className="px-8 py-6">
+                                                <div className="flex flex-col">
+                                                    <span className="font-black text-gray-900 font-mono text-xs uppercase">#{dev.id.slice(-6)}</span>
+                                                    <span className="text-[10px] text-gray-400 font-bold mt-1 uppercase">
+                                                        {new Date(dev.creadoEn).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${modo === 'CLIENTE' ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}>
+                                                        {(dev.venta?.cliente?.nombre || dev.compra?.proveedor?.nombre || "P").charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-900 line-clamp-1">
+                                                            {modo === 'CLIENTE' ? (dev.venta?.cliente?.nombre || "Público General") : (dev.compra?.proveedor?.nombre)}
+                                                        </p>
+                                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
+                                                            Ref: {modo === 'CLIENTE' ? `#${dev.venta?.codigo || '---'}` : `Compra ID`}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${dev.accion === 'CAMBIO' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                                    dev.accion === 'SALDO_A_FAVOR' ? 'bg-purple-50 text-purple-700 border-purple-100' :
+                                                        'bg-red-50 text-red-700 border-red-100'
+                                                    }`}>
+                                                    <CheckCircle2 className="w-3 h-3" />
+                                                    {dev.accion.replace(/_/g, " ")}
+                                                </span>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <p className="text-gray-500 text-xs line-clamp-1 max-w-[200px]" title={dev.motivo}>
+                                                    {dev.motivo}
+                                                </p>
+                                            </td>
+                                            <td className="px-8 py-6 text-right">
+                                                <span className="font-black text-gray-900 font-mono">S/ {Number(dev.montoTotal).toFixed(2)}</span>
+                                            </td>
+                                            <td className="px-8 py-6 text-right">
+                                                <Link
+                                                    href={`/admin/devoluciones/${dev.id}`}
+                                                    className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-400 hover:text-slate-900 hover:border-slate-300 p-2 rounded-xl transition-all shadow-sm"
+                                                >
+                                                    <ArrowRight className="w-4 h-4" />
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Paginación */}
+                <div className="flex justify-center pb-8">
+                    <Pagination totalPages={totalPages} />
                 </div>
             </div>
 

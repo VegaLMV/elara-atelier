@@ -9,7 +9,7 @@ import { sesionAdmin } from "@/lib/sesion";
 import FiltrosProductos from "./filtros-productos";
 import ProductoImageClient from "./producto-image-client";
 import { Plus, Tag, AlertCircle, CheckCircle2, ArrowLeft } from "lucide-react";
-import Pagination from "@/components/pagination";
+import Pagination from "@/components/ui/pagination";
 
 // --- HELPERS ---
 import { calcularPrecioProducto, formatMoney } from "@/lib/precios";
@@ -45,7 +45,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const orden = (sp.orden ?? "recientes") as SP["orden"];
   const vista = (sp.vista ?? "tabla") as SP["vista"];
   const currentPage = Number(sp.page) || 1;
-  const ITEMS_PER_PAGE = 50;
+  const ITEMS_PER_PAGE = 25;
   const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
   // --- FILTROS PRISMA ---

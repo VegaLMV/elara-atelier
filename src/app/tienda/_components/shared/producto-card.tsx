@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { ShoppingBag, Eye } from "lucide-react";
 import { formatMoney } from "@/lib/precios";
@@ -51,13 +52,17 @@ export default function ProductoCard({ producto }: ProductoCardProps) {
 
         {producto.imagenes.length > 0 ? (
           producto.imagenes.map((img, index) => (
-            <img
+            <Image
               key={img}
               src={img}
               alt={producto.nombre}
-              className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-in-out ${index === currentImageIndex
-                ? 'opacity-100 scale-105'
-                : 'opacity-0 scale-100'
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              quality={85}
+              priority={index === 0}
+              className={`object-cover transition-all duration-700 ease-in-out ${index === currentImageIndex
+                  ? 'opacity-100 scale-105'
+                  : 'opacity-0 scale-100'
                 }`}
             />
           ))

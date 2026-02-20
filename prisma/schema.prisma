@@ -58,6 +58,13 @@ enum EstadoVenta {
   ANULADO
 }
 
+enum EstadoPedido {
+  PENDIENTE
+  ENVIADO
+  ENTREGADO
+  CANCELADO
+}
+
 enum TipoDevolucion {
   CLIENTE
   PROVEEDOR
@@ -260,6 +267,7 @@ model Variante {
   movimientos MovimientoInventario[]
   itemsCompra ItemCompra[]
   itemsVenta  ItemVenta[]
+  itemsPedido ItemPedido[]
   devoluciones DevolucionItem[]
 
   @@unique([productoId, tallaId, colorId])
@@ -359,6 +367,9 @@ model Venta {
   devoluciones Devolucion[]
   creadoEn      DateTime               @default(now())
   actualizadoEn DateTime               @updatedAt
+
+  pedidoId      String?  @unique
+  pedido        Pedido?  @relation("PedidoAVenta", fields: [pedidoId], references: [id])
 }
 
 model ItemVenta {
@@ -394,8 +405,10 @@ model TipoEmpaque {
 
 model UsoEmpaque {
   id            String      @id @default(cuid())
-  ventaId       String
-  venta         Venta       @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  ventaId       String?
+  venta         Venta?       @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  pedidoId      String?
+  pedido        Pedido?      @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   tipoEmpaqueId String
   tipoEmpaque   TipoEmpaque @relation(fields: [tipoEmpaqueId], references: [id])
   cantidad      Int
@@ -417,6 +430,7 @@ model Cliente {
   saldoAFavor  Decimal  @default(0)
 
   ventas        Venta[]
+  pedidos       Pedido[]
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 }
@@ -534,4 +548,51 @@ model SocialLink {
 
   @@index([order])
   @@index([enabled])
+}
+
+model Pedido {
+  id            String       @id @default(cuid())
+  codigo        String       @unique @default(cuid())
+  
+  clienteId     String?
+  cliente       Cliente?     @relation(fields: [clienteId], references: [id])
+  clienteNombre String?
+  clienteEmail  String?
+  clienteTelefono String?
+  
+  direccion     String?
+  distrito      String?
+  provincia     String?
+  departamento  String?
+  referencia    String?
+
+  estado        EstadoPedido @default(PENDIENTE)
+  
+  subtotal      Decimal      @default(0) @db.Decimal(10, 2)
+  costoEnvio    Decimal      @default(0) @db.Decimal(10, 2)
+  total         Decimal      @default(0) @db.Decimal(10, 2)
+  
+  notas           String?
+  whatsappMessage String?    @db.Text
+  
+  items         ItemPedido[]
+  empaques      UsoEmpaque[]
+  
+  venta         Venta?       @relation("PedidoAVenta")
+  
+  creadoEn      DateTime     @default(now())
+  actualizadoEn DateTime     @updatedAt
+}
+
+model ItemPedido {
+  id         String   @id @default(cuid())
+  pedidoId   String
+  pedido     Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  
+  varianteId String
+  variante   Variante @relation(fields: [varianteId], references: [id])
+  
+  cantidad   Int
+  precioUnitario Decimal @db.Decimal(10, 2)
+  subtotal       Decimal @db.Decimal(10, 2)
 }

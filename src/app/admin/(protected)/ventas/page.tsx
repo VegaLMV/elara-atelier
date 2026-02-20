@@ -12,7 +12,7 @@ import {
   Users,
   CreditCard
 } from "lucide-react";
-import Pagination from "@/components/pagination";
+import Pagination from "@/components/ui/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
 
   const sp = await searchParams;
   const currentPage = Number(sp?.page) || 1;
-  const ITEMS_PER_PAGE = 50;
+  const ITEMS_PER_PAGE = 25;
   const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
   // Obtener ventas paginadas y total

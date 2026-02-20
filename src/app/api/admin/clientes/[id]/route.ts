@@ -2,6 +2,20 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
 
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const admin = await sesionAdmin();
+  if (!admin) return new NextResponse("Unauthorized", { status: 401 });
+
+  const { id } = await params;
+  try {
+    const cliente = await prisma.cliente.findUnique({ where: { id } });
+    if (!cliente) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+    return NextResponse.json(cliente);
+  } catch (error) {
+    return NextResponse.json({ error: "Error al obtener cliente" }, { status: 500 });
+  }
+}
+
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await sesionAdmin();
   if (!admin) return new NextResponse("Unauthorized", { status: 401 });

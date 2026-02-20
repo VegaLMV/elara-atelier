@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
@@ -101,11 +102,15 @@ export default function HeroCarousel({
               }`}
           >
             {/* Image with Zoom Animation */}
-            <img
+            <Image
               src={s.imagenUrl}
               alt={s.titulo || "Hero"}
-              className={`w-full h-full object-cover transition-transform duration-[4000ms] linear ${i === idx ? "scale-110" : "scale-100"
+              fill
+              priority={i === idx}
+              quality={85}
+              className={`object-cover transition-transform duration-[4000ms] linear ${i === idx ? "scale-110" : "scale-100"
                 }`}
+              sizes="100vw"
             />
             {/* Overlay */}
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/70" />

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import type { CSSProperties } from "react";
 import { prisma } from "@/lib/prisma";
 import { absolutizeUrl, baseUrl } from "@/lib/site";
@@ -153,18 +154,22 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
             {fontsUrl && <link rel="stylesheet" href={fontsUrl} />}
 
             {/* HEADER */}
-            <header className="sticky top-0 z-50 bg-white border-b border-slate-100">
+            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100/50 shadow-sm transition-all duration-300">
                 <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between gap-4">
                     <Link
                         href="/tienda"
-                        className="flex items-center gap-3"
+                        className="flex items-center gap-3 group"
                     >
                         {settings.logoUrl ? (
-                            <img
-                                src={settings.logoUrl}
-                                alt={storeName}
-                                className="h-10 md:h-16 w-auto object-contain"
-                            />
+                            <div className="relative h-12 md:h-14 w-32 md:w-40 transition-transform group-hover:scale-105">
+                                <Image
+                                    src={settings.logoUrl}
+                                    alt={storeName}
+                                    fill
+                                    priority
+                                    className="object-contain object-left"
+                                />
+                            </div>
                         ) : (
                             <span
                                 className="text-xl md:text-2xl tracking-tight font-bold"
@@ -175,12 +180,12 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
                         )}
                     </Link>
 
-                    <nav className="hidden md:flex items-center gap-8 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+                    <nav className="hidden md:flex items-center gap-8 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
                         {headerLinks.map((l) => (
                             <Link
                                 key={l.id}
                                 href={l.href}
-                                className="hover:text-slate-900 transition-colors"
+                                className="hover:text-slate-900 transition-all hover:-translate-y-0.5 relative after:content-[''] after:absolute after:-bottom-1 after:left-0 after:w-0 after:h-px after:bg-slate-900 after:transition-all hover:after:w-full"
                                 style={{ fontFamily: "var(--brand-font-body)" }}
                             >
                                 {l.label}
@@ -192,7 +197,7 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
                         {settings.whatsapp && (
                             <a
                                 href={`https://wa.me/${String(settings.whatsapp).replace(/\D/g, "")}`}
-                                className="hidden md:inline-flex items-center justify-center px-5 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest text-white shadow-lg active:scale-95 transition"
+                                className="hidden md:inline-flex items-center justify-center px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-lg active:scale-95 hover:shadow-xl hover:brightness-110 transition-all duration-300"
                                 style={{ backgroundColor: "var(--brand-accent)", fontFamily: "var(--brand-font-body)" }}
                                 target="_blank"
                                 rel="noreferrer"

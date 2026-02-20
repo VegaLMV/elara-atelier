@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
-import ProductoCard from "../producto-card";
+import ProductoCard from "../shared/producto-card";
 
 type Product = {
     id: string;
@@ -141,10 +142,12 @@ export default function ProductDualSection({
                 {campana && (
                     <div className="w-full lg:w-[350px] group relative aspect-[4/5] lg:aspect-auto overflow-hidden rounded-2xl bg-slate-100 shrink-0">
                         {bannerImageUrl ? (
-                            <img
+                            <Image
                                 src={bannerImageUrl}
                                 alt={displayTitle}
-                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                fill
+                                sizes="(max-width: 1024px) 100vw, 350px"
+                                className="object-cover transition-transform duration-700 group-hover:scale-110"
                             />
                         ) : (
                             <div className="absolute inset-0 bg-slate-200 flex items-center justify-center text-slate-400 font-serif italic text-center p-6">
@@ -174,7 +177,13 @@ export default function ProductDualSection({
                                             {campana.productos.slice(0, 4).map((imgProd) => (
                                                 <div key={imgProd.id} className="inline-block h-8 w-8 rounded-full ring-2 ring-black bg-white overflow-hidden" title={imgProd.nombre}>
                                                     {imgProd.imagen ? (
-                                                        <img src={imgProd.imagen} alt={imgProd.nombre} className="h-full w-full object-cover" />
+                                                        <Image
+                                                            src={imgProd.imagen}
+                                                            alt={imgProd.nombre}
+                                                            width={32}
+                                                            height={32}
+                                                            className="h-full w-full object-cover"
+                                                        />
                                                     ) : (
                                                         <div className="h-full w-full flex items-center justify-center text-[8px] text-slate-400">?</div>
                                                     )}

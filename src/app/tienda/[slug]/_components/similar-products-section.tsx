@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import ProductoCard from "../producto-card";
+import ProductoCard from "../../_components/shared/producto-card";
 import { ArrowRight, ArrowLeft } from "lucide-react";
 
 type Producto = {

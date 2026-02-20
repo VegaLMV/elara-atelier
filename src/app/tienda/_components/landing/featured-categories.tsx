@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 
 interface SectionCategory {
@@ -44,10 +45,12 @@ export default function FeaturedCategories({ title, subtitle, categories }: Feat
                         href={`/tienda/catalogo?categoria=${cat.slug}#catalogo-grid`}
                         className={`group relative overflow-hidden rounded-3xl aspect-[4/3] md:aspect-square ${i % 3 === 0 ? "lg:col-span-2" : "lg:col-span-1"}`}
                     >
-                        <img
+                        <Image
                             src={cat.image}
                             alt={cat.title}
-                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            className="object-cover transition-transform duration-700 group-hover:scale-110"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-500 group-hover:opacity-90" />
 

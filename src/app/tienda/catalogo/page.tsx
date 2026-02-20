@@ -4,22 +4,16 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import ProductoCard from "../producto-card"; // Import path adjusted
-import FilterSidebar from "../filter-sidebar"; // Import path adjusted
+import ProductoCard from "../_components/shared/producto-card"; // Import path adjusted
+import FilterSidebar from "./_components/filter-sidebar"; // Import path adjusted
 import {
   Search,
   ArrowLeft
 } from "lucide-react";
-import { formatMoney } from "@/lib/precios";
-import Pagination from "@/components/pagination";
+import { formatMoney, calcularPrecioFinal } from "@/lib/precios";
+import Pagination from "@/components/ui/pagination";
 import ScrollReveal from "@/components/ui/scroll-reveal";
 
-// Cálculo de precios (backend)
-function calcularPrecioFinal(precio: number, tipo: string | null, valor: number | null) {
-  if (!tipo || !valor) return precio;
-  if (tipo === "PORCENTAJE") return precio * (1 - valor / 100);
-  return Math.max(0, precio - valor);
-}
 
 type SP = {
   q?: string;
@@ -70,12 +64,25 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
     prisma.producto.count({ where }),
     prisma.producto.findMany({
       where,
-      include: {
-        categoria: true,
-        imagenes: { orderBy: [{ esPortada: "desc" }, { orden: "asc" }], take: 2 },
-        variantes: {
-          select: { stockActual: true }
-        }
+      select: {
+        id: true,
+        nombre: true,
+        slug: true,
+        precio: true,
+        descuentoActivo: true,
+        descuentoTipo: true,
+        descuentoValor: true,
+        descuentoInicio: true,
+        descuentoFin: true,
+        nuevoHasta: true,
+        destacado: true,
+        categoria: { select: { nombre: true } },
+        imagenes: {
+          select: { url: true },
+          orderBy: [{ esPortada: "desc" }, { orden: "asc" }],
+          take: 2
+        },
+        variantes: { select: { stockActual: true } }
       },
       orderBy,
       take: ITEMS_PER_PAGE,
