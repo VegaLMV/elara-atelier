@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, X as XIcon, Plus, Eye, Loader2 } from "lucide-react";
+import { ArrowLeft, X as XIcon, Plus, Eye, Loader2, Printer } from "lucide-react";
+import jsPDF from "jspdf";
 
 // ============================================================================
 // TIPOS DE DATOS
@@ -356,7 +357,7 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
     showToast("Producto guardado correctamente");
   }
 
-  // ✅ Función para eliminar descuento (Ahora disponible para el formulario superior)
+  // ✅ Función para eliminar descuento
   async function eliminarDescuento(id: string) {
     if (!confirm("¿Deseas cancelar o eliminar este descuento?")) return;
     try {
@@ -474,10 +475,112 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
 
   const combinaciones = tallasSel.length * coloresSel.length;
 
-  // ✅ Filtramos el historial para NO mostrar la campaña activa (ya que está arriba)
   const historialFiltrado = initialData.descuentosHistorial.filter(d =>
     !descuentoVigente || d.id !== descuentoVigente.id
   );
+
+  // ✅ ESCENARIO A: GENERACIÓN DE ETIQUETAS PDF MEJORADO (SEGÚN STOCK FÍSICO)
+  const generarEtiquetasPDF = () => {
+    if (!variantes || variantes.length === 0) {
+      return showToast("No hay variantes creadas para imprimir.", "error");
+    }
+
+    // Inicializar documento A4 (210 x 297 mm)
+    const doc = new jsPDF({
+      orientation: 'p',
+      unit: 'mm',
+      format: 'a4'
+    });
+    
+    // Configuración de la cuadrícula (Grid)
+    const margenX = 15;
+    const margenY = 15;
+    const columnas = 3;
+    const filasPorPagina = 7;
+    const gap = 5; // Espacio entre etiquetas
+    
+    // Cálculo de tamaño de etiqueta
+    const anchoEtiqueta = (210 - (margenX * 2) - (gap * (columnas - 1))) / columnas;
+    const altoEtiqueta = 35; // 3.5 cm de alto
+
+    let colActual = 0;
+    let filaActual = 0;
+
+    // Recorrer variantes y generar etiquetas según el stock
+    variantes.forEach((variante) => {
+      // Imprimir tantas etiquetas como stock haya (mínimo 1 por seguridad/modelo)
+      const cantidadAImprimir = variante.stockActual > 0 ? variante.stockActual : 1;
+
+      for (let i = 0; i < cantidadAImprimir; i++) {
+        // Control de saltos de página
+        if (filaActual >= filasPorPagina) {
+          doc.addPage();
+          filaActual = 0;
+          colActual = 0;
+        }
+
+        // Posición X e Y actual
+        const posX = margenX + (colActual * (anchoEtiqueta + gap));
+        const posY = margenY + (filaActual * (altoEtiqueta + gap));
+
+        // Dibujar el marco de la etiqueta (borde gris claro)
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(posX, posY, anchoEtiqueta, altoEtiqueta, 2, 2, "S");
+
+        // TEXTOS DE LA ETIQUETA (Centrados)
+        const centroX = posX + (anchoEtiqueta / 2);
+
+        // 1. Marca
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(30, 41, 59); // slate-800
+        doc.text("ÉLARA ATELIER", centroX, posY + 6, { align: "center" });
+
+        // Línea separadora
+        doc.setDrawColor(226, 232, 240);
+        doc.line(posX + 5, posY + 8, posX + anchoEtiqueta - 5, posY + 8);
+
+        // 2. Producto
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(71, 85, 105); // slate-600
+        const nombreCorto = nombre.length > 25 ? nombre.substring(0, 22) + "..." : nombre;
+        doc.text(nombreCorto.toUpperCase(), centroX, posY + 13, { align: "center" });
+
+        // 3. Variante (Talla y Color)
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0); // black
+        doc.text(`${variante.talla} | ${variante.color}`, centroX, posY + 19, { align: "center" });
+
+        // 4. SKU (Identificador único corto)
+        doc.setFont("courier", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139); // slate-500
+        const sku = variante.id.slice(-8).toUpperCase();
+        doc.text(`SKU: ${sku}`, centroX, posY + 25, { align: "center" });
+
+        // 5. Precio
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(15, 23, 42); // slate-900
+        doc.text(`S/ ${Number(precio).toFixed(2)}`, centroX, posY + 31, { align: "center" });
+
+        // Avanzar a la siguiente celda
+        colActual++;
+        if (colActual >= columnas) {
+          colActual = 0;
+          filaActual++;
+        }
+      }
+    });
+
+    // Guardar el PDF con el nombre del producto
+    const nombreArchivo = `Etiquetas_${nombre.replace(/\s+/g, '_')}.pdf`;
+    doc.save(nombreArchivo);
+    showToast("PDF de etiquetas generado correctamente");
+  };
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto relative">
@@ -527,7 +630,6 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
             <h2 className="font-semibold text-lg border-b pb-2 text-gray-800">Detalles Generales</h2>
 
             <div className="space-y-4">
-              {/* ... Campos básicos ... */}
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Nombre</label>
                 <input className="w-full border rounded-md px-3 py-2 text-gray-900 focus:ring-black/5 outline-none" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
@@ -571,7 +673,6 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
                     onChange={(e) => {
                       const val = e.target.checked;
                       setNuevo(val);
-                      // Si marca como nuevo, asumimos que quiere lanzarlo/activarlo
                       if (val && estado === "INACTIVO") {
                         setEstado("ACTIVO");
                       }
@@ -644,17 +745,27 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex justify-between items-center pt-4 border-t">
               <button
                 type="button"
-                onClick={() => router.push("/admin/productos")}
-                className="px-6 py-2.5 rounded-lg font-medium text-gray-500 hover:bg-gray-100 transition"
+                onClick={generarEtiquetasPDF}
+                className="flex items-center gap-2 text-slate-600 hover:text-black font-bold text-sm h-10 px-4 rounded-lg border border-gray-200 hover:border-gray-400 transition-all bg-white shadow-sm"
               >
-                Cancelar
+                <Printer className="w-4 h-4" /> GENERAR PDF ETIQUETAS
               </button>
-              <button type="submit" className="bg-black text-white px-6 py-2.5 rounded-lg font-medium hover:bg-gray-800 transition shadow-sm">
-                Guardar Cambios
-              </button>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => router.push("/admin/productos")}
+                  className="px-6 py-2.5 rounded-lg font-medium text-gray-500 hover:bg-gray-100 transition"
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="bg-black text-white px-6 py-2.5 rounded-lg font-medium hover:bg-gray-800 transition shadow-sm">
+                  Guardar Cambios
+                </button>
+              </div>
             </div>
           </form>
 

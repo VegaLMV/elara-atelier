@@ -66,3 +66,4 @@ export default function FeaturedCategories({ title, subtitle, categories }: Feat
         </section>
     );
 }
+//ELIMINAR

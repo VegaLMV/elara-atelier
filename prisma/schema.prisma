@@ -79,14 +79,10 @@ enum AccionDevolucion {
 enum TipoSeccionHome {
   HERO
   BEST_SELLERS
-  FEATURED_COLLECTIONS
-  STORY
-  NEWSLETTER
-  CONTACT
-  BENEFITS
-  FEATURED_CATEGORIES
-  BRAND_ESSENCE
   PROMO_CAMPAIGN
+  CATEGORY_SPOTLIGHT
+  SHOP_THE_LOOK
+  VIDEO_BANNER
 }
 
 enum UbicacionNavegacion {
@@ -135,7 +131,6 @@ model Producto {
   estado      EstadoProducto @default(ACTIVO)
   destacado   Boolean        @default(false)
 
-  // --- DESCUENTOS (Campos de caché para rendimiento en tienda) ---
   descuentoActivo Boolean                @default(false)
   descuentoTipo   TipoDescuentoProducto?
   descuentoValor  Decimal?               @db.Decimal(10, 2)
@@ -595,4 +590,16 @@ model ItemPedido {
   cantidad   Int
   precioUnitario Decimal @db.Decimal(10, 2)
   subtotal       Decimal @db.Decimal(10, 2)
+}
+
+// --- RATE LIMIT ---
+// Limita peticiones por IP/key usando PostgreSQL como store compartido.
+// Funciona correctamente en entornos serverless (Vercel) donde la memoria RAM
+// se reinicia entre instancias (cold starts).
+model RateLimit {
+  id      String   @id            // IP o clave de rate-limit (ej. "login:1.2.3.4")
+  count   Int      @default(0)    // Contador de peticiones en la ventana actual
+  resetAt DateTime               // Cuándo expira la ventana y el contador se reinicia
+
+  @@index([resetAt])             // Índice para accelerar la limpieza de registros caducados
 }

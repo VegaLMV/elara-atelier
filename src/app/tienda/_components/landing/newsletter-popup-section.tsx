@@ -1,68 +1,130 @@
 "use client";
 
-import { ArrowRight, Mail } from "lucide-react";
+import Link from "next/link";
 import Image from "next/image";
+import { ArrowRight, Truck, Star, Sparkles, Gift, MapPin } from "lucide-react";
 
-export default function NewsletterPopupSection() {
-    return (
-        <section className="bg-[#3f2f2f] text-[#e6dad1] py-24 relative overflow-hidden">
-            {/* Decorative Lines */}
-            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#e6dad1]/30 to-transparent" />
-            <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#e6dad1]/30 to-transparent" />
+type PromoBannerProps = {
+  title?: string;
+  subtitle?: string;
+  badge?: string;
+  imageUrl?: string;
+};
 
-            <div className="max-w-[1400px] mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
-                <div className="space-y-8 relative z-10">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 border border-[#e6dad1]/30 rounded-full text-xs font-bold uppercase tracking-widest text-[#e6dad1]/80">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        Oportunidad Limitada
-                    </div>
+export default function NewsletterSection({
+  title = "PRIMER ENVÍO GRATIS",
+  // 1. CAMBIO AQUÍ: Especificamos "Perú" en la descripción
+  subtitle = "Tu primera compra merece ser especial. Descubre nuestra colección y nosotros cubrimos el costo de envío a nivel nacional.",
+  badge = "REGALO DE BIENVENIDA",
+  imageUrl = "https://images.unsplash.com/photo-1581044777550-4cfa60707c03?q=80&w=1886&auto=format&fit=crop", 
+}: PromoBannerProps) {
+  return (
+    <section className="py-20 md:py-28 bg-[var(--brand-bg)] relative overflow-hidden">
+      {/* --- FONDOS ABSTRACTOS --- */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[120%] bg-[var(--brand-primary)] opacity-[0.03] blur-[100px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[100%] bg-[var(--brand-accent)] opacity-[0.05] blur-[120px] rounded-full" />
+      </div>
 
-                    <h2 className="text-4xl md:text-6xl font-serif leading-tight">
-                        Tu Primera Compra <br />
-                        <span className="text-emerald-400 italic">Envío Gratis</span>
-                    </h2>
+      <div className="max-w-[1400px] mx-auto px-6 relative z-10">
+        <div className={`mx-auto ${imageUrl ? 'grid grid-cols-1 lg:grid-cols-2 gap-10 items-center' : 'max-w-4xl text-center'}`}>
+          
+          {/* === COLUMNA DE TEXTO === */}
+          <div className={`space-y-6 ${!imageUrl && 'flex flex-col items-center'} relative z-10`}>
+            
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--brand-accent)]/30 bg-[var(--brand-accent)]/5 backdrop-blur-sm relative overflow-hidden group">
+              <Sparkles className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--brand-accent)]">
+                {badge}
+              </span>
+            </div>
 
-                    <p className="text-lg text-[#e6dad1]/70 font-light max-w-md leading-relaxed">
-                        Disfruta de la experiencia completa de Elara Atelier sin costos de envío en tu primer pedido. Regístrate ahora.
-                    </p>
-
-                    <form className="flex flex-col sm:flex-row gap-4 max-w-lg">
-                        <div className="relative flex-1">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[#3f2f2f]/60 w-5 h-5" />
-                            <input
-                                type="email"
-                                placeholder="Ingresa tu correo electrónico"
-                                className="w-full bg-[#e6dad1] text-[#3f2f2f] placeholder-[#3f2f2f]/50 px-12 py-4 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-shadow"
-                            />
-                        </div>
-                        <button className="bg-emerald-600 text-white px-8 py-4 rounded-full font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2 group shadow-emerald-900/20 shadow-xl">
-                            Obtener Beneficio
-                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                        </button>
-                    </form>
-
-                    <p className="text-xs text-[#e6dad1]/40">
-                        *Válido solo para nuevos registros. Aplican términos y condiciones.
-                    </p>
-                </div>
-
-                {/* Decorative Visual Side */}
-                <div className="relative h-[400px] lg:h-[500px] rounded-2xl overflow-hidden group shadow-2xl shadow-black/20">
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#3f2f2f] via-transparent to-transparent z-10" />
-                    <Image
-                        src="https://images.unsplash.com/photo-1549439602-43ebca2327af?q=80&w=2070&auto=format&fit=crop"
-                        alt="Elara Unboxing"
-                        fill
-                        sizes="(max-width: 1024px) 100vw, 50vw"
-                        className="object-cover transition-transform duration-[2s] group-hover:scale-105"
-                    />
-
-                    <div className="absolute bottom-8 left-8 z-20">
-                        <div className="text-3xl font-serif italic text-white mb-2">"Unboxing Experiencial"</div>
-                        <div className="text-xs font-bold uppercase tracking-widest text-emerald-400">Envío Premium Incluido</div>
-                    </div>
+            {/* Títulos */}
+            <div className="space-y-2">
+              <h2 className="text-sm font-bold uppercase tracking-[0.3em] text-[var(--brand-primary)]/60" style={{ fontFamily: "var(--brand-font-body)" }}>
+                Solo por tiempo limitado
+              </h2>
+              <h3 
+                className="text-5xl md:text-6xl lg:text-[4.5rem] font-black text-[var(--brand-primary)] tracking-tighter leading-[0.9]"
+                style={{ fontFamily: "var(--brand-font-heading)" }}
+              >
+                {title}
+              </h3>
+            </div>
+            
+            {/* PUNTOS DE CONFIANZA (AQUÍ ESTÁ EL CAMBIO PRINCIPAL) */}
+            <div className={`flex flex-wrap gap-3 md:gap-4 pt-2 ${!imageUrl && 'justify-center'}`}>
+                {/* Etiqueta Perú */}
+                <div className="flex items-center gap-2 text-[10px] md:text-xs uppercase tracking-wider text-[var(--brand-primary)] font-black bg-white/80 shadow-sm px-3 py-2 rounded-md border border-[var(--brand-primary)]/10">
+                    <span className="text-sm leading-none">🇵🇪</span> 
+                    A todo el Perú
                 </div>
             </div>
-        </section>
-    );
+
+            {/* Descripción */}
+            <p 
+              className={`text-base md:text-lg text-[var(--brand-primary)]/70 leading-relaxed font-light ${!imageUrl ? 'max-w-2xl' : 'max-w-md'}`}
+              style={{ fontFamily: "var(--brand-font-body)" }}
+            >
+              {subtitle}
+            </p>
+
+            {/* Botón CTA */}
+            <div className="pt-4">
+              <Link 
+                href="/tienda/catalogo"
+                className="inline-flex items-center gap-4 px-8 py-4 bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-accent)] transition-all duration-500 shadow-xl hover:shadow-[var(--brand-accent)]/20 group relative overflow-hidden rounded-sm"
+                style={{ fontFamily: "var(--brand-font-body)" }}
+              >
+                <span className="text-xs font-black uppercase tracking-[0.2em] relative z-10">
+                  Reclamar Mi Envío Gratis
+                </span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
+            
+          </div>
+
+          {/* === COLUMNA DE IMAGEN CON ACCESORIOS === */}
+          {imageUrl && (
+            <div className="relative h-[400px] sm:h-[450px] lg:h-[550px] w-full group perspective-1000 mt-10 lg:mt-0">
+              
+              <div className="absolute top-1/4 left-1/4 w-[80%] h-[80%] bg-[var(--brand-accent)]/20 blur-[80px] rounded-full -z-10 pointer-events-none mix-blend-multiply" />
+              <div className="absolute inset-0 border-2 border-[var(--brand-primary)]/5 translate-x-4 translate-y-4 md:translate-x-6 md:translate-y-6 transition-all duration-700 group-hover:translate-x-3 group-hover:translate-y-3 group-hover:border-[var(--brand-accent)]/20 z-0" />
+              
+              <div className="relative w-full h-full overflow-hidden shadow-2xl rounded-sm z-10">
+                <div className="absolute inset-0 bg-[var(--brand-primary)]/10 z-10 group-hover:bg-transparent transition-colors duration-700 mix-blend-overlay" />
+                <Image
+                  src={imageUrl}
+                  alt="Promoción de envío gratis Perú"
+                  fill
+                  className="object-cover object-top scale-100 group-hover:scale-105 transition-transform duration-1000 ease-out"
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                />
+              </div>
+
+              {/* BADGE FLOTANTE */}
+              <div className="absolute -top-4 -right-2 md:-top-5 md:-right-5 z-20 bg-white p-1 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] animate-[bounce_3s_ease-in-out_infinite]">
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-[var(--brand-accent)] flex flex-col items-center justify-center text-white text-center p-2 border-2 border-white dashed">
+                    {/* CAMBIO: Ícono de Mapa en lugar del camión para reforzar territorio */}
+                    <MapPin className="w-5 h-5 md:w-6 md:h-6 mb-0.5 md:mb-1" />
+                    <span className="text-[7px] md:text-[9px] font-black uppercase leading-none tracking-tighter">
+                        Envíos <br/> Perú
+                    </span>
+                </div>
+              </div>
+              
+              {/* Etiqueta inferior */}
+              <div className="absolute -bottom-3 left-4 md:-bottom-4 md:left-8 z-20 bg-white px-3 py-1.5 md:px-4 md:py-2 shadow-lg rounded-sm flex items-center gap-2">
+                 <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-gray-800">Oferta Activa Febrero - Marzo 2026</span>
+              </div>
+
+            </div>
+          )}
+
+        </div>
+      </div>
+    </section>
+  );
 }

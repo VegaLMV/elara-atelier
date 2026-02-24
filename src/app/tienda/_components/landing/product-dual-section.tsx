@@ -1,239 +1,297 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import Image from "next/image";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
-import ProductoCard from "../shared/producto-card";
+import Link from "next/link";
+import { ArrowRight, ArrowUpRight, Sparkles, Image as ImageIcon } from "lucide-react";
+import { formatMoney } from "@/lib/precios";
 
-type Product = {
+// Tipo de producto con todas las propiedades necesarias
+type CleanProduct = {
     id: string;
     nombre: string;
     slug: string;
-    categoria: string | undefined;
+    categoria?: string;
     imagenes: string[];
     precioOriginal: number;
     precioFinal: number;
     tieneDescuento: boolean;
     porcentaje: number | null;
     esNuevo: boolean;
-    stock: number;
     destacado: boolean;
+    stock: number;
 };
 
-type ProductDualSectionProps = {
+type Campana = {
+    nombre: string;
+    descripcion: string | null;
+    valor: number;
+    tipo: "PORCENTAJE" | "MONTO";
+    startsAt: Date;
+    endsAt: Date;
+    estado: string;
+    productos?: {
+        id: string;
+        nombre: string;
+        imagen: string | null;
+    }[];
+};
+
+interface ProductDualSectionProps {
     title?: string;
     subtitle?: string;
-    bannerTitle?: string;
-    bannerCtaText?: string;
-    bannerCtaHref?: string;
-    bannerImageUrl?: string | null;
-    newArrivals: Product[];
-    bestSellers: Product[];
-    campana?: {
-        nombre: string;
-        descripcion: string | null;
-        valor: number;
-        tipo: string;
-        startsAt: Date;
-        endsAt: Date;
-        estado: string;
-        productos?: { id: string; nombre: string; imagen: string | null }[];
-    } | null;
-};
+    newArrivals: CleanProduct[];
+    bestSellers: CleanProduct[];
+    campana?: Campana | null;
+}
 
 export default function ProductDualSection({
-    title = "NEW LAUNCH",
-    subtitle = "BEST SELLER",
-    bannerTitle = "The Pink Aurora Tulle Dress",
-    bannerCtaText = "VIEW ALL",
-    bannerCtaHref = "/tienda/catalogo",
-    bannerImageUrl,
+    title,
+    subtitle,
     newArrivals,
     bestSellers,
     campana
 }: ProductDualSectionProps) {
     const [activeTab, setActiveTab] = useState<"new" | "best">("new");
-    const products = activeTab === "new" ? newArrivals : bestSellers;
-    const scrollRef = useRef<HTMLDivElement>(null);
+    const [isAnimating, setIsAnimating] = useState(false);
 
-    const displayTitle = campana?.nombre || bannerTitle;
-    const displayDesc = campana?.descripcion || (campana ? `${campana.valor}${campana.tipo === 'PORCENTAJE' ? '%' : '$'} de descuento` : "");
-    const displayHref = campana ? `/tienda/catalogo?campana=${campana.nombre}` : bannerCtaHref;
+    // Los productos actuales según la pestaña
+    const currentProducts = activeTab === "new" ? newArrivals : bestSellers;
 
-    const [isPaused, setIsPaused] = useState(false);
-    const [canScroll, setCanScroll] = useState(false);
-
-    // Asegurar que no hay duplicados en la data original (por si acaso)
-    const uniqueProducts = products.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-
-    // Detección de desbordamiento para activar el bucle
-    const checkScroll = () => {
-        if (scrollRef.current) {
-            const { scrollWidth, clientWidth } = scrollRef.current;
-            // Para el modo infinito, comparamos el ancho del contenido duplicado.
-            // Si el contenido total es mayor al del contenedor, activamos el scroll.
-            // Si no estamos duplicando aún (porque canScroll es false), forzamos una comprobación basada en el número de productos.
-            const minProductsForScroll = 4; // Umbral mínimo razonable
-            setCanScroll(scrollWidth > clientWidth || uniqueProducts.length >= minProductsForScroll);
-        }
+    // Manejador del cambio de pestaña para forzar la animación
+    const handleTabChange = (tab: "new" | "best") => {
+        if (tab === activeTab) return;
+        setIsAnimating(true);
+        setActiveTab(tab);
+        setTimeout(() => setIsAnimating(false), 700);
     };
 
-    useEffect(() => {
-        checkScroll();
-        window.addEventListener("resize", checkScroll);
-        // Pequeño delay para asegurar que el DOM esté listo
-        const timer = setTimeout(checkScroll, 500);
-        return () => {
-            window.removeEventListener("resize", checkScroll);
-            clearTimeout(timer);
-        };
-    }, [activeTab, uniqueProducts.length]);
-
-    // Lógica de Scroll Automático Lento (Seamless Loop) - Solo si hay desbordamiento
-    useEffect(() => {
-        if (isPaused || !canScroll || uniqueProducts.length === 0) return;
-
-        const interval = setInterval(() => {
-            if (scrollRef.current) {
-                const { scrollLeft, scrollWidth } = scrollRef.current;
-                const halfWidth = scrollWidth / 2;
-
-                // Si pasamos la mitad (donde termina el primer set), saltamos al inicio instantáneamente
-                if (scrollLeft >= halfWidth) {
-                    scrollRef.current.scrollLeft = 0;
-                } else {
-                    scrollRef.current.scrollBy({ left: 1, behavior: "auto" });
-                }
-            }
-        }, 30);
-
-        return () => clearInterval(interval);
-    }, [activeTab, isPaused, canScroll, uniqueProducts.length]);
+    if (newArrivals.length === 0 && bestSellers.length === 0) return null;
 
     return (
-        <section className="max-w-[1600px] mx-auto px-6 py-20">
-            {/* Tabs Header */}
-            <div className="flex justify-center gap-12 mb-16 border-b border-slate-100">
-                <button
-                    onClick={() => setActiveTab("new")}
-                    className={`pb-4 text-xs font-black uppercase tracking-[0.2em] transition-all relative ${activeTab === "new" ? "text-slate-900" : "text-slate-300 hover:text-slate-500"
-                        }`}
-                >
-                    {title}
-                    {activeTab === "new" && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 animate-in fade-in slide-in-from-left-2" />
-                    )}
-                </button>
-                <button
-                    onClick={() => setActiveTab("best")}
-                    className={`pb-4 text-xs font-black uppercase tracking-[0.2em] transition-all relative ${activeTab === "best" ? "text-slate-900" : "text-slate-300 hover:text-slate-500"
-                        }`}
-                >
-                    {subtitle}
-                    {activeTab === "best" && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 animate-in fade-in slide-in-from-left-2" />
-                    )}
-                </button>
-            </div>
+        <section className="py-12 md:py-16 bg-[#fcfaf8] relative">
+            <div className="max-w-[1400px] mx-auto px-6">
 
-            <div className={`flex flex-col lg:flex-row gap-8 ${!campana ? 'justify-center' : ''}`}>
-                {/* Lateral Banner - Solo se muestra si hay una campaña vinculada */}
-                {campana && (
-                    <div className="w-full lg:w-[350px] group relative aspect-[4/5] lg:aspect-auto overflow-hidden rounded-2xl bg-slate-100 shrink-0">
-                        {bannerImageUrl ? (
-                            <Image
-                                src={bannerImageUrl}
-                                alt={displayTitle}
-                                fill
-                                sizes="(max-width: 1024px) 100vw, 350px"
-                                className="object-cover transition-transform duration-700 group-hover:scale-110"
-                            />
-                        ) : (
-                            <div className="absolute inset-0 bg-slate-200 flex items-center justify-center text-slate-400 font-serif italic text-center p-6">
-                                {displayTitle}
-                            </div>
-                        )}
-                        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
+                {/* 1. HEADER Y PESTAÑAS (Estilo Vogue) */}
+                <div className="flex flex-col items-center mb-12 md:mb-16">
 
-                        <div className="absolute bottom-8 left-8 right-8 space-y-4">
-                            <div className="space-y-1">
-                                <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-widest">
-                                    Campaña Activa: {campana.estado}
-                                </span>
-                                <h3 className="text-3xl font-serif text-white leading-tight drop-shadow-md">
-                                    {displayTitle}
-                                </h3>
-                                <p className="text-white/80 text-sm font-light leading-relaxed">
-                                    {displayDesc}
-                                </p>
-                                <p className="text-white/60 text-[10px] uppercase tracking-tighter pt-1">
-                                    Válido hasta: {new Date(campana.endsAt).toLocaleDateString()}
-                                </p>
-                                {campana.productos && campana.productos.length > 0 && (
-                                    <div className="mt-4 space-y-2">
-                                        <p className="text-white/50 text-[9px] uppercase tracking-widest font-bold">Incluye:</p>
-                                        <div className="flex -space-x-2 overflow-hidden">
-                                            {campana.productos.slice(0, 4).map((imgProd) => (
-                                                <div key={imgProd.id} className="inline-block h-8 w-8 rounded-full ring-2 ring-black bg-white overflow-hidden" title={imgProd.nombre}>
-                                                    {imgProd.imagen ? (
-                                                        <Image
-                                                            src={imgProd.imagen}
-                                                            alt={imgProd.nombre}
-                                                            width={32}
-                                                            height={32}
-                                                            className="h-full w-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="h-full w-full flex items-center justify-center text-[8px] text-slate-400">?</div>
-                                                    )}
+                    {campana && (
+                        <div className="mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            <span className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-[#864d2d] bg-[#864d2d]/10 px-4 py-1.5 rounded-full border border-[#864d2d]/20">
+                                <Sparkles className="w-3 h-3" /> {campana.nombre}
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Línea divisoria superior sutil */}
+                    <div className="w-full max-w-md h-[1px] bg-gradient-to-r from-transparent via-[#e6dad1] to-transparent mb-6" />
+
+                    <div className="flex items-center gap-8 md:gap-16">
+                        <button
+                            onClick={() => handleTabChange("new")}
+                            className={`group relative text-xl md:text-2xl transition-all duration-500 ${activeTab === "new"
+                                ? "font-serif italic text-[#3f2f2f]"
+                                : "font-sans font-light text-[#3f2f2f]/40 hover:text-[#3f2f2f]/70"
+                            }`}
+                        >
+                            {title || "Novedades"}
+                            <span className={`absolute -bottom-3 left-1/2 -translate-x-1/2 h-[1px] bg-[#864d2d] transition-all duration-500 ${activeTab === "new" ? "w-8" : "w-0"}`} />
+                        </button>
+
+                        <div className="w-[1px] h-6 bg-[#e6dad1]" />
+
+                        <button
+                            onClick={() => handleTabChange("best")}
+                            className={`group relative text-xl md:text-2xl transition-all duration-500 ${activeTab === "best"
+                                ? "font-serif italic text-[#3f2f2f]"
+                                : "font-sans font-light text-[#3f2f2f]/40 hover:text-[#3f2f2f]/70"
+                            }`}
+                        >
+                            {subtitle || "Más Vendidos"}
+                            <span className={`absolute -bottom-3 left-1/2 -translate-x-1/2 h-[1px] bg-[#864d2d] transition-all duration-500 ${activeTab === "best" ? "w-8" : "w-0"}`} />
+                        </button>
+                    </div>
+
+                    {/* Línea divisoria inferior sutil */}
+                    <div className="w-full max-w-md h-[1px] bg-gradient-to-r from-transparent via-[#e6dad1] to-transparent mt-6" />
+                </div>
+
+                {/* 2. GRID DE PRODUCTOS (Diseño Editorial) */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-12">
+                    {currentProducts.length === 0 ? (
+                        <div className="col-span-full py-20 text-center flex flex-col items-center gap-4">
+                            <div className="w-12 h-[1px] bg-[#e6dad1]" />
+                            <p className="text-[#3f2f2f]/40 font-serif italic text-lg md:text-xl">
+                                Curando nuestra próxima selección...
+                            </p>
+                        </div>
+                    ) : (
+                        currentProducts.map((product, index) => {
+                            // Verificamos de forma segura si existen imágenes
+                            const hasImages = product.imagenes && product.imagenes.length > 0;
+                            const mainImage = hasImages && product.imagenes[0].trim() !== "" ? product.imagenes[0] : null;
+                            const hoverImage = hasImages && product.imagenes.length > 1 && product.imagenes[1].trim() !== "" ? product.imagenes[1] : null;
+
+                            return (
+                                <Link
+                                    key={`${activeTab}-${product.id}`}
+                                    href={`/tienda/${product.slug}`}
+                                    className={`group flex flex-col gap-4 cursor-pointer w-full h-full
+                                        ${isAnimating ? 'opacity-0 animate-[fadeInUp_0.8s_ease-out_forwards]' : 'opacity-100'}`}
+                                    style={{ animationDelay: `${index * 100}ms` }}
+                                >
+                                    {/* --- CONTENEDOR DE IMAGEN ALTA COSTURA --- */}
+                                    <div className="relative aspect-[3/4] overflow-hidden bg-[#f0ebe6] rounded-sm">
+
+                                        {/* BADGES MINIMALISTAS */}
+                                        <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5 items-start">
+                                            {campana ? (
+                                                <span className="bg-[#864d2d] text-white text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1.5 shadow-sm">
+                                                    {campana.tipo === 'PORCENTAJE' ? `${campana.valor}% OFF` : `-$${campana.valor}`}
+                                                </span>
+                                            ) : product.tieneDescuento ? (
+                                                <span className="bg-[#864d2d] text-white text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1.5 shadow-sm">
+                                                    {product.porcentaje}% OFF
+                                                </span>
+                                            ) : null}
+
+                                            {product.esNuevo && (
+                                                <span className="bg-[#3f2f2f] text-[#fcfaf8] text-[9px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 shadow-sm">
+                                                    Nuevo
+                                                </span>
+                                            )}
+                                            {product.destacado && activeTab !== "best" && (
+                                                <span className="bg-white/90 backdrop-blur-md text-[#3f2f2f] border border-[#3f2f2f]/10 text-[9px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 shadow-sm">
+                                                    Top
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* SISTEMA DE IMÁGENES A PRUEBA DE FALLOS */}
+                                        {mainImage ? (
+                                            <>
+                                                <Image
+                                                    src={mainImage}
+                                                    alt={product.nombre}
+                                                    fill
+                                                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                                    quality={90}
+                                                    priority={index < 4}
+                                                    className={`object-cover transition-transform duration-[1.5s] ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105
+                                                        ${hoverImage ? 'group-hover:opacity-0' : ''}
+                                                    `}
+                                                />
+                                                {hoverImage && (
+                                                    <Image
+                                                        src={hoverImage}
+                                                        alt={`${product.nombre} vista 2`}
+                                                        fill
+                                                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                                        quality={90}
+                                                        className="object-cover absolute inset-0 opacity-0 transition-all duration-[1s] ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:opacity-100 group-hover:scale-105"
+                                                    />
+                                                )}
+                                            </>
+                                        ) : (
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center text-[#3f2f2f]/30 space-y-3">
+                                                <ImageIcon className="w-8 h-8 opacity-50" />
+                                                <span className="font-serif italic text-sm">Imagen en curaduría</span>
+                                            </div>
+                                        )}
+
+                                        {/* BOTÓN "VER DETALLES" (Estilo Boutique) */}
+                                        {product.stock > 0 && (
+                                            <div className="absolute inset-x-4 bottom-4 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 z-20">
+                                                <div className="w-full bg-white/95 backdrop-blur-md text-[#3f2f2f] text-[10px] font-bold uppercase tracking-[0.2em] py-3.5 text-center flex items-center justify-center gap-2 border border-black/5 hover:bg-[#3f2f2f] hover:text-white transition-colors shadow-xl">
+                                                    Ver detalles <ArrowUpRight className="w-3 h-3" />
                                                 </div>
-                                            ))}
-                                            {campana.productos.length > 4 && (
-                                                <div className="flex items-center justify-center h-8 w-8 rounded-full ring-2 ring-black bg-slate-800 text-[10px] text-white font-bold">
-                                                    +{campana.productos.length - 4}
+                                            </div>
+                                        )}
+
+                                        {/* OVERLAY AGOTADO TOTAL (Elegante) */}
+                                        {product.stock === 0 && (
+                                            <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] flex items-center justify-center z-20">
+                                                <div className="border border-[#3f2f2f] text-[#3f2f2f] bg-white/90 px-6 py-2.5 text-[9px] font-black uppercase tracking-[0.3em] shadow-lg">
+                                                    Agotado
                                                 </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* --- TEXTOS DEL PRODUCTO (Centrados) --- */}
+                                    <div className="space-y-1.5 px-1 text-center">
+                                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#864d2d]/70">
+                                            {product.categoria || "Colección Exclusiva"}
+                                        </p>
+                                        <h3 className="text-sm md:text-base font-serif text-[#3f2f2f] line-clamp-1 group-hover:text-[#864d2d] transition-colors">
+                                            {product.nombre}
+                                        </h3>
+
+                                        <div className="flex items-center justify-center gap-3 pt-1">
+                                            {campana ? (
+                                                <>
+                                                    <span className="text-xs text-[#3f2f2f]/40 line-through">
+                                                        {formatMoney(product.precioOriginal)}
+                                                    </span>
+                                                    <span className="text-sm font-bold text-[#864d2d]">
+                                                        {formatMoney(
+                                                            campana.tipo === "PORCENTAJE"
+                                                                ? product.precioOriginal * (1 - campana.valor / 100)
+                                                                : product.precioOriginal - campana.valor
+                                                        )}
+                                                    </span>
+                                                </>
+                                            ) : product.tieneDescuento ? (
+                                                <>
+                                                    <span className="text-xs text-[#3f2f2f]/40 line-through">
+                                                        {formatMoney(product.precioOriginal)}
+                                                    </span>
+                                                    <span className="text-sm font-bold text-[#864d2d]">
+                                                        {formatMoney(product.precioFinal)}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <span className="text-sm font-medium text-[#3f2f2f]/80">
+                                                    {formatMoney(product.precioFinal)}
+                                                </span>
                                             )}
                                         </div>
                                     </div>
-                                )}
-                            </div>
-                            <Link
-                                href={displayHref || "/tienda/catalogo"}
-                                className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-2xl"
-                            >
-                                Explorar Campaña <ArrowRight className="w-3 h-3" />
-                            </Link>
-                        </div>
-                    </div>
-                )}
-
-                {/* Products Carousel Area */}
-                <div className={`flex-1 relative group/carousel ${!campana ? 'max-w-[1400px]' : ''}`}>
-                    <div
-                        ref={scrollRef}
-                        onMouseEnter={() => setIsPaused(true)}
-                        onMouseLeave={() => setIsPaused(false)}
-                        className="flex gap-6 overflow-x-auto no-scrollbar scroll-smooth pb-4"
-                    >
-                        {uniqueProducts.length > 0 ? (
-                            (canScroll ? [...uniqueProducts, ...uniqueProducts] : uniqueProducts).map((p, idx) => (
-                                <div
-                                    key={`${p.id}-${idx}`}
-                                    className="min-w-[280px] sm:min-w-[320px] lg:min-w-[300px] animate-in fade-in slide-in-from-bottom-4 duration-500 shrink-0"
-                                    style={{ animationDelay: `${(idx % uniqueProducts.length) * 100}ms` }}
-                                >
-                                    <ProductoCard producto={p} />
-                                </div>
-                            ))
-                        ) : (
-                            <div className="w-full py-20 text-center border-2 border-dashed border-slate-100 rounded-3xl">
-                                <p className="text-slate-400 font-serif italic">Próximamente más productos...</p>
-                            </div>
-                        )}
-                    </div>
+                                </Link>
+                            );
+                        })
+                    )}
                 </div>
+
+                {/* 3. ENLACE AL CATÁLOGO COMPLETO */}
+                <div className="mt-16 flex justify-center">
+                    <Link
+                        href={`/tienda/catalogo${activeTab === "new" ? '?sort=new' : ''}`}
+                        className="group inline-flex items-center gap-3 text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-[#3f2f2f] hover:text-[#864d2d] transition-colors"
+                    >
+                        <span className="border-b border-[#3f2f2f]/30 group-hover:border-[#864d2d] pb-1 transition-colors">
+                            Ver selección completa
+                        </span>
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                </div>
+
             </div>
+
+            {/* CSS Inyectado para la animación en cascada (Staggered Fade In Up) */}
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                @keyframes fadeInUp {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            `}} />
         </section>
     );
 }

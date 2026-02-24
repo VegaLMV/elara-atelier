@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -21,17 +21,14 @@ import {
 import { UploaderImage } from "@/components/ui/uploader-image";
 import { formatMoney } from "@/lib/precios";
 
+// Agregamos las nuevas secciones premium
 type TipoSeccionHome =
     | "HERO"
     | "BEST_SELLERS"
-    | "FEATURED_COLLECTIONS"
-    | "STORY"
-    | "NEWSLETTER"
-    | "CONTACT"
-    | "BENEFITS"
-    | "FEATURED_CATEGORIES"
-    | "BRAND_ESSENCE"
-    | "PROMO_CAMPAIGN";
+    | "PROMO_CAMPAIGN"
+    | "VIDEO_BANNER"
+    | "CATEGORY_SPOTLIGHT"
+    | "SHOP_THE_LOOK";
 
 type HomeSection = {
     id: string;
@@ -41,17 +38,20 @@ type HomeSection = {
     content: any;
 };
 
+// 👇 NUEVA INTERFAZ PARA RECIBIR LAS CATEGORÍAS 👇
+interface CategoriaBasica {
+    id: string;
+    nombre: string;
+    slug: string;
+}
+
 const LABEL: Record<TipoSeccionHome, string> = {
     HERO: "Hero principal",
-    BEST_SELLERS: "Más vendidos",
-    FEATURED_COLLECTIONS: "Colecciones",
-    STORY: "Historia",
-    NEWSLETTER: "Newsletter",
-    CONTACT: "Contacto",
-    BENEFITS: "Barra de Confianza",
-    FEATURED_CATEGORIES: "Categorías Destacadas",
-    BRAND_ESSENCE: "Esencia de Marca",
+    BEST_SELLERS: "Más vendidos / Novedades",
     PROMO_CAMPAIGN: "Campaña Publicitaria",
+    VIDEO_BANNER: "Banner de Video",
+    CATEGORY_SPOTLIGHT: "Foco de Categoría",
+    SHOP_THE_LOOK: "Shop The Look",
 };
 
 function normalizeOrders(sections: HomeSection[]) {
@@ -59,6 +59,9 @@ function normalizeOrders(sections: HomeSection[]) {
     return sorted.map((s, i) => ({ ...s, order: i }));
 }
 
+// ============================================================
+// ProductPicker (Reutilizable para Best Sellers y Shop the Look)
+// ============================================================
 function ProductPicker({
     selectedIds,
     onToggle,
@@ -77,21 +80,13 @@ function ProductPicker({
         );
     }, [products, q]);
 
-    async function load() {
-        setLoading(true);
-        try {
-            const r = await fetch("/api/admin/productos");
-            const d = await r.json();
-            setProducts(d);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
-    }
-
     useMemo(() => {
-        load();
+        setLoading(true);
+        fetch("/api/admin/productos")
+            .then(r => r.json())
+            .then(d => setProducts(d))
+            .catch(console.error)
+            .finally(() => setLoading(false));
     }, []);
 
     return (
@@ -163,6 +158,9 @@ function ProductPicker({
     );
 }
 
+// ============================================================
+// CampaignPicker
+// ============================================================
 function CampaignPicker({
     selectedId,
     onSelect,
@@ -173,21 +171,13 @@ function CampaignPicker({
     const [campaigns, setCampaigns] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
-    async function load() {
-        setLoading(true);
-        try {
-            const r = await fetch("/api/admin/descuentos/lista");
-            const d = await r.json();
-            setCampaigns(d);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
-    }
-
     useMemo(() => {
-        load();
+        setLoading(true);
+        fetch("/api/admin/descuentos/lista")
+            .then(r => r.json())
+            .then(d => setCampaigns(d))
+            .catch(console.error)
+            .finally(() => setLoading(false));
     }, []);
 
     const selected = campaigns.find(c => c.id === selectedId);
@@ -253,12 +243,16 @@ function CampaignPicker({
     );
 }
 
-export default function HomeSeccionesClient({ initial }: { initial: HomeSection[] }) {
+// ============================================================
+// Componente principal
+// ============================================================
+// 👇 SE RECIBEN LAS CATEGORÍAS COMO PROP (default vacio para evitar errores) 👇
+export default function HomeSeccionesClient({ initial, categorias = [] }: { initial: HomeSection[], categorias?: CategoriaBasica[] }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-    const [sections, setSections] = useState<HomeSection[]>(normalizeOrders(initial));
+    const [sections, setSections] = useState<HomeSection[]>(normalizeOrders(initial as HomeSection[]));
     const [selectedId, setSelectedId] = useState<string>(sections[0]?.id ?? "");
 
     const selected = useMemo(
@@ -266,19 +260,21 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
         [sections, selectedId]
     );
 
-    function updateSelected(patch: Partial<HomeSection>) {
-        if (!selected) return;
+    const updateSelected = useCallback((patch: Partial<HomeSection>) => {
         setSections((prev) =>
-            prev.map((s) => (s.id === selected.id ? { ...s, ...patch } : s))
+            prev.map((s) => (s.id === selectedId ? { ...s, ...patch } : s))
         );
-    }
+    }, [selectedId]);
 
-    function updateSelectedContent(patch: any) {
-        if (!selected) return;
-        updateSelected({ content: { ...(selected.content ?? {}), ...patch } });
-    }
+    const updateSelectedContent = useCallback((patch: any) => {
+        setSections((prev) => {
+            const sec = prev.find(s => s.id === selectedId);
+            if (!sec) return prev;
+            return prev.map((s) => s.id === selectedId ? { ...s, content: { ...(s.content ?? {}), ...patch } } : s);
+        });
+    }, [selectedId]);
 
-    function move(id: string, dir: "up" | "down") {
+    const move = useCallback((id: string, dir: "up" | "down") => {
         setSections((prev) => {
             const sorted = normalizeOrders(prev);
             const idx = sorted.findIndex((s) => s.id === id);
@@ -291,11 +287,16 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
             [copy[idx], copy[swapWith]] = [copy[swapWith], copy[idx]];
             return normalizeOrders(copy);
         });
-    }
+    }, []);
 
-    function toggle(id: string) {
+    const toggle = useCallback((id: string) => {
         setSections((prev) => prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)));
-    }
+    }, []);
+
+    const deleteSection = useCallback((id: string) => {
+        setSections((prev) => normalizeOrders(prev.filter(s => s.id !== id)));
+        setSelectedId((prev) => prev === id ? "" : prev);
+    }, []);
 
     function addSection(type: TipoSeccionHome) {
         const id = `temp_${Date.now()}`;
@@ -307,32 +308,17 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
             content: {},
         };
 
-        // defaults rápidos por tipo
         if (type === "HERO") base.content = { title: "Título", subtitle: "Subtítulo", ctaText: "Ver catálogo", ctaHref: "/tienda/catalogo", imageUrl: null, overlayOpacity: 0.25 };
         if (type === "BEST_SELLERS") base.content = {
             title: "NEW LAUNCH",
             subtitle: "BEST SELLER",
-            bannerTitle: "The Pink Aurora Tulle Dress",
-            bannerCtaText: "VIEW ALL",
-            bannerCtaHref: "/tienda/catalogo",
-            bannerImageUrl: null,
-            mode: "automático", // automático, manual
+            mode: "automático",
             manualProductIds: []
         };
-        if (type === "STORY") base.content = { title: "Nuestra historia", body: "Texto...", imageUrl: null, ctaText: "Conócenos", ctaHref: "/tienda/catalogo" };
-        if (type === "CONTACT") base.content = { title: "Contáctanos", subtitle: "WhatsApp", showMap: false, mapUrl: null };
-        if (type === "BENEFITS") base.content = {
-            items: [
-                { icon: "Truck", title: "Envío Prioritario", desc: "A todo el país en 24-48h" },
-                { icon: "ShieldCheck", title: "Compra Segura", desc: "Garantía de satisfacción total" },
-                { icon: "Heart", title: "Diseño Local", desc: "Hecho con amor y calidad" },
-                { icon: "Sparkles", title: "Calidad Premium", desc: "Telas y acabados de lujo" },
-            ]
-        };
-        if (type === "FEATURED_CATEGORIES") base.content = { title: "Colecciones", subtitle: "Explora lo mejor", categories: [] };
-        if (type === "BRAND_ESSENCE") base.content = { tagline: "Nuestra Esencia", title: "Elara Atelier", body: "...", imageUrl: null, quote: null };
-        if (type === "NEWSLETTER") base.content = { badge: "VIP", title: "Únete", subtitle: "Regístrate hoy" };
         if (type === "PROMO_CAMPAIGN") base.content = { selectedCampaignId: null, title: "", subtitle: "" };
+        if (type === "VIDEO_BANNER") base.content = { title: "Nueva Colección", subtitle: "Editorial", ctaText: "Descubrir", ctaHref: "/tienda/catalogo", videoUrl: "", overlayOpacity: 0.3 };
+        if (type === "CATEGORY_SPOTLIGHT") base.content = { title: "Vestidos de Noche", subtitle: "Elegancia Atemporal", categorySlug: "", ctaText: "Ver Colección", ctaHref: "/tienda/catalogo", imageUrl: null };
+        if (type === "SHOP_THE_LOOK") base.content = { title: "Get The Look", subtitle: "Inspiración", categorySlug: "", imageUrl: null, manualProductIds: [] };
 
         setSections((prev) => normalizeOrders([...prev, base]));
         setSelectedId(id);
@@ -345,7 +331,6 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
         try {
             const payload = {
                 sections: normalizeOrders(sections).map((s) => ({
-                    // si es temp_ lo mandamos sin id para que el endpoint cree
                     id: s.id.startsWith("temp_") ? undefined : s.id,
                     type: s.type,
                     enabled: s.enabled,
@@ -367,7 +352,7 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
             }
 
             const data = (await r.json()) as HomeSection[];
-            setSections(normalizeOrders(data));
+            setSections(normalizeOrders(data as HomeSection[]));
             setSelectedId(data[0]?.id ?? "");
             setMsg({ type: "ok", text: "Secciones guardadas ✅" });
             router.refresh();
@@ -399,7 +384,7 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                             <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Home Secciones</h1>
                         </div>
                         <p className="text-sm text-gray-500 max-w-2xl ml-1">
-                            Ordena, activa/desactiva y edita secciones como Squarespace (Hales).
+                            Ordena, activa/desactiva y edita las secciones del home público.
                         </p>
                     </div>
                 </div>
@@ -435,30 +420,24 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                                     <h3 className="font-bold text-lg tracking-tight">Secciones</h3>
                                     <p className="text-slate-400 text-xs">Orden y visibilidad</p>
                                 </div>
-
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        className="bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-2"
-                                        onClick={() => addSection("HERO")}
-                                        title="Añadir Hero rápido"
-                                    >
-                                        <Plus className="w-4 h-4" /> Add
-                                    </button>
-                                </div>
                             </div>
 
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                {(Object.keys(LABEL) as TipoSeccionHome[]).map((t) => (
-                                    <button
-                                        key={t}
-                                        type="button"
-                                        onClick={() => addSection(t)}
-                                        className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10"
-                                    >
-                                        {t}
-                                    </button>
-                                ))}
+                            {/* Botones de añadir sección */}
+                            <div className="mt-4 space-y-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Añadir sección premium</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {(Object.keys(LABEL) as TipoSeccionHome[]).map((t) => (
+                                        <button
+                                            key={t}
+                                            type="button"
+                                            onClick={() => addSection(t)}
+                                            className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 flex items-center gap-1.5 transition-colors"
+                                        >
+                                            <Plus className="w-3 h-3" />
+                                            {LABEL[t]}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
@@ -479,13 +458,14 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                                                     {sec.type} • #{sec.order + 1}
                                                 </p>
-                                                <p className="font-bold text-slate-900 truncate">{LABEL[sec.type]}</p>
+                                                <p className="font-bold text-slate-900 truncate">{LABEL[sec.type as TipoSeccionHome] ?? sec.type}</p>
                                                 <p className="text-xs text-slate-500 truncate mt-1">
                                                     {sec.content?.title || sec.content?.subtitle || "Sin título"}
                                                 </p>
                                             </div>
 
                                             <div className="flex flex-col items-end gap-2 shrink-0">
+                                                {/* Toggle */}
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
@@ -503,7 +483,8 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                                                     )}
                                                 </button>
 
-                                                <div className="flex items-center gap-2">
+                                                {/* Order controls */}
+                                                <div className="flex items-center gap-1">
                                                     <button
                                                         type="button"
                                                         onClick={(e) => {
@@ -529,11 +510,32 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                                                     >
                                                         <ChevronDown className="w-4 h-4 text-slate-500" />
                                                     </button>
+
+                                                    {/* Delete button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            if (confirm(`¿Eliminar sección "${LABEL[sec.type as TipoSeccionHome] ?? sec.type}"?`)) {
+                                                                deleteSection(sec.id);
+                                                            }
+                                                        }}
+                                                        className="p-1 rounded-lg hover:bg-red-50 hover:border-red-100 border border-transparent"
+                                                        title="Eliminar sección"
+                                                    >
+                                                        <Trash2 className="w-4 h-4 text-red-400" />
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
                                     );
                                 })}
+                            {sections.length === 0 && (
+                                <div className="p-10 text-center text-slate-400 text-sm">
+                                    Sin secciones. Añade una arriba.
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -546,35 +548,46 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                         </div>
                     ) : (
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                    Editor • {selected.type}
-                                </p>
-                                <h2 className="font-bold text-slate-900">{LABEL[selected.type]}</h2>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Edita el contenido que se renderizará en el home público.
-                                </p>
+                            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                        Editor • {selected.type}
+                                    </p>
+                                    <h2 className="font-bold text-slate-900">{LABEL[selected.type] ?? selected.type}</h2>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        Edita el contenido que se renderizará en el home público.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (confirm(`¿Eliminar sección "${LABEL[selected.type] ?? selected.type}"?`)) {
+                                            deleteSection(selected.id);
+                                        }
+                                    }}
+                                    className="p-2 rounded-xl border border-red-100 bg-red-50 text-red-500 hover:bg-red-100 transition-colors flex items-center gap-1.5 text-xs font-bold"
+                                    title="Eliminar sección"
+                                >
+                                    <Trash2 className="w-4 h-4" /> Eliminar
+                                </button>
                             </div>
 
                             <div className="p-6 space-y-5">
-                                {/* Campos comunes (Título) */}
-                                {("title" in (selected.content ?? {}) ||
-                                    ["HERO", "BEST_SELLERS", "STORY", "CONTACT", "FEATURED_CATEGORIES", "BRAND_ESSENCE", "NEWSLETTER"].includes(selected.type)) && (
+
+                                {/* === HERO === */}
+                                {selected.type === "HERO" && (
+                                    <>
                                         <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Title</label>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título</label>
                                             <input
                                                 className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all text-sm font-medium"
                                                 value={selected.content?.title ?? ""}
                                                 onChange={(e) => updateSelectedContent({ title: e.target.value })}
                                             />
                                         </div>
-                                    )}
 
-                                {/* HERO */}
-                                {selected.type === "HERO" && (
-                                    <>
                                         <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtitle</label>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtítulo</label>
                                             <input
                                                 className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all text-sm font-medium"
                                                 value={selected.content?.subtitle ?? ""}
@@ -624,14 +637,16 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                                     </>
                                 )}
 
-                                {/* BEST_SELLERS - DUAL SECTION */}
+                                {/* === BEST_SELLERS === */}
                                 {selected.type === "BEST_SELLERS" && (
                                     <div className="space-y-6">
+
+                                        {/* Nombres de pestañas */}
                                         <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-4">
-                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Configuración de Pestañas</h3>
+                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nombres de Pestañas</h3>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Título Pestaña 1</label>
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Pestaña "Novedades"</label>
                                                     <input
                                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
                                                         value={selected.content?.title ?? ""}
@@ -640,7 +655,7 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Título Pestaña 2</label>
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Pestaña "Más Vendidos"</label>
                                                     <input
                                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
                                                         value={selected.content?.subtitle ?? ""}
@@ -651,76 +666,11 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                                             </div>
                                         </div>
 
+                                        {/* Modo de selección */}
                                         <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
-                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Banner Destacado (Izquierda)</h3>
-
-                                            <div className="space-y-4">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Vincular a Campaña (Opcional)</label>
-                                                <CampaignPicker
-                                                    selectedId={selected.content?.selectedCampaignId || null}
-                                                    onSelect={(c) => {
-                                                        if (c) {
-                                                            updateSelectedContent({
-                                                                selectedCampaignId: c.id,
-                                                                bannerTitle: c.nombre,
-                                                                bannerCtaText: "Ver Ofertas",
-                                                                bannerCtaHref: `/tienda/catalogo?campana=${c.id}`
-                                                            });
-                                                        } else {
-                                                            updateSelectedContent({
-                                                                selectedCampaignId: null,
-                                                                bannerTitle: "",
-                                                                bannerCtaText: "VIEW ALL",
-                                                                bannerCtaHref: "/tienda/catalogo"
-                                                            });
-                                                        }
-                                                    }}
-                                                />
-                                            </div>
-
-                                            {!selected.content?.selectedCampaignId && (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-300">
-                                                    <div className="space-y-2">
-                                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título Banner</label>
-                                                        <input
-                                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                            value={selected.content?.bannerTitle ?? ""}
-                                                            onChange={(e) => updateSelectedContent({ bannerTitle: e.target.value })}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Texto Botón</label>
-                                                        <input
-                                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                            value={selected.content?.bannerCtaText ?? "VIEW ALL"}
-                                                            onChange={(e) => updateSelectedContent({ bannerCtaText: e.target.value })}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {!selected.content?.selectedCampaignId && (
-                                                <div className="space-y-2 animate-in fade-in duration-300">
-                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Enlace Botón</label>
-                                                    <input
-                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                        value={selected.content?.bannerCtaHref ?? "/tienda/catalogo"}
-                                                        onChange={(e) => updateSelectedContent({ bannerCtaHref: e.target.value })}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            <UploaderImage
-                                                label={selected.content?.selectedCampaignId ? "Portada personalizada de la Campaña" : "Imagen del Banner"}
-                                                url={selected.content?.bannerImageUrl || null}
-                                                onUpload={(url) => updateSelectedContent({ bannerImageUrl: url })}
-                                            />
-                                        </div>
-
-                                        <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
-                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pestaña "Más Vendidos"</h3>
+                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Selección de Productos</h3>
                                             <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Modo de Selección</label>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Modo</label>
                                                 <div className="flex gap-2">
                                                     {["automático", "manual"].map((m) => (
                                                         <button
@@ -736,11 +686,16 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                                                         </button>
                                                     ))}
                                                 </div>
+                                                <p className="text-[10px] text-slate-400 ml-1 mt-1">
+                                                    {(selected.content?.mode || "automático") === "automático"
+                                                        ? "Modo automático: Se muestran los productos destacados más recientes."
+                                                        : "Modo manual: Selecciona exactamente qué productos quieres mostrar."}
+                                                </p>
                                             </div>
 
                                             {(selected.content?.mode || "automático") === "manual" && (
                                                 <div className="space-y-4 pt-2">
-                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Seleccionar Productos</label>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Seleccionar Productos (máx. 8)</label>
                                                     <ProductPicker
                                                         selectedIds={selected.content?.manualProductIds || []}
                                                         onToggle={(id) => {
@@ -754,6 +709,9 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
 
                                                     {selected.content?.manualProductIds?.length > 0 && (
                                                         <div className="flex flex-wrap gap-2 pt-2">
+                                                            <p className="w-full text-[10px] text-slate-400 font-bold uppercase">
+                                                                {selected.content.manualProductIds.length} producto(s) seleccionado(s)
+                                                            </p>
                                                             {selected.content.manualProductIds.map((id: string) => (
                                                                 <div key={id} className="bg-slate-100 text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 border border-slate-200">
                                                                     ID: {id.slice(-6)}
@@ -777,268 +735,7 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                                     </div>
                                 )}
 
-                                {/* STORY */}
-                                {selected.type === "STORY" && (
-                                    <>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Body</label>
-                                            <textarea
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium min-h-[140px]"
-                                                value={selected.content?.body ?? ""}
-                                                onChange={(e) => updateSelectedContent({ body: e.target.value })}
-                                            />
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">CTA Text</label>
-                                                <input
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                    value={selected.content?.ctaText ?? ""}
-                                                    onChange={(e) => updateSelectedContent({ ctaText: e.target.value })}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">CTA Href</label>
-                                                <input
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                    value={selected.content?.ctaHref ?? ""}
-                                                    onChange={(e) => updateSelectedContent({ ctaHref: e.target.value })}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="pt-2">
-                                            <UploaderImage
-                                                key={`story-img-${selected.id}`}
-                                                label="Imagen de Historia"
-                                                url={selected.content?.imageUrl || null}
-                                                onUpload={(url) => updateSelectedContent({ imageUrl: url })}
-                                            />
-                                        </div>
-                                    </>
-                                )}
-
-                                {/* CONTACT */}
-                                {selected.type === "CONTACT" && (
-                                    <>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtitle</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                value={selected.content?.subtitle ?? ""}
-                                                onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
-                                            />
-                                        </div>
-
-                                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={Boolean(selected.content?.showMap)}
-                                                onChange={(e) => updateSelectedContent({ showMap: e.target.checked })}
-                                                className="w-4 h-4"
-                                            />
-                                            Mostrar mapa
-                                        </label>
-
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Map URL</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                placeholder="https://maps.google.com/..."
-                                                value={selected.content?.mapUrl ?? ""}
-                                                onChange={(e) => updateSelectedContent({ mapUrl: e.target.value || null })}
-                                            />
-                                        </div>
-                                    </>
-                                )}
-
-                                {/* BENEFITS */}
-                                {selected.type === "BENEFITS" && (
-                                    <div className="space-y-6">
-                                        {(selected.content?.items || []).map((item: any, idx: number) => (
-                                            <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Beneficio #{idx + 1}</p>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="space-y-1">
-                                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Icono (Lucide)</label>
-                                                        <input
-                                                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
-                                                            value={item.icon || ""}
-                                                            onChange={(e) => {
-                                                                const newItems = [...selected.content.items];
-                                                                newItems[idx].icon = e.target.value;
-                                                                updateSelectedContent({ items: newItems });
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Título</label>
-                                                        <input
-                                                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
-                                                            value={item.title || ""}
-                                                            onChange={(e) => {
-                                                                const newItems = [...selected.content.items];
-                                                                newItems[idx].title = e.target.value;
-                                                                updateSelectedContent({ items: newItems });
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Descripción</label>
-                                                    <input
-                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
-                                                        value={item.desc || ""}
-                                                        onChange={(e) => {
-                                                            const newItems = [...selected.content.items];
-                                                            newItems[idx].desc = e.target.value;
-                                                            updateSelectedContent({ items: newItems });
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* FEATURED_CATEGORIES */}
-                                {selected.type === "FEATURED_CATEGORIES" && (
-                                    <div className="space-y-6">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtítulo</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                value={selected.content?.subtitle ?? ""}
-                                                onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-4">
-                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Categorías</p>
-                                            {(selected.content?.categories || []).map((cat: any, idx: number) => (
-                                                <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="space-y-1">
-                                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Nombre</label>
-                                                            <input
-                                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
-                                                                value={cat.title || ""}
-                                                                onChange={(e) => {
-                                                                    const newCats = [...selected.content.categories];
-                                                                    newCats[idx].title = e.target.value;
-                                                                    updateSelectedContent({ categories: newCats });
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Slug</label>
-                                                            <input
-                                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
-                                                                value={cat.slug || ""}
-                                                                onChange={(e) => {
-                                                                    const newCats = [...selected.content.categories];
-                                                                    newCats[idx].slug = e.target.value;
-                                                                    updateSelectedContent({ categories: newCats });
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Imagen URL</label>
-                                                        <input
-                                                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
-                                                            value={cat.image || ""}
-                                                            onChange={(e) => {
-                                                                const newCats = [...selected.content.categories];
-                                                                newCats[idx].image = e.target.value;
-                                                                updateSelectedContent({ categories: newCats });
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const newCats = [...selected.content.categories];
-                                                            newCats.splice(idx, 1);
-                                                            updateSelectedContent({ categories: newCats });
-                                                        }}
-                                                        className="text-red-500 text-[10px] font-bold uppercase hover:underline"
-                                                    >
-                                                        Eliminar Categoría
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const newCats = [...(selected.content?.categories || []), { title: "", slug: "", image: "" }];
-                                                    updateSelectedContent({ categories: newCats });
-                                                }}
-                                                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-xs font-bold text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
-                                            >
-                                                + Añadir Categoría
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* BRAND_ESSENCE */}
-                                {selected.type === "BRAND_ESSENCE" && (
-                                    <div className="space-y-5">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Tagline</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                value={selected.content?.tagline ?? ""}
-                                                onChange={(e) => updateSelectedContent({ tagline: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Cuerpo (Body)</label>
-                                            <textarea
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium min-h-[100px]"
-                                                value={selected.content?.body ?? ""}
-                                                onChange={(e) => updateSelectedContent({ body: e.target.value })}
-                                            />
-                                        </div>
-                                        <UploaderImage
-                                            label="Imagen Principal"
-                                            url={selected.content?.imageUrl || null}
-                                            onUpload={(url) => updateSelectedContent({ imageUrl: url })}
-                                        />
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Cita (Quote)</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium italic"
-                                                value={selected.content?.quote ?? ""}
-                                                onChange={(e) => updateSelectedContent({ quote: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {selected.type === "NEWSLETTER" && (
-                                    <div className="space-y-5">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Badge</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                value={selected.content?.badge ?? ""}
-                                                onChange={(e) => updateSelectedContent({ badge: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtítulo</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                value={selected.content?.subtitle ?? ""}
-                                                onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* PROMO_CAMPAIGN */}
+                                {/* === PROMO_CAMPAIGN === */}
                                 {selected.type === "PROMO_CAMPAIGN" && (
                                     <div className="space-y-6">
                                         <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-4">
@@ -1066,7 +763,7 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                                         <div className="space-y-4">
                                             <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl">
                                                 <p className="text-[11px] text-amber-800 font-medium">
-                                                    💡 <strong>Nota:</strong> Los datos como fechas y valor del descuento se obtienen automáticamente de la campaña seleccionada. La imagen de la campaña debe configurarse en la sección de "Descuentos".
+                                                    💡 <strong>Nota:</strong> Los datos como fechas y valor del descuento se obtienen automáticamente de la campaña seleccionada. La imagen de la campaña debe configurarse en "Descuentos".
                                                 </p>
                                             </div>
 
@@ -1092,6 +789,217 @@ export default function HomeSeccionesClient({ initial }: { initial: HomeSection[
                                         </div>
                                     </div>
                                 )}
+
+                                {/* === VIDEO BANNER === */}
+                                {selected.type === "VIDEO_BANNER" && (
+                                    <div className="space-y-5">
+                                        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-4">
+                                            <p className="text-[11px] text-amber-800 font-medium">
+                                                💡 <strong>Importante:</strong> Pega el enlace directo a un archivo de video terminado en <strong>.mp4</strong>. Para mejor rendimiento, te sugerimos alojarlo en un servicio como Cloudinary o tu propio hosting.
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">URL del Video (.mp4)</label>
+                                            <input
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-slate-900 outline-none"
+                                                value={selected.content?.videoUrl ?? ""}
+                                                onChange={(e) => updateSelectedContent({ videoUrl: e.target.value })}
+                                                placeholder="https://tudominio.com/video.mp4"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título</label>
+                                            <input
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-slate-900 outline-none"
+                                                value={selected.content?.title ?? ""}
+                                                onChange={(e) => updateSelectedContent({ title: e.target.value })}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtítulo (Opcional)</label>
+                                            <input
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-slate-900 outline-none"
+                                                value={selected.content?.subtitle ?? ""}
+                                                onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Botón: Texto</label>
+                                                <input
+                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
+                                                    value={selected.content?.ctaText ?? ""}
+                                                    onChange={(e) => updateSelectedContent({ ctaText: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Botón: Enlace</label>
+                                                <input
+                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
+                                                    value={selected.content?.ctaHref ?? ""}
+                                                    onChange={(e) => updateSelectedContent({ ctaHref: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Filtro Oscuro (0 a 1)</label>
+                                            <input
+                                                type="number" step="0.1" min={0} max={1}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
+                                                value={selected.content?.overlayOpacity ?? 0.3}
+                                                onChange={(e) => updateSelectedContent({ overlayOpacity: Number(e.target.value) })}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* === CATEGORY SPOTLIGHT === */}
+                                {selected.type === "CATEGORY_SPOTLIGHT" && (
+                                    <div className="space-y-5">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título de la Colección</label>
+                                            <input
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
+                                                value={selected.content?.title ?? ""}
+                                                onChange={(e) => updateSelectedContent({ title: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtítulo</label>
+                                            <input
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
+                                                value={selected.content?.subtitle ?? ""}
+                                                onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
+                                            />
+                                        </div>
+                                        {/* 👇 AQUI USAMOS EL SELECT PARA LA CATEGORÍA 👇 */}
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Asignar a Categoría</label>
+                                            <select
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-slate-900 outline-none bg-white cursor-pointer"
+                                                value={selected.content?.categorySlug ?? ""}
+                                                onChange={(e) => updateSelectedContent({ categorySlug: e.target.value })}
+                                            >
+                                                <option value="">-- Catálogo General (Se muestra a todos) --</option>
+                                                {categorias.map(cat => (
+                                                    <option key={cat.id} value={cat.slug}>
+                                                        {cat.nombre}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Botón: Texto</label>
+                                                <input
+                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
+                                                    value={selected.content?.ctaText ?? ""}
+                                                    onChange={(e) => updateSelectedContent({ ctaText: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Botón: Enlace</label>
+                                                <input
+                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
+                                                    value={selected.content?.ctaHref ?? ""}
+                                                    onChange={(e) => updateSelectedContent({ ctaHref: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <UploaderImage
+                                            label="Imagen Principal (Editorial)"
+                                            url={selected.content?.imageUrl || null}
+                                            onUpload={(url) => updateSelectedContent({ imageUrl: url })}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* === SHOP THE LOOK === */}
+                                {selected.type === "SHOP_THE_LOOK" && (
+                                    <div className="space-y-5">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título del Look</label>
+                                            <input
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
+                                                value={selected.content?.title ?? ""}
+                                                onChange={(e) => updateSelectedContent({ title: e.target.value })}
+                                                placeholder="Ej: Elegancia Urbana"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtítulo</label>
+                                            <input
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
+                                                value={selected.content?.subtitle ?? ""}
+                                                onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
+                                            />
+                                        </div>
+                                        
+                                        {/* 👇 AQUI TAMBIEN USAMOS EL SELECT PARA LA CATEGORÍA 👇 */}
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Asignar a Categoría</label>
+                                            <select
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-slate-900 outline-none bg-white cursor-pointer"
+                                                value={selected.content?.categorySlug ?? ""}
+                                                onChange={(e) => updateSelectedContent({ categorySlug: e.target.value })}
+                                            >
+                                                <option value="">-- Catálogo General (Se muestra a todos) --</option>
+                                                {categorias.map(cat => (
+                                                    <option key={cat.id} value={cat.slug}>
+                                                        {cat.nombre}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <UploaderImage
+                                            label="Fotografía del Outfit (Cuerpo completo)"
+                                            url={selected.content?.imageUrl || null}
+                                            onUpload={(url) => updateSelectedContent({ imageUrl: url })}
+                                        />
+                                        <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
+                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Prendas que componen el Look</h3>
+                                            <ProductPicker
+                                                selectedIds={selected.content?.manualProductIds || []}
+                                                onToggle={(id) => {
+                                                    const current = selected.content?.manualProductIds || [];
+                                                    const next = current.includes(id)
+                                                        ? current.filter((x: string) => x !== id)
+                                                        : [...current, id];
+                                                    updateSelectedContent({ manualProductIds: next });
+                                                }}
+                                            />
+                                            {selected.content?.manualProductIds?.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 pt-2">
+                                                    <p className="w-full text-[10px] text-slate-400 font-bold uppercase">
+                                                        {selected.content.manualProductIds.length} prenda(s) en el outfit
+                                                    </p>
+                                                    {selected.content.manualProductIds.map((id: string) => (
+                                                        <div key={id} className="bg-slate-100 text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 border border-slate-200">
+                                                            ID: {id.slice(-6)}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const next = selected.content.manualProductIds.filter((x: string) => x !== id);
+                                                                    updateSelectedContent({ manualProductIds: next });
+                                                                }}
+                                                                className="hover:text-red-500"
+                                                            >
+                                                                <X className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
                             </div>
                         </div>
                     )}

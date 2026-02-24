@@ -5,7 +5,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
-import { ArrowLeft, Printer, FileText, Calendar, Box, Truck, MapPin, Phone, CreditCard } from "lucide-react";
+import { ArrowLeft, Printer, FileText, Calendar, Box, Truck, MapPin, Phone, CreditCard, RotateCcw } from "lucide-react";
 import { PurchaseActions } from "./purchase-actions";
 
 // Helpers
@@ -117,8 +117,17 @@ export default async function Page({
                     </div>
                 </div>
 
-                <PurchaseActions compraId={compra.id} />
+                <div className="flex items-center gap-3">
+                    <Link
+                        href={`/admin/devoluciones/nueva?refId=${compra.id}&tipo=PROVEEDOR`}
+                        className="flex items-center text-sm font-bold text-orange-600 hover:text-orange-700 transition-colors bg-orange-50 px-4 py-2 rounded-xl border border-orange-200 shadow-sm"
+                    >
+                        <RotateCcw className="w-4 h-4 mr-2" /> Registrar Devolución
+                    </Link>
+                    <PurchaseActions compraId={compra.id} />
+                </div>
             </div>
+
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Info General */}

@@ -14,73 +14,8 @@ export const metadata = {
   title: "Campañas y Descuentos | Admin",
 };
 
-// --- FUNCIÓN CRÍTICA: Sincronización Automática (Versión Campana) ---
-async function sincronizarEstados() {
-  const now = new Date();
-
-  try {
-    // 1. ACTIVAR: Campañas "PROGRAMADAS" que ya llegaron a su fecha de inicio
-    const porActivar = await prisma.campana.findMany({
-      where: {
-        estado: "PROGRAMADO",
-        startsAt: { lte: now },
-        endsAt: { gte: now }
-      },
-      include: { detalles: true }
-    });
-
-    for (const c of porActivar) {
-      // A. Activar Campaña Padre
-      await prisma.campana.update({ where: { id: c.id }, data: { estado: "ACTIVO" } });
-
-      // B. Reflejar en Productos
-      const pids = c.detalles.map(d => d.productoId);
-      if (pids.length > 0) {
-        await prisma.producto.updateMany({
-          where: { id: { in: pids } },
-          data: {
-            descuentoActivo: true,
-            descuentoTipo: c.tipo,
-            descuentoValor: Number(c.valor),
-            descuentoInicio: c.startsAt,
-            descuentoFin: c.endsAt
-          }
-        });
-      }
-    }
-
-    // 2. FINALIZAR: Campañas "ACTIVAS" que ya vencieron
-    const porFinalizar = await prisma.campana.findMany({
-      where: {
-        estado: "ACTIVO",
-        endsAt: { lt: now }
-      },
-      include: { detalles: true }
-    });
-
-    for (const c of porFinalizar) {
-      // A. Finalizar Campaña Padre
-      await prisma.campana.update({ where: { id: c.id }, data: { estado: "FINALIZADO" } });
-
-      // B. Limpiar Productos (Solo si siguen activos para evitar pisar campañas nuevas)
-      const pids = c.detalles.map(d => d.productoId);
-      if (pids.length > 0) {
-        await prisma.producto.updateMany({
-          where: { id: { in: pids }, descuentoActivo: true },
-          data: {
-            descuentoActivo: false,
-            descuentoTipo: null,
-            descuentoValor: null,
-            descuentoInicio: null,
-            descuentoFin: null
-          }
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Error en sincronización automática:", error);
-  }
-}
+// La sincronización de estados se maneja ahora de forma automática 
+// vía Cron Job en /api/cron/sync-descuentos.
 
 type SearchParams = {
   q?: string;
@@ -94,8 +29,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   const admin = await sesionAdmin();
   if (!admin) redirect("/admin/login");
 
-  // 🔥 EJECUTAR SINCRONIZACIÓN 🔥
-  await sincronizarEstados();
 
   // Leer parámetros
   const sp = await searchParams;

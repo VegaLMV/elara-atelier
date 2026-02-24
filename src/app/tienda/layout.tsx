@@ -17,6 +17,7 @@ import {
     Mail,
     MapPin,
     Link2,
+    ArrowRight
 } from "lucide-react";
 
 type StoreSettings = {
@@ -68,13 +69,13 @@ async function getSettings(): Promise<StoreSettings> {
     const s = (await prisma.storeSettings?.findUnique?.({ where: { id: "default" } })) as
         | StoreSettings
         | null;
-    return s ?? { storeName: "Elara Atelier" };
+    return s ?? { storeName: "Élara Atelier" };
 }
 
 export async function generateMetadata(): Promise<Metadata> {
     const s = await getSettings();
-    const storeName = s.storeName ?? "Elara Atelier";
-    const desc = s.description ?? "Catálogo público de Elara Atelier.";
+    const storeName = s.storeName ?? "Élara Atelier";
+    const desc = s.description ?? "Catálogo público de Élara Atelier.";
     const og = s.ogImageUrl ? absolutizeUrl(s.ogImageUrl) : absolutizeUrl("/og-default.jpg");
     const favicon = s.faviconUrl ? absolutizeUrl(s.faviconUrl) : "/favicon.ico";
 
@@ -106,8 +107,11 @@ export async function generateMetadata(): Promise<Metadata> {
     };
 }
 
+import SmartHeader from "@/components/layout/smart-header";
+import CartDrawer from "@/components/layout/cart-drawer";
+
 export default async function CatalogoLayout({ children }: { children: React.ReactNode }) {
-    const [settings, navItems, social] = await Promise.all([
+    const [settings, navItems, social, categorias] = await Promise.all([
         getSettings(),
         prisma.navigationItem?.findMany?.({
             where: { enabled: true },
@@ -117,9 +121,13 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
             where: { enabled: true },
             orderBy: { order: "asc" },
         }) as Promise<SocialLink[]>,
+        prisma.categoria.findMany({
+            where: { visible: true },
+            orderBy: { orden: "asc" }
+        })
     ]);
 
-    const storeName = settings.storeName ?? "Elara Atelier";
+    const storeName = settings.storeName ?? "Élara Atelier";
     const headerLinks = (navItems ?? []).filter((i) => i.location === "HEADER");
     const footerLinks = (navItems ?? []).filter((i) => i.location === "FOOTER");
 
@@ -129,18 +137,17 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
     const fontH = settings.fontHeading || "Playfair Display, serif";
     const fontB = settings.fontBody || "Inter, sans-serif";
 
-    // Generar URL de Google Fonts si parecen ser fuentes de Google (no nombres genéricos)
     const googleFonts = [];
     if (fontH && !fontH.includes(",")) googleFonts.push(fontH);
     if (fontB && !fontB.includes(",") && fontB !== fontH) googleFonts.push(fontB);
 
     const fontsUrl = googleFonts.length
-        ? `https://fonts.googleapis.com/css2?${googleFonts.map(f => `family=${f.replace(/ /g, '+')}:wght@400;700`).join('&')}&display=swap`
+        ? `https://fonts.googleapis.com/css2?${googleFonts.map(f => `family=${f.replace(/ /g, '+')}:wght@300;400;700;900`).join('&')}&display=swap`
         : null;
 
     return (
         <div
-            className="min-h-screen"
+            className="min-h-screen overflow-x-hidden flex flex-col w-full relative"
             style={
                 {
                     "--brand-primary": primary,
@@ -153,76 +160,20 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
         >
             {fontsUrl && <link rel="stylesheet" href={fontsUrl} />}
 
-            {/* HEADER */}
-            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100/50 shadow-sm transition-all duration-300">
-                <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between gap-4">
-                    <Link
-                        href="/tienda"
-                        className="flex items-center gap-3 group"
-                    >
-                        {settings.logoUrl ? (
-                            <div className="relative h-12 md:h-14 w-32 md:w-40 transition-transform group-hover:scale-105">
-                                <Image
-                                    src={settings.logoUrl}
-                                    alt={storeName}
-                                    fill
-                                    priority
-                                    className="object-contain object-left"
-                                />
-                            </div>
-                        ) : (
-                            <span
-                                className="text-xl md:text-2xl tracking-tight font-bold"
-                                style={{ color: "var(--brand-primary)", fontFamily: "var(--brand-font-heading)" }}
-                            >
-                                {storeName}
-                            </span>
-                        )}
-                    </Link>
+            <SmartHeader
+                settings={{
+                    storeName,
+                    logoUrl: settings.logoUrl
+                }}
+                navItems={headerLinks.map(l => ({ id: l.id, label: l.label, href: l.href }))}
+                categorias={categorias.map(c => ({ id: c.id, nombre: c.nombre, slug: c.slug }))}
+            />
 
-                    <nav className="hidden md:flex items-center gap-8 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
-                        {headerLinks.map((l) => (
-                            <Link
-                                key={l.id}
-                                href={l.href}
-                                className="hover:text-slate-900 transition-all hover:-translate-y-0.5 relative after:content-[''] after:absolute after:-bottom-1 after:left-0 after:w-0 after:h-px after:bg-slate-900 after:transition-all hover:after:w-full"
-                                style={{ fontFamily: "var(--brand-font-body)" }}
-                            >
-                                {l.label}
-                            </Link>
-                        ))}
-                    </nav>
-
-                    <div className="flex items-center gap-3">
-                        {settings.whatsapp && (
-                            <a
-                                href={`https://wa.me/${String(settings.whatsapp).replace(/\D/g, "")}`}
-                                className="hidden md:inline-flex items-center justify-center px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-lg active:scale-95 hover:shadow-xl hover:brightness-110 transition-all duration-300"
-                                style={{ backgroundColor: "var(--brand-accent)", fontFamily: "var(--brand-font-body)" }}
-                                target="_blank"
-                                rel="noreferrer"
-                            >
-                                WhatsApp
-                            </a>
-                        )}
-
-                        {headerLinks.length > 0 && (
-                            <div className="md:hidden flex items-center gap-1">
-                                <Link
-                                    href={headerLinks[0].href}
-                                    className="shrink-0 text-[10px] font-black uppercase tracking-widest text-slate-600 px-3 py-2 rounded-full bg-slate-50 border border-slate-200"
-                                    style={{ fontFamily: "var(--brand-font-body)" }}
-                                >
-                                    {headerLinks[0].label}
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </header>
+            <CartDrawer />
 
             {/* MAIN */}
             <main
+                className="pt-[112px]"
                 style={{
                     backgroundColor: "var(--brand-bg)",
                     fontFamily: "var(--brand-font-body)"
@@ -231,83 +182,111 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
                 {children}
             </main>
 
-            {/* FOOTER */}
-            <footer className="bg-[#3f2f2f] text-[#e6dad1]" style={{ fontFamily: "var(--brand-font-body)" }}>
-                <div className="max-w-[1600px] mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-12 gap-10">
-                    <div className="md:col-span-4 space-y-4">
-                        <p
-                            className="text-2xl font-bold text-[#e6dad1]"
-                            style={{ fontFamily: "var(--brand-font-heading)" }}
-                        >
+            {/* FOOTER PREMIUM */}
+            <footer className="bg-[#3f2f2f] text-[#e6dad1] border-t border-[#e6dad1]/20" style={{ fontFamily: "var(--brand-font-body)" }}>
+
+                {/* 2. Main Footer Links */}
+                <div className="max-w-[1600px] mx-auto px-6 py-20 grid grid-cols-1 md:grid-cols-12 gap-12 lg:gap-8">
+                    
+                    {/* Brand Column */}
+                    <div className="md:col-span-12 lg:col-span-5 space-y-6 pr-0 lg:pr-12 text-center lg:text-left">
+                        <p className="text-4xl md:text-5xl lg:text-6xl font-serif italic text-white tracking-wide leading-none" style={{ fontFamily: "var(--brand-font-heading)" }}>
                             {storeName}
                         </p>
-                        {settings.tagline && <p className="text-sm text-[#e6dad1]/70">{settings.tagline}</p>}
+                        {settings.tagline && <p className="text-xs text-[#864d2d] font-bold uppercase tracking-[0.3em]">{settings.tagline}</p>}
                         {settings.description && (
-                            <p className="text-sm text-[#e6dad1]/70 leading-relaxed">{settings.description}</p>
+                            <p className="text-sm text-[#e6dad1]/60 leading-relaxed font-light max-w-md mx-auto lg:mx-0">
+                                {settings.description}
+                            </p>
                         )}
                     </div>
 
-                    <div className="md:col-span-4">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-[#e6dad1]/40 mb-4">Links</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Links Column */}
+                    <div className="md:col-span-4 lg:col-span-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white mb-8">Descubrir</p>
+                        <ul className="space-y-5">
                             {footerLinks.map((l) => (
-                                <Link key={l.id} href={l.href} className="text-sm text-[#e6dad1]/70 hover:text-[#e6dad1] transition-colors">
-                                    {l.label}
-                                </Link>
+                                <li key={l.id}>
+                                    <Link href={l.href} className="text-sm text-[#e6dad1]/60 hover:text-white hover:pl-2 transition-all duration-300 font-light relative w-fit">
+                                        {l.label}
+                                    </Link>
+                                </li>
                             ))}
-                            {footerLinks.length === 0 && <p className="text-sm text-[#e6dad1]/50">Sin links configurados.</p>}
-                        </div>
+                            {footerLinks.length === 0 && <li className="text-sm text-[#e6dad1]/40">Navegación en curso</li>}
+                        </ul>
                     </div>
 
-                    <div className="md:col-span-4 space-y-5">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-[#e6dad1]/40">Contacto</p>
-
-                        <div className="space-y-3">
+                    {/* Contact Column */}
+                    <div className="md:col-span-4 lg:col-span-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white mb-8">Atención al Cliente</p>
+                        <ul className="space-y-5 font-light text-sm text-[#e6dad1]/60">
                             {settings.contactEmail && (
-                                <a href={`mailto:${settings.contactEmail}`} className="flex items-center gap-2 text-sm text-[#e6dad1]/70 hover:text-[#e6dad1]">
-                                    <Mail className="w-4 h-4" /> {settings.contactEmail}
-                                </a>
+                                <li>
+                                    <a href={`mailto:${settings.contactEmail}`} className="hover:text-white transition-colors flex items-center gap-4">
+                                        <Mail className="w-4 h-4 text-[#864d2d]" /> {settings.contactEmail}
+                                    </a>
+                                </li>
                             )}
                             {(settings.phone || settings.whatsapp) && (
-                                <div className="flex items-center gap-2 text-sm text-[#e6dad1]/70">
-                                    <Phone className="w-4 h-4" />
-                                    <span>{settings.phone ?? settings.whatsapp}</span>
-                                </div>
+                                <li>
+                                    <div className="flex items-center gap-4 hover:text-white transition-colors cursor-pointer">
+                                        <Phone className="w-4 h-4 text-[#864d2d]" />
+                                        <span>{settings.phone ?? settings.whatsapp}</span>
+                                    </div>
+                                </li>
                             )}
                             {settings.address && (
-                                <div className="flex items-start gap-2 text-sm text-[#e6dad1]/70">
-                                    <MapPin className="w-4 h-4 mt-0.5" />
-                                    <span>{settings.address}</span>
-                                </div>
+                                <li className="flex items-start gap-4">
+                                    <MapPin className="w-4 h-4 text-[#864d2d] mt-1 shrink-0" />
+                                    <span className="leading-relaxed hover:text-white transition-colors">{settings.address}</span>
+                                </li>
                             )}
-                        </div>
-
-                        <div className="flex items-center gap-3 pt-2">
-                            {(social ?? []).map((s) => {
-                                const Icon = iconForPlatform(s.platform);
-                                return (
-                                    <a
-                                        key={s.id}
-                                        href={s.url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="w-10 h-10 rounded-xl bg-[#e6dad1]/5 border border-[#e6dad1]/10 flex items-center justify-center hover:bg-[#e6dad1]/10 transition"
-                                        title={s.platform}
-                                    >
-                                        <Icon className="w-4 h-4 text-[#e6dad1]" />
-                                    </a>
-                                );
-
-                            })}
-                        </div>
+                            {!settings.contactEmail && !settings.phone && !settings.whatsapp && !settings.address && (
+                                <li>Contacto en actualización.</li>
+                            )}
+                        </ul>
                     </div>
 
-                    <div className="md:col-span-12 pt-10 border-t border-[#e6dad1]/10 flex flex-col md:flex-row items-center justify-between gap-3">
-                        <p className="text-xs text-[#e6dad1]/40">
-                            © {new Date().getFullYear()} {storeName}. Todos los derechos reservados.
-                        </p>
+                    {/* Social Column */}
+                    <div className="md:col-span-4 lg:col-span-2 lg:flex lg:justify-end">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white mb-8 lg:text-right">Social</p>
+                            <div className="flex flex-wrap lg:flex-col gap-4 lg:items-end">
+                                {(social ?? []).map((s) => {
+                                    const Icon = iconForPlatform(s.platform);
+                                    return (
+                                        <a
+                                            key={s.id}
+                                            href={s.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="group flex items-center gap-3 text-[#e6dad1]/60 hover:text-white transition-colors"
+                                            title={s.platform}
+                                        >
+                                            <span className="text-[11px] tracking-[0.2em] uppercase hidden lg:block group-hover:pr-1 transition-all">{s.platform}</span>
+                                            <div className="w-10 h-10 rounded-full border border-[#e6dad1]/20 flex items-center justify-center group-hover:border-[#864d2d] group-hover:bg-[#864d2d]/10 transition-all duration-300">
+                                                <Icon className="w-4 h-4" />
+                                            </div>
+                                        </a>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+                {/* 3. Bottom Bar */}
+                <div className="border-t border-[#e6dad1]/10 bg-[#352727]">
+                    <div className="max-w-[1600px] mx-auto px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <p className="text-[10px] text-[#e6dad1]/40 tracking-widest uppercase">
+                            © {new Date().getFullYear()} {storeName}. Todos los derechos reservados.
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-6 text-[10px] text-[#e6dad1]/40 uppercase tracking-[0.2em] font-medium">
+                            <span className="text-[#864d2d]">Diseñado en Ica, Perú</span>
+                        </div>
+                    </div>
+                </div>
+
             </footer>
         </div>
     );

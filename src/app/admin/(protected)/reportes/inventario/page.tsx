@@ -10,6 +10,7 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
+    Cell,
 } from "recharts";
 import {
     Package,
@@ -19,7 +20,9 @@ import {
     Layers,
     PackageX,
     Users,
-    Image as ImageIcon
+    Image as ImageIcon,
+    ChevronLeft,
+    ChevronRight
 } from "lucide-react";
 import { ChartCard } from "../_components/chart-card";
 import { StatCard } from "../_components/stat-card";
@@ -33,11 +36,12 @@ interface ReporteInventario {
         variantesActivas: number;
         variantesSinStock: number;
         alertasStockBajo: number;
+        variantesEstancadas: number;
     };
     stockPorCategoria: { categoria: string; stock: number }[];
     stockPorProducto: { producto: string; stock: number }[];
     alertasStock: {
-        id: string; // Added ID for variants
+        id: string;
         producto: string;
         talla: string;
         color: string;
@@ -56,6 +60,17 @@ interface ReporteInventario {
             direccion?: string;
         } | null;
     }[];
+    variantesEstancadas: {
+        id: string;
+        producto: string;
+        talla: string;
+        color: string;
+        colorHex: string;
+        stockActual: number;
+        precio: number;
+        imagenUrl?: string | null;
+        ultimaVenta?: string | null;
+    }[];
 }
 
 const ALL_COLUMNS = [
@@ -71,13 +86,13 @@ const ALL_COLUMNS = [
 function getColorStyle(hex: string | null) {
     if (!hex) return { backgroundColor: '#e2e8f0' }; // slate-200
     const codes = hex.split(",").map(c => c.trim()).filter(Boolean);
-    
+
     if (codes.length <= 1) return { backgroundColor: codes[0] || '#e2e8f0' };
 
     // Si hay dos o más colores, hacemos un corte vertical limpio al 50%
     // Esto evita sombras o mezclas entre los dos tonos
-    return { 
-        background: `linear-gradient(90deg, ${codes[0]} 0%, ${codes[0]} 50%, ${codes[1]} 50%, ${codes[1]} 100%)` 
+    return {
+        background: `linear-gradient(90deg, ${codes[0]} 0%, ${codes[0]} 50%, ${codes[1]} 50%, ${codes[1]} 100%)`
     };
 }
 
@@ -91,6 +106,12 @@ export default function InventarioReportePage() {
 
     // Estado para el gráfico
     const [chartView, setChartView] = useState<"categoria" | "producto">("categoria");
+
+    // Estados para paginación de tablas
+    const ITEMS_PER_PAGE = 5;
+    const [pageProveedores, setPageProveedores] = useState(1);
+    const [pageAlertas, setPageAlertas] = useState(1);
+    const [pageEstancado, setPageEstancado] = useState(1);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -127,18 +148,6 @@ export default function InventarioReportePage() {
 
     const exportTables = [
         {
-            title: "Directorio de Proveedores Sugeridos",
-            headers: ["Nombre Comercial", "RUC", "Razón Social", "Teléfono", "Ubicación", "Dirección"],
-            data: proveedoresUnicos.map(p => [
-                p.nombre,
-                p.ruc,
-                p.razonSocial || "-",
-                p.telefono || "-",
-                `${p.provincia || ""} - ${p.distrito || ""}`,
-                p.direccion || "-"
-            ])
-        },
-        {
             title: "Inventario con Stock Bajo",
             headers: columns.filter(c => c.enabled).map(c => c.label),
             data: data.alertasStock.map((a) => {
@@ -158,6 +167,17 @@ export default function InventarioReportePage() {
                 if (columns.find(c => c.id === "valorUnitario")?.enabled) row.push(a.valorUnitario);
                 return row;
             })
+        },
+        {
+            title: "Stock Estancado (Sin ventas > 60 días)",
+            headers: ["Producto", "Variante", "Stock Actual", "Precio", "Última Venta"],
+            data: data.variantesEstancadas.map(v => [
+                v.producto,
+                `${v.talla} / ${v.color}`,
+                v.stockActual,
+                v.precio,
+                v.ultimaVenta ? new Date(v.ultimaVenta).toLocaleDateString() : "Nunca"
+            ])
         }
     ];
 
@@ -202,16 +222,19 @@ export default function InventarioReportePage() {
                     currentNote={note}
                 />
                 <div className="w-px h-8 bg-gray-100 hidden md:block" />
-                <ExportButtons
-                    title="Reporte de Inventario y Directorio"
-                    filename={`Inventario_Reporte_${new Date().toISOString().split('T')[0]}`}
-                    metadata={exportMetadata}
-                    tables={exportTables}
-                />
+                <div className="flex flex-col items-end gap-1">
+                    <span className="text-[10px] text-gray-400 font-bold uppercase mr-2">Resumen General (Todo)</span>
+                    <ExportButtons
+                        title="Reporte de Inventario Completo"
+                        filename={`Inventario_Full_${new Date().toISOString().split('T')[0]}`}
+                        metadata={exportMetadata}
+                        tables={exportTables}
+                    />
+                </div>
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                 <StatCard
                     label="Valorización Total"
                     value={`S/ ${data.resumen.valorizacionTotal.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`}
@@ -235,6 +258,12 @@ export default function InventarioReportePage() {
                     value={`${data.resumen.variantesSinStock}`}
                     icon={<PackageX className="w-6 h-6 text-red-600" />}
                     color="bg-red-50"
+                />
+                <StatCard
+                    label="Stock Estancado"
+                    value={`${data.resumen.variantesEstancadas}`}
+                    icon={<AlertTriangle className="w-6 h-6 text-orange-600" />}
+                    color="bg-orange-50"
                 />
             </div>
 
@@ -295,10 +324,22 @@ export default function InventarioReportePage() {
             {/* Directorio de Proveedores */}
             <ChartCard
                 title={
-                    <span className="flex items-center gap-2">
-                        <Users className="w-5 h-5 text-indigo-500" />
-                        Directorio de Proveedores Sugeridos ({proveedoresUnicos.length})
-                    </span>
+                    <div className="flex items-center justify-between w-full">
+                        <span className="flex items-center gap-2 text-indigo-900">
+                            <Users className="w-5 h-5 text-indigo-500" />
+                            Directorio de Proveedores Sugeridos ({proveedoresUnicos.length})
+                        </span>
+                        <ExportButtons
+                            variant="compact"
+                            title="Directorio de Proveedores"
+                            filename="Proveedores_Reporte"
+                            headers={["Nombre Comercial", "RUC", "Razón Social", "Teléfono", "Ubicación", "Dirección"]}
+                            data={proveedoresUnicos.map(p => [
+                                p.nombre, p.ruc, p.razonSocial || "-", p.telefono || "-",
+                                `${p.provincia || ""} - ${p.distrito || ""}`, p.direccion || "-"
+                            ])}
+                        />
+                    </div>
                 }
                 description="Contactos de los proveedores según las últimas compras de productos con stock bajo"
             >
@@ -308,48 +349,90 @@ export default function InventarioReportePage() {
                         <p>No hay proveedores registrados en compras recientes para estos productos.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                                <tr>
-                                    <th className="text-left py-3 px-2">Nombre Comercial</th>
-                                    <th className="text-left py-3 px-2">RUC / Razón Social</th>
-                                    <th className="text-left py-3 px-2">Teléfono</th>
-                                    <th className="text-left py-3 px-2">Ubicación / Dirección</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {proveedoresUnicos.map((p, i) => (
-                                    <tr key={i} className="hover:bg-indigo-50/30">
-                                        <td className="py-3 px-2 font-bold text-gray-900">{p.nombre}</td>
-                                        <td className="py-3 px-2">
-                                            <div className="flex flex-col">
-                                                <span className="font-mono text-xs">{p.ruc}</span>
-                                                <span className="text-[10px] text-gray-400 truncate max-w-[200px]">{p.razonSocial || "N/A"}</span>
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-2 font-medium text-slate-700">{p.telefono || "Sin teléfono"}</td>
-                                        <td className="py-3 px-2">
-                                            <div className="flex flex-col">
-                                                <span className="text-xs">{p.provincia} - {p.distrito}</span>
-                                                <span className="text-[10px] text-gray-400 italic truncate max-w-[250px]">{p.direccion}</span>
-                                            </div>
-                                        </td>
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                                    <tr>
+                                        <th className="text-left py-3 px-2">Nombre Comercial</th>
+                                        <th className="text-left py-3 px-2">RUC / Razón Social</th>
+                                        <th className="text-left py-3 px-2">Teléfono</th>
+                                        <th className="text-left py-3 px-2">Ubicación / Dirección</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {proveedoresUnicos
+                                        .slice((pageProveedores - 1) * ITEMS_PER_PAGE, pageProveedores * ITEMS_PER_PAGE)
+                                        .map((p, i) => (
+                                            <tr key={i} className="hover:bg-indigo-50/30">
+                                                <td className="py-3 px-2 font-bold text-gray-900">{p.nombre}</td>
+                                                <td className="py-3 px-2">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-mono text-xs">{p.ruc}</span>
+                                                        <span className="text-[10px] text-gray-400 truncate max-w-[200px]">{p.razonSocial || "N/A"}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-2 font-medium text-slate-700">{p.telefono || "Sin teléfono"}</td>
+                                                <td className="py-3 px-2">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs">{p.provincia} - {p.distrito}</span>
+                                                        <span className="text-[10px] text-gray-400 italic truncate max-w-[250px]">{p.direccion}</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <TablePagination
+                            currentPage={pageProveedores}
+                            totalItems={proveedoresUnicos.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            onPageChange={setPageProveedores}
+                        />
+                    </>
                 )}
             </ChartCard>
 
             {/* Alertas de Stock Bajo */}
             <ChartCard
                 title={
-                    <span className="flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-amber-500" />
-                        Alertas de Stock Bajo ({data.alertasStock.length})
-                    </span>
+                    <div className="flex items-center justify-between w-full">
+                        <span className="flex items-center gap-2 text-amber-900">
+                            <AlertTriangle className="w-5 h-5 text-amber-500" />
+                            Alertas de Stock Bajo ({data.alertasStock.length})
+                        </span>
+                        <ExportButtons
+                            variant="compact"
+                            title="Reporte Stock Bajo y Proveedores"
+                            filename="Stock_Bajo_Con_Contactos"
+                            tables={[
+                                {
+                                    title: "Directorio de Proveedores Sugeridos",
+                                    headers: ["Nombre Comercial", "RUC", "Razón Social", "Teléfono", "Ubicación", "Dirección"],
+                                    data: proveedoresUnicos.map(p => [
+                                        p.nombre, p.ruc, p.razonSocial || "-", p.telefono || "-",
+                                        `${p.provincia || ""} - ${p.distrito || ""}`, p.direccion || "-"
+                                    ])
+                                },
+                                {
+                                    title: "Inventario con Stock Bajo",
+                                    headers: columns.filter(c => c.enabled).map(c => c.label),
+                                    data: data.alertasStock.map((a) => {
+                                        const row: (string | number)[] = [];
+                                        if (columns.find(c => c.id === "imagen")?.enabled) row.push(a.imagenUrl || "");
+                                        if (columns.find(c => c.id === "producto")?.enabled) row.push(a.proveedor ? `${a.producto} - ${a.proveedor.nombre}` : a.producto);
+                                        if (columns.find(c => c.id === "talla")?.enabled) row.push(a.talla);
+                                        if (columns.find(c => c.id === "color")?.enabled) row.push(`${a.colorHex || "#ccc"}|${a.color}`);
+                                        if (columns.find(c => c.id === "stockActual")?.enabled) row.push(a.stockActual);
+                                        if (columns.find(c => c.id === "stockMinimo")?.enabled) row.push(a.stockMinimo);
+                                        if (columns.find(c => c.id === "valorUnitario")?.enabled) row.push(a.valorUnitario);
+                                        return row;
+                                    })
+                                }
+                            ]}
+                        />
+                    </div>
                 }
                 description="Productos con stock por debajo del mínimo configurado"
             >
@@ -359,70 +442,229 @@ export default function InventarioReportePage() {
                         <p>No hay productos con stock bajo. ¡Excelente!</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                                <tr>
-                                    <th className="text-left py-3 px-2">Imagen</th>
-                                    <th className="text-left py-3 px-2">Producto - Proveedor</th>
-                                    <th className="text-left py-3 px-2">Variante</th>
-                                    <th className="text-right py-3 px-2">Stock Actual</th>
-                                    <th className="text-right py-3 px-2">Mínimo</th>
-                                    <th className="text-right py-3 px-2">Faltante</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {data.alertasStock.map((a, i) => (
-                                    <tr key={i} className="hover:bg-indigo-50/20 group transition-colors">
-                                        <td className="py-3 px-2">
-                                            <div className="w-10 h-12 rounded-lg bg-white border border-slate-100 overflow-hidden shadow-sm group-hover:scale-110 transition-transform">
-                                                {a.imagenUrl ? (
-                                                    <img src={a.imagenUrl} alt={a.producto} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center bg-slate-50">
-                                                        <ImageIcon className="w-4 h-4 text-slate-300" />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-2 font-bold text-gray-900">
-                                            {a.producto}
-                                            {a.proveedor && (
-                                                <span className="ml-2 text-[10px] font-normal text-slate-400 px-2 py-0.5 bg-slate-100 rounded-lg">
-                                                    {a.proveedor.nombre}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="py-3 px-2">
-                                            <div className="flex items-center gap-3">
-                                                <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-black text-slate-500 uppercase tracking-tighter">
-                                                    {a.talla}
-                                                </span>
-                                                <div className="flex items-center gap-2 px-2.5 py-1 rounded-full border border-slate-200 bg-white shadow-sm">
-                                                    <div
-                                                        className="w-4 h-4 rounded-full border border-black/5 shadow-inner ring-1 ring-slate-100 ring-offset-1"
-                                                        style={getColorStyle(a.colorHex)}
-                                                    />
-                                                    <span className="text-[11px] font-bold text-slate-700">{a.color}</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-2 text-right">
-                                            <span className={`font-mono font-bold ${a.stockActual === 0 ? 'text-red-600' : 'text-amber-600'}`}>
-                                                {a.stockActual}
-                                            </span>
-                                        </td>
-                                        <td className="py-3 px-2 text-right font-mono text-gray-500">{a.stockMinimo}</td>
-                                        <td className="py-3 px-2 text-right font-mono font-bold text-red-600">
-                                            -{a.stockMinimo - a.stockActual}
-                                        </td>
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                                    <tr>
+                                        <th className="text-left py-3 px-2">Imagen</th>
+                                        <th className="text-left py-3 px-2">Producto - Proveedor</th>
+                                        <th className="text-left py-3 px-2">Variante</th>
+                                        <th className="text-right py-3 px-2">Stock Actual</th>
+                                        <th className="text-right py-3 px-2">Mínimo</th>
+                                        <th className="text-right py-3 px-2">Faltante</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {data.alertasStock
+                                        .slice((pageAlertas - 1) * ITEMS_PER_PAGE, pageAlertas * ITEMS_PER_PAGE)
+                                        .map((a, i) => (
+                                            <tr key={i} className="hover:bg-indigo-50/20 group transition-colors">
+                                                <td className="py-3 px-2">
+                                                    <div className="w-10 h-12 rounded-lg bg-white border border-slate-100 overflow-hidden shadow-sm group-hover:scale-110 transition-transform">
+                                                        {a.imagenUrl ? (
+                                                            <img src={a.imagenUrl} alt={a.producto} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                                                                <ImageIcon className="w-4 h-4 text-slate-300" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-2 font-bold text-gray-900">
+                                                    {a.producto}
+                                                    {a.proveedor && (
+                                                        <span className="ml-2 text-[10px] font-normal text-slate-400 px-2 py-0.5 bg-slate-100 rounded-lg">
+                                                            {a.proveedor.nombre}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                                                            {a.talla}
+                                                        </span>
+                                                        <div className="flex items-center gap-2 px-2.5 py-1 rounded-full border border-slate-200 bg-white shadow-sm">
+                                                            <div
+                                                                className="w-4 h-4 rounded-full border border-black/5 shadow-inner ring-1 ring-slate-100 ring-offset-1"
+                                                                style={getColorStyle(a.colorHex)}
+                                                            />
+                                                            <span className="text-[11px] font-bold text-slate-700">{a.color}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-2 text-right">
+                                                    <span className={`font-mono font-bold ${a.stockActual === 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                                                        {a.stockActual}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-2 text-right font-mono text-gray-500">{a.stockMinimo}</td>
+                                                <td className="py-3 px-2 text-right font-mono font-bold text-red-600">
+                                                    -{a.stockMinimo - a.stockActual}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <TablePagination
+                            currentPage={pageAlertas}
+                            totalItems={data.alertasStock.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            onPageChange={setPageAlertas}
+                        />
+                    </>
                 )}
             </ChartCard>
+
+            {/* Stock Estancado */}
+            <ChartCard
+                title={
+                    <div className="flex items-center justify-between w-full">
+                        <span className="flex items-center gap-2 text-red-900">
+                            <PackageX className="w-5 h-5 text-red-500" />
+                            Stock Estancado ({data.variantesEstancadas.length})
+                        </span>
+                        <ExportButtons
+                            variant="compact"
+                            title="Stock Estancado"
+                            filename="Stock_Estancado_Reporte"
+                            headers={["Producto", "Variante", "Stock Actual", "Precio", "Última Venta"]}
+                            data={data.variantesEstancadas.map(v => [
+                                v.producto, `${v.talla} / ${v.color}`, v.stockActual, v.precio,
+                                v.ultimaVenta ? new Date(v.ultimaVenta).toLocaleDateString() : "Nunca"
+                            ])}
+                        />
+                    </div>
+                }
+                description="Variantes con stock disponible que no han tenido ventas en los últimos 60 días"
+            >
+                {data.variantesEstancadas.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                        <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p>No hay stock estancado. ¡Tus productos rotan bien!</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                                    <tr>
+                                        <th className="text-left py-3 px-2">Imagen</th>
+                                        <th className="text-left py-3 px-2">Producto</th>
+                                        <th className="text-left py-3 px-2">Variante</th>
+                                        <th className="text-right py-3 px-2">Stock Actual</th>
+                                        <th className="text-right py-3 px-2">Precio</th>
+                                        <th className="text-right py-3 px-2">Última Venta</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {data.variantesEstancadas
+                                        .slice((pageEstancado - 1) * ITEMS_PER_PAGE, pageEstancado * ITEMS_PER_PAGE)
+                                        .map((v, i) => (
+                                            <tr key={i} className="hover:bg-red-50/20 group transition-colors">
+                                                <td className="py-3 px-2">
+                                                    <div className="w-10 h-12 rounded-lg bg-white border border-slate-100 overflow-hidden shadow-sm group-hover:scale-110 transition-transform">
+                                                        {v.imagenUrl ? (
+                                                            <img src={v.imagenUrl} alt={v.producto} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                                                                <ImageIcon className="w-4 h-4 text-slate-300" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-2 font-bold text-gray-900">{v.producto}</td>
+                                                <td className="py-3 px-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                                                            {v.talla}
+                                                        </span>
+                                                        <div className="flex items-center gap-2 px-2.5 py-1 rounded-full border border-slate-200 bg-white shadow-sm">
+                                                            <div
+                                                                className="w-4 h-4 rounded-full border border-black/5 shadow-inner ring-1 ring-slate-100 ring-offset-1"
+                                                                style={getColorStyle(v.colorHex)}
+                                                            />
+                                                            <span className="text-[11px] font-bold text-slate-700">{v.color}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-2 text-right font-mono font-bold text-slate-900">{v.stockActual}</td>
+                                                <td className="py-3 px-2 text-right font-mono text-gray-500">
+                                                    S/ {v.precio.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="py-3 px-2 text-right">
+                                                    <span className="px-2 py-1 rounded-lg bg-gray-100 text-[10px] font-bold text-gray-500">
+                                                        {v.ultimaVenta ? new Date(v.ultimaVenta).toLocaleDateString() : "Sin ventas récord"}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <TablePagination
+                            currentPage={pageEstancado}
+                            totalItems={data.variantesEstancadas.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            onPageChange={setPageEstancado}
+                        />
+                    </>
+                )}
+            </ChartCard>
+        </div>
+    );
+}
+
+function TablePagination({
+    currentPage,
+    totalItems,
+    itemsPerPage,
+    onPageChange
+}: {
+    currentPage: number;
+    totalItems: number;
+    itemsPerPage: number;
+    onPageChange: (page: number) => void;
+}) {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    if (totalPages <= 1) return null;
+
+    return (
+        <div className="flex items-center justify-between px-2 py-4 border-t border-gray-50 mt-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Mostrando <span className="text-gray-900">{Math.min(itemsPerPage, totalItems - (currentPage - 1) * itemsPerPage)}</span> de <span className="text-gray-900">{totalItems}</span>
+            </p>
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-slate-900 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-white transition-all"
+                >
+                    <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }).map((_, i) => (
+                        <button
+                            key={i}
+                            onClick={() => onPageChange(i + 1)}
+                            className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-black transition-all ${currentPage === i + 1
+                                ? "bg-slate-900 text-white shadow-md shadow-slate-900/20 scale-110"
+                                : "text-gray-400 hover:text-slate-900 hover:bg-gray-50"
+                                }`}
+                        >
+                            {i + 1}
+                        </button>
+                    )).slice(Math.max(0, currentPage - 2), Math.min(totalPages, currentPage + 1))}
+                </div>
+                <button
+                    onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-slate-900 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-white transition-all"
+                >
+                    <ChevronRight className="w-4 h-4" />
+                </button>
+            </div>
         </div>
     );
 }

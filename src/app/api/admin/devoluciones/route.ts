@@ -31,6 +31,57 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No se incluyeron productos" }, { status: 400 });
     }
 
+    // --- 1.2 PREVENCIÓN DE DOBLE DEVOLUCIÓN ---
+    if (tipo === "CLIENTE" || tipo === "PROVEEDOR") {
+      const isCliente = tipo === "CLIENTE";
+
+      // 1. Obtener el documento original y sus cantidades
+      const original = isCliente
+        ? await prisma.venta.findUnique({ where: { id: referenciaId }, include: { items: true } })
+        : await prisma.compra.findUnique({ where: { id: referenciaId }, include: { items: true } });
+
+      if (!original) {
+        return NextResponse.json({ error: `${isCliente ? "Venta" : "Compra"} original no encontrada` }, { status: 404 });
+      }
+
+      // 2. Obtener lo ya devuelto históricamente para este documento
+      const devolucionesPrevias = await prisma.devolucion.findMany({
+        where: isCliente ? { ventaId: referenciaId } : { compraId: referenciaId },
+        include: { items: true }
+      });
+
+      // Mapear cantidades ya devueltas por varianteId
+      const yaDevueltoMap = new Map<string, number>();
+      for (const dev of devolucionesPrevias) {
+        for (const item of dev.items) {
+          yaDevueltoMap.set(
+            item.varianteId,
+            (yaDevueltoMap.get(item.varianteId) || 0) + item.cantidad
+          );
+        }
+      }
+
+      // 3. Validar si la nueva solicitud excede lo permitido
+      for (const itemSolicitado of items) {
+        const itemOriginal = original.items.find((i: any) => i.varianteId === itemSolicitado.varianteId);
+
+        if (!itemOriginal) {
+          return NextResponse.json({ error: `El producto ${itemSolicitado.varianteId} no existe en el documento original` }, { status: 400 });
+        }
+
+        const yaDevuelto = yaDevueltoMap.get(itemSolicitado.varianteId) || 0;
+        const disponible = itemOriginal.cantidad - yaDevuelto;
+
+        if (itemSolicitado.cantidad > disponible) {
+          return NextResponse.json({
+            error: `La cantidad a devolver del producto (${itemSolicitado.cantidad}) excede los items disponibles para devolver en esta transacción. Máximo disponible: ${disponible}`
+          }, { status: 400 });
+        }
+      }
+    }
+
+
+
     // --- INICIO DE TRANSACCIÓN ---
     const resultado = await prisma.$transaction(async (tx) => {
 

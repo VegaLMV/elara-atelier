@@ -10,6 +10,7 @@ import FiltrosProductos from "./filtros-productos";
 import ProductoImageClient from "./producto-image-client";
 import { Plus, Tag, AlertCircle, CheckCircle2, ArrowLeft } from "lucide-react";
 import Pagination from "@/components/ui/pagination";
+import { AuditStockButton } from "./_components/audit-stock-button";
 
 // --- HELPERS ---
 import { calcularPrecioProducto, formatMoney } from "@/lib/precios";
@@ -163,12 +164,18 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
           </div>
         </div>
 
-        <Link
-          href="/admin/productos/nuevo"
-          className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4 text-emerald-400" /> Nuevo Producto
-        </Link>
+        <div className="flex items-center gap-3">
+          <AuditStockButton
+            currentCategoryId={categoriaId}
+            currentCategoryName={categorias.find(c => c.id === categoriaId)?.nombre}
+          />
+          <Link
+            href="/admin/productos/nuevo"
+            className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4 text-emerald-400" /> Nuevo Producto
+          </Link>
+        </div>
       </div>
 
       {/* FILTROS */}

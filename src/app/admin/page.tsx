@@ -42,7 +42,8 @@ export default async function AdminHome() {
         totalCategorias,
         campanasActivas,
         ultimasVentas,
-        ventasHoy
+        ventasHoy,
+        pedidosPendientes // <-- NUEVO: Consulta de Pedidos
     ] = await Promise.all([
         // 1. Productos Activos
         prisma.producto.count({ where: { estado: 'ACTIVO' } }),
@@ -70,7 +71,12 @@ export default async function AdminHome() {
         prisma.venta.aggregate({
             _sum: { total: true },
             where: { fechaVenta: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } }
-        })
+        }),
+
+        // 6. Pedidos Pendientes (NUEVO)
+        prisma.pedido.count({
+            where: { estado: 'PENDIENTE' }
+        }).catch(() => 0) // Previene error si no hay pedidos
     ]);
 
     const variantesParaAlertas = await prisma.variante.findMany({
@@ -109,42 +115,55 @@ export default async function AdminHome() {
                 </div>
                 <div className="flex gap-3">
                     <Link
-                        href="/"
+                        href="/tienda"
                         target="_blank"
                         className="px-5 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
                     >
                         <ExternalLink className="w-4 h-4" /> Tienda
                     </Link>
                     <Link
-                        href="/admin/ventas/nueva"
+                        href="/admin/pedidos"
                         className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-sm font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 flex items-center gap-2 hover:-translate-y-0.5 active:translate-y-0"
                     >
-                        <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" /> Nueva Venta
+                        <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" /> Nuevo Pedido
                     </Link>
                 </div>
             </div>
 
-            {/* 2. BENTO GRID - KPIs Principales */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
+            {/* 2. BENTO GRID - KPIs Principales (Modificado a 5 columnas) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
+                
+                {/* NUEVO KPI: Pedidos Pendientes */}
+                <StatCard
+                    label="Pedidos Pendientes"
+                    value={pedidosPendientes.toString()}
+                    icon={<ClipboardList className="w-6 h-6 text-white" />}
+                    color={pedidosPendientes > 0 ? "bg-amber-500 text-white shadow-xl shadow-amber-500/20" : "bg-teal-500 text-white shadow-xl shadow-teal-500/20"}
+                    trend={pedidosPendientes > 0 ? { value: pedidosPendientes, label: "por procesar" } : undefined}
+                />
+
                 <StatCard
                     label="Ventas Hoy"
                     value={formatMoney(totalVentasHoy)}
                     icon={<TicketPercent className="w-6 h-6 text-white" />}
                     color="bg-slate-900 text-white shadow-xl shadow-slate-900/20"
-                    trend={{ value: 12, label: "vs ayer" }} // Mock up trend
+                    trend={{ value: 12, label: "vs ayer" }}
                 />
+                
                 <StatCard
                     label="Productos Activos"
                     value={totalProductos.toString()}
                     icon={<Package className="w-6 h-6 text-white" />}
                     color="bg-indigo-600 text-white shadow-xl shadow-indigo-600/20"
                 />
+                
                 <StatCard
                     label="Alertas Stock"
                     value={totalAlertasStock.toString()}
                     icon={<AlertTriangle className="w-6 h-6 text-white" />}
                     color={totalAlertasStock > 0 ? "bg-red-500 text-white shadow-xl shadow-red-500/20" : "bg-emerald-500 text-white shadow-xl shadow-emerald-500/20"}
                 />
+                
                 <StatCard
                     label="Campañas"
                     value={campanasActivas.toString()}
@@ -163,7 +182,18 @@ export default async function AdminHome() {
                         <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                             <LayoutGrid className="w-4 h-4" /> Accesos Directos
                         </h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                        
+                        {/* Se actualizó a grid-cols-3 md:grid-cols-5 para acomodar el nuevo botón mejor */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                            
+                            {/* NUEVO BOTÓN: Pedidos */}
+                            <QuickActionButton
+                                href="/admin/pedidos"
+                                icon={<ClipboardList className="w-6 h-6 text-teal-600" />}
+                                label="Gestión Pedidos"
+                                color="bg-teal-50 border-teal-100 hover:border-teal-300"
+                            />
+
                             <QuickActionButton
                                 href="/admin/productos"
                                 icon={<Package className="w-6 h-6 text-indigo-600" />}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
 import { redirect, notFound } from "next/navigation";
-import { ArrowLeft, Printer, ShoppingBag, Package, User, CreditCard, Calendar } from "lucide-react";
+import { ArrowLeft, Printer, ShoppingBag, Package, User, CreditCard, Calendar, RotateCcw } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -74,10 +74,19 @@ export default async function DetalleVentaPage({ params }: PageProps) {
         <div className="p-6 md:p-8 max-w-4xl mx-auto bg-gray-50/50 min-h-screen">
 
             {/* Header de Navegación */}
-            <div className="mb-6 flex items-center justify-between no-print">
-                <Link href="/admin/ventas" className="flex items-center text-sm font-bold text-gray-500 hover:text-slate-900 transition-colors bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm">
-                    <ArrowLeft className="w-4 h-4 mr-2" /> Volver al historial
-                </Link>
+            <div className="mb-6 flex items-center justify-between no-print gap-4">
+                <div className="flex items-center gap-3">
+                    <Link href="/admin/ventas" className="flex items-center text-sm font-bold text-gray-500 hover:text-slate-900 transition-colors bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm">
+                        <ArrowLeft className="w-4 h-4 mr-2" /> Volver al historial
+                    </Link>
+                    <Link
+                        href={`/admin/devoluciones/nueva?refId=${venta.id}&tipo=CLIENTE`}
+                        className="flex items-center text-sm font-bold text-orange-600 hover:text-orange-700 transition-colors bg-orange-50 px-4 py-2 rounded-xl border border-orange-200 shadow-sm"
+                    >
+                        <RotateCcw className="w-4 h-4 mr-2" /> Registrar Devolución
+                    </Link>
+
+                </div>
                 <button
                     type="button"
                     onClick={() => typeof window !== 'undefined' && window.print()}
@@ -86,6 +95,7 @@ export default async function DetalleVentaPage({ params }: PageProps) {
                     <Printer className="w-4 h-4" /> Imprimir Comprobante
                 </button>
             </div>
+
 
             {/* TICKET / FACTURA */}
             <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden print:shadow-none print:border-0 print:rounded-none">

@@ -130,3 +130,59 @@ export function calcularPrecioFinal(
     return Math.max(0, precio - valor);
 }
 
+
+/**
+ * Parsea una fecha en formato YYYY-MM-DD a un objeto Date (Mediodía para evitar desfases)
+ */
+export function parseFechaYYYYMMDD(s: any): Date | null {
+    const t = String(s ?? "").trim();
+    if (!t) return null;
+    return new Date(`${t}T12:00:00`);
+}
+
+/**
+ * Parsea y valida los datos de un descuento proveniente de un request body.
+ */
+export function parseDescuentoFromBody(body: any) {
+    const descuentoActivo = Boolean(body?.descuentoActivo);
+
+    if (!descuentoActivo) {
+        return {
+            descuentoActivo: false,
+            descuentoTipo: null,
+            descuentoValor: null,
+            descuentoInicio: null,
+            descuentoFin: null,
+            error: null as string | null,
+        };
+    }
+
+    const tipo = String(body?.descuentoTipo ?? "").trim().toUpperCase();
+    if (tipo !== "PORCENTAJE" && tipo !== "MONTO") {
+        return { error: "descuentoTipo inválido (PORCENTAJE | MONTO)" };
+    }
+
+    const rawVal = body?.descuentoValor;
+    const valNum = Number(rawVal);
+    if (!Number.isFinite(valNum) || valNum <= 0) {
+        return { error: "descuentoValor inválido" };
+    }
+    if (tipo === "PORCENTAJE" && (valNum <= 0 || valNum > 100)) {
+        return { error: "En PORCENTAJE, descuentoValor debe ser > 0 y <= 100" };
+    }
+
+    const inicio = parseFechaYYYYMMDD(body?.descuentoInicio);
+    const fin = parseFechaYYYYMMDD(body?.descuentoFin);
+    if (inicio && fin && inicio.getTime() > fin.getTime()) {
+        return { error: "descuentoInicio no puede ser mayor que descuentoFin" };
+    }
+
+    return {
+        descuentoActivo: true,
+        descuentoTipo: tipo as "PORCENTAJE" | "MONTO",
+        descuentoValor: new Prisma.Decimal(String(rawVal)),
+        descuentoInicio: inicio,
+        descuentoFin: fin,
+        error: null as string | null,
+    };
+}

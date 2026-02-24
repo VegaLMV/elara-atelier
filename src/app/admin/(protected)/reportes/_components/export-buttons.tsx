@@ -21,9 +21,20 @@ interface ExportButtonsProps {
         filters?: Record<string, string>;
     };
     tables?: TableData[];
+    variant?: "full" | "compact";
+    showExcel?: boolean;
 }
 
-export function ExportButtons({ title, headers, data, filename, metadata, tables }: ExportButtonsProps) {
+export function ExportButtons({
+    title,
+    headers,
+    data,
+    filename,
+    metadata,
+    tables,
+    variant = "full",
+    showExcel = true
+}: ExportButtonsProps) {
 
     const cleanCellData = (cell: string | number) => {
         if (typeof cell === 'string' && cell.startsWith('#') && cell.includes('|')) {
@@ -106,7 +117,7 @@ export function ExportButtons({ title, headers, data, filename, metadata, tables
                     if (cellData.section === 'body') {
                         // Limpiar texto de URL para que no salga escrito en el PDF
                         if (header.includes("imagen")) {
-                            cellData.cell.text = [""]; 
+                            cellData.cell.text = [""];
                             cellData.cell.styles.minCellHeight = 20;
                         }
                         // Limpiar color para mostrar solo el nombre
@@ -133,7 +144,7 @@ export function ExportButtons({ title, headers, data, filename, metadata, tables
                     if (cellData.section === 'body' && header.includes("color") && typeof rawValue === 'string' && rawValue.includes('|')) {
                         const [hexRaw] = rawValue.split('|');
                         const colors = hexRaw.split(',').map(c => c.trim()).filter(Boolean);
-                        
+
                         const cx = cellData.cell.x + 5; // Ajustado un poco más a la derecha
                         const cy = cellData.cell.y + (cellData.cell.height / 2);
                         const r = 3; // Radio ligeramente más grande para legibilidad
@@ -206,17 +217,48 @@ export function ExportButtons({ title, headers, data, filename, metadata, tables
             XLSX.utils.book_append_sheet(wb, ws, table.title || `Datos ${i + 1}`);
         });
 
-            XLSX.writeFile(wb, `${filename}.xlsx`);
+        XLSX.writeFile(wb, `${filename}.xlsx`);
     };
+
+    if (variant === "compact") {
+        return (
+            <div className="flex gap-1">
+                <button
+                    onClick={exportPDF}
+                    title="Exportar a PDF"
+                    className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 border border-red-100 transition-colors"
+                >
+                    <FileText className="w-4 h-4" />
+                </button>
+                {showExcel && (
+                    <button
+                        onClick={exportExcel}
+                        title="Exportar a Excel"
+                        className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 border border-emerald-100 transition-colors"
+                    >
+                        <FileSpreadsheet className="w-4 h-4" />
+                    </button>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className="flex gap-2">
-            <button onClick={exportPDF} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-xl text-xs font-bold hover:bg-red-100 border border-red-100">
-                <FileText className="w-4 h-4" /> PDF
+            <button
+                onClick={exportPDF}
+                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 border border-red-100 transition-colors"
+            >
+                <FileText className="w-4 h-4" /> Exportar a PDF
             </button>
-            <button onClick={exportExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 border border-emerald-100">
-                <FileSpreadsheet className="w-4 h-4" /> Excel
-            </button>
+            {showExcel && (
+                <button
+                    onClick={exportExcel}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 border border-emerald-100 transition-colors"
+                >
+                    <FileSpreadsheet className="w-4 h-4" /> Excel
+                </button>
+            )}
         </div>
     );
 }

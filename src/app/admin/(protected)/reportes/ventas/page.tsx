@@ -25,6 +25,8 @@ import {
     TrendingUp,
     Percent,
     CreditCard,
+    PiggyBank,
+    Activity,
 } from "lucide-react";
 import { ChartCard } from "../_components/chart-card";
 import { StatCard } from "../_components/stat-card";
@@ -38,6 +40,8 @@ interface ReporteVentas {
         totalDescuentos: number;
         cantidadVentas: number;
         ticketPromedio: number;
+        utilidadBruta: number;
+        margenPromedio: number;
     };
     ventasPorPeriodo: { fecha: string; total: number }[];
     metodosPago: { metodo: string; total: number; cantidad: number }[];
@@ -166,12 +170,24 @@ function VentasReporteContent() {
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                 <StatCard
                     label="Ingresos Totales"
                     value={`S/ ${data.resumen.totalIngresos.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`}
                     icon={<DollarSign className="w-6 h-6 text-emerald-600" />}
                     color="bg-emerald-50"
+                />
+                <StatCard
+                    label="Utilidad Bruta"
+                    value={`S/ ${data.resumen.utilidadBruta.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`}
+                    icon={<PiggyBank className="w-6 h-6 text-emerald-700" />}
+                    color="bg-emerald-100"
+                />
+                <StatCard
+                    label="Margen de Ganancia"
+                    value={`${data.resumen.margenPromedio.toFixed(2)}%`}
+                    icon={<Activity className="w-6 h-6 text-indigo-600" />}
+                    color="bg-indigo-50"
                 />
                 <StatCard
                     label="Ventas Realizadas"

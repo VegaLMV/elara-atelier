@@ -117,25 +117,33 @@ export default function PedidoFormModal({ isOpen, onClose, onSuccess, initialCli
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
-            // Si parseó con éxito, agregar el producto
-            if (data.variante) {
-                if (data.variante.stockActual <= 0) {
-                    toast.error(`"${data.producto.nombre} (${data.variante.talla}/${data.variante.color})" está AGOTADO.`);
-                    return;
-                }
+            if (data.items && data.items.length > 0) {
+                let count = 0;
+                let errors = 0;
 
-                addItem({
-                    varianteId: data.variante.id,
-                    cantidad: 1,
-                    precioUnitario: data.parsed.precio || data.producto.precio,
-                    titulo: data.producto.nombre,
-                    detalle: `${data.variante.talla} · ${data.variante.color}`,
-                    imagen: data.producto.imagenes?.[0]?.url,
-                    stockMax: data.variante.stockActual
+                data.items.forEach((item: any) => {
+                    if (item.success && item.variante) {
+                        addItem({
+                            varianteId: item.variante.id,
+                            cantidad: item.parsed.cantidad || 1,
+                            precioUnitario: item.parsed.precio || item.producto.precio,
+                            titulo: item.producto.nombre,
+                            detalle: `${item.variante.talla} · ${item.variante.color}`,
+                            imagen: item.producto.imagenes?.[0]?.url,
+                            stockMax: item.variante.stockActual
+                        });
+                        count++;
+                    } else {
+                        errors++;
+                    }
                 });
-                toast.success("Producto detectado");
-            } else {
-                toast.error(`Producto encontrado como "${data.producto.nombre}", pero no se detectó la Talla/Color exacta. Intenta seleccionarlo manualmente.`);
+
+                if (count > 0) {
+                    toast.success(`${count} producto(s) detectado(s) y agregado(s)`);
+                }
+                if (errors > 0) {
+                    toast.error(`${errors} producto(s) no se pudieron identificar completamente. Revisa el mensaje e inténtalo manualmente.`);
+                }
             }
         } catch (e: any) {
             toast.error(e.message);

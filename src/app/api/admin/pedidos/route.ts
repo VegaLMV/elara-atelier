@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sesionAdmin } from "@/lib/sesion";
 
 /**
  * GET: List all orders with filters
  */
 export async function GET(req: Request) {
+    const admin = await sesionAdmin();
+    if (!admin) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
     try {
         const { searchParams } = new URL(req.url);
         const estado = searchParams.get("estado") as any;
@@ -60,6 +64,9 @@ export async function GET(req: Request) {
  * POST: Create a new order with HARD STOCK LOCKING
  */
 export async function POST(req: Request) {
+    const admin = await sesionAdmin();
+    if (!admin) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+
     try {
         const body = await req.json();
         const {

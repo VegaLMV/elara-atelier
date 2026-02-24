@@ -60,10 +60,6 @@ export default function PromoCampaignSection({
     const finalSubtitle = subtitle || campaign.descripcion || "Descubre nuestra colección exclusiva con descuentos especiales.";
     const bgImage = campaign.imagenUrl || "/images/promo-placeholder.jpg";
 
-    const descuentoTexto = campaign.tipo === "PORCENTAJE"
-        ? `${campaign.valor}% OFF`
-        : `S/${Number(campaign.valor).toFixed(2)} OFF`;
-
     // Formato de Fechas (DD MMM)
     const formatDate = (dateStr: string) => {
         const d = new Date(dateStr);
@@ -125,15 +121,17 @@ export default function PromoCampaignSection({
                             <div className="pt-2">
                                 <Link
                                     href="/tienda/catalogo"
-                                    className="inline-flex items-center gap-4 bg-[#3f2f2f] text-[#e6dad1] px-10 py-5 rounded-full font-bold text-lg transition-all hover:bg-[#864d2d] hover:text-white hover:shadow-2xl hover:shadow-[#864d2d]/30 hover:-translate-y-1 active:translate-y-0"
+                                    className="inline-flex items-center justify-center bg-[#3f2f2f] text-[#e6dad1] px-10 py-5 rounded-full font-bold text-lg transition-all duration-300 hover:bg-[#864d2d] hover:text-white hover:shadow-2xl hover:shadow-[#864d2d]/30 hover:-translate-y-1 active:translate-y-0 group/btn"
                                 >
-                                    Ver Colección
-                                    <ArrowRight className="w-5 h-5" />
+                                    <span className="relative z-10 flex items-center gap-4">
+                                        Aprovechar Oferta   
+                                        <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
+                                    </span>
                                 </Link>
                             </div>
                         </div>
 
-                        {/* === COLUMNA DERECHA: IMAGEN (Card Decorada - MÁS GRANDE) === */}
+                        {/* === COLUMNA DERECHA: IMAGEN (Card Decorada) === */}
                         <div className="w-full lg:w-1/2 order-1 lg:order-2 relative perspective-1000">
                             {/* Decoraciones Flotantes detrás de la imagen */}
                             <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#864d2d]/20 rounded-full blur-[80px] animate-pulse" />
@@ -156,9 +154,17 @@ export default function PromoCampaignSection({
                                     <div className="absolute top-8 right-8 z-20">
                                         <div className="relative flex items-center justify-center w-28 h-28 bg-[#e6dad1] text-[#3f2f2f] rounded-full shadow-2xl animate-bounce-slow">
                                             <div className="absolute inset-1 border-2 border-dashed border-[#864d2d]/30 rounded-full animate-[spin_10s_linear_infinite]" />
-                                            <div className="flex flex-col items-center leading-none">
-                                                <span className="text-3xl font-black text-[#864d2d]">{campaign.tipo === "PORCENTAJE" ? `${campaign.valor}%` : `S/${campaign.valor}`}</span>
-                                                <span className="text-xs font-bold uppercase tracking-widest mt-1 text-[#3f2f2f]/70">OFF</span>
+                                            <div className="flex flex-col items-center leading-none mt-1">
+                                                {/* MEJORA: Tipografía diferenciada para Moneda vs Porcentaje */}
+                                                {campaign.tipo === "PORCENTAJE" ? (
+                                                    <span className="text-3xl font-black text-[#864d2d]">{campaign.valor}%</span>
+                                                ) : (
+                                                    <div className="flex items-start text-[#864d2d]">
+                                                        <span className="text-sm font-bold mt-1 mr-0.5">S/</span>
+                                                        <span className="text-3xl font-black">{campaign.valor}</span>
+                                                    </div>
+                                                )}
+                                                <span className="text-[10px] font-bold uppercase tracking-widest mt-0.5 text-[#3f2f2f]/70">Desc.</span>
                                             </div>
                                         </div>
                                     </div>
@@ -166,10 +172,10 @@ export default function PromoCampaignSection({
                                 </div>
                             </div>
 
-                            {/* Decorative Floating Elements */}
+                            {/* Decorative Floating Elements (MEJORA: Texto en Español) */}
                             <div className="absolute -bottom-8 -right-8 bg-[#3f2f2f] text-[#e6dad1] px-6 py-4 rounded-2xl shadow-xl animate-float-delayed hidden lg:block rotate-[-5deg] z-30">
                                 <div className="text-sm font-bold text-center leading-tight tracking-wider">
-                                    LIMITED TIME<br />OFFER
+                                    ÚLTIMOS<br />DÍAS
                                 </div>
                             </div>
                         </div>

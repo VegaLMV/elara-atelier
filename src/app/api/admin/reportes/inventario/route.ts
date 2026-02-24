@@ -11,25 +11,55 @@ export async function GET() {
     }
 
     try {
-        // 1. Única consulta maestra: Traemos todas las variantes de productos ACTIVOS
-        // Incluimos imagenesColor para poder filtrar la foto por variante más adelante
-        const todasVariantes = await prisma.variante.findMany({
-            where: { 
-                activa: true,
-                producto: { estado: "ACTIVO" } 
-            },
-            include: {
-                producto: {
-                    include: {
-                        categoria: { select: { nombre: true } },
-                        imagenes: { select: { url: true }, take: 1 }, // SE AGREGÓ LA COMA AQUÍ
-                        imagenesColor: true // Relación con las fotos por color
+        // 1. Consultas maestras: Traemos todas las variantes y las estancadas (sin ventas en 60 días)
+        const hace60Dias = new Date();
+        hace60Dias.setDate(hace60Dias.getDate() - 60);
+
+        const [todasVariantes, estancadasDB] = await Promise.all([
+            prisma.variante.findMany({
+                where: {
+                    activa: true,
+                    producto: { estado: "ACTIVO" }
+                },
+                include: {
+                    producto: {
+                        include: {
+                            categoria: { select: { nombre: true } },
+                            imagenes: { select: { url: true }, take: 1 },
+                            imagenesColor: true
+                        }
+                    },
+                    talla: { select: { nombre: true } },
+                    color: { select: { nombre: true, hex: true } },
+                },
+            }),
+            prisma.variante.findMany({
+                where: {
+                    stockActual: { gt: 0 },
+                    NOT: {
+                        itemsVenta: {
+                            some: {
+                                venta: {
+                                    fechaVenta: { gte: hace60Dias },
+                                    estado: "COMPLETADO"
+                                }
+                            }
+                        }
                     }
                 },
-                talla: { select: { nombre: true } },
-                color: { select: { nombre: true, hex: true } },
-            },
-        });
+                include: {
+                    producto: { select: { nombre: true, precio: true, imagenes: { select: { url: true }, take: 1 } } },
+                    talla: { select: { nombre: true } },
+                    color: { select: { nombre: true, hex: true } },
+                    itemsVenta: {
+                        where: { venta: { estado: "COMPLETADO" } },
+                        orderBy: { venta: { fechaVenta: "desc" } },
+                        take: 1,
+                        select: { venta: { select: { fechaVenta: true } } }
+                    }
+                }
+            })
+        ]);
 
         // 2. Filtrar stock bajo y ORDENAR ALFABÉTICAMENTE por nombre de producto
         const stockBajo = todasVariantes
@@ -71,8 +101,7 @@ export async function GET() {
         const alertasStock = stockBajo.map((v) => {
             const itemCompra = comprasRecientes.find((it) => it.varianteId === v.id);
             const proveedor = itemCompra?.compra?.proveedor;
-            
-            // LÓGICA DE IMAGEN: Buscamos en imagenesColor la que coincida con el colorId de la variante
+
             const imgPorColor = v.producto.imagenesColor.find(ic => ic.colorId === v.colorId);
             const imagenFinal = imgPorColor?.url || v.producto.imagenes[0]?.url || null;
 
@@ -85,7 +114,7 @@ export async function GET() {
                 stockActual: v.stockActual,
                 stockMinimo: v.stockMinimo,
                 valorUnitario: Number(v.producto.precio),
-                imagenUrl: imagenFinal, // URL de la imagen del color específico
+                imagenUrl: imagenFinal,
                 proveedor: proveedor ? {
                     nombre: proveedor.nombre,
                     ruc: proveedor.ruc,
@@ -98,6 +127,19 @@ export async function GET() {
             };
         });
 
+        // 5. Formatear Variantes Estancadas
+        const variantesEstancadas = estancadasDB.map(v => ({
+            id: v.id,
+            producto: v.producto.nombre,
+            talla: v.talla.nombre,
+            color: v.color.nombre,
+            colorHex: v.color.hex,
+            stockActual: v.stockActual,
+            precio: Number(v.producto.precio),
+            imagenUrl: v.producto.imagenes[0]?.url || null,
+            ultimaVenta: v.itemsVenta[0]?.venta?.fechaVenta || null
+        }));
+
         return NextResponse.json({
             resumen: {
                 valorizacionTotal,
@@ -105,6 +147,7 @@ export async function GET() {
                 variantesActivas: todasVariantes.length,
                 variantesSinStock,
                 alertasStockBajo: stockBajo.length,
+                variantesEstancadas: estancadasDB.length,
             },
             stockPorCategoria: Object.entries(stockPorCategoria).map(([categoria, stock]) => ({ categoria, stock })),
             stockPorProducto: Object.entries(stockPorProducto)
@@ -112,6 +155,7 @@ export async function GET() {
                 .sort((a, b) => b.stock - a.stock)
                 .slice(0, 10),
             alertasStock,
+            variantesEstancadas,
         });
 
     } catch (error) {

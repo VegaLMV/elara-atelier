@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   Search,
@@ -19,7 +19,7 @@ import {
   ArrowDownCircle,
   ArrowUpCircle
 } from "lucide-react";
-import { formatMoney } from "@/lib/precios"; // IMPORTANTE: Usar el formateador global
+import { formatMoney } from "@/lib/precios";
 
 // --- TIPOS ---
 type ItemReferencia = {
@@ -52,17 +52,9 @@ function getColorStyle(hex: string | null) {
   return { background: `linear-gradient(135deg, ${stops})` };
 }
 
-/**
- * ============================================================================
- * INTERFAZ PREMIUM DE DEVOLUCIONES Y CAMBIOS
- * ============================================================================
- * Proceso guiado en 3 pasos:
- * 1. Identificación: ¿Quién devuelve y qué documento es la referencia?
- * 2. Selección: ¿Qué productos regresan y en qué cantidad?
- * 3. Resolución: ¿Cómo se compensa (Cambio, Saldo o Reembolso)?
- */
 export default function DevolucionForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // --- ESTADOS DE CONFIGURACIÓN ---
   const [tipo, setTipo] = useState<"CLIENTE" | "PROVEEDOR">("CLIENTE");
@@ -78,9 +70,48 @@ export default function DevolucionForm() {
 
   // --- ESTADOS DE DATOS ---
   const [codigoBusqueda, setCodigoBusqueda] = useState("");
-  const [referencia, setReferencia] = useState<any>(null); // Datos de la Venta/Compra
+  const [referencia, setReferencia] = useState<any>(null);
   const [items, setItems] = useState<ItemReferencia[]>([]);
   const [motivo, setMotivo] = useState("");
+
+  // --- AUTO-CARGA DESDE URL ---
+  useEffect(() => {
+    const refId = searchParams.get("refId");
+    const tipoUrl = searchParams.get("tipo") as "CLIENTE" | "PROVEEDOR";
+
+    if (refId) {
+      setCodigoBusqueda(refId);
+      if (tipoUrl) setTipo(tipoUrl);
+
+      const autoBuscar = async () => {
+        setBuscando(true);
+        try {
+          const res = await fetch(`/api/admin/devoluciones/buscar?tipo=${tipoUrl || "CLIENTE"}&codigo=${refId}`);
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "No se encontró la referencia");
+
+          setReferencia(data);
+          const itemsMapeados = data.items?.map((it: any) => ({
+            varianteId: it.varianteId,
+            nombre: it.variante.producto.nombre,
+            detalle: `${it.variante.talla.nombre} / ${it.variante.color.nombre}`,
+            cantidadOriginal: it.cantidad,
+            cantidadADevolver: 0,
+            precioUnitario: Number(tipoUrl === "PROVEEDOR" ? it.costoUnitario : (it.precioFinal || it.costoUnitario)),
+            imagen: it.variante.producto.imagenes[0]?.url || null,
+            hex: it.variante.color.hex
+          })) || [];
+          setItems(itemsMapeados);
+          toast.success(`Referencia de ${tipoUrl || "CLIENTE"} cargada automáticamente`);
+        } catch (error: any) {
+          toast.error(error.message);
+        } finally {
+          setBuscando(false);
+        }
+      };
+      autoBuscar();
+    }
+  }, [searchParams]);
 
   // --- LÓGICA DE BÚSQUEDA ---
   const buscarReferencia = async () => {
@@ -90,24 +121,22 @@ export default function DevolucionForm() {
     setReferencia(null);
 
     try {
-      // Endpoint que deberás crear para buscar la data de la venta o compra
       const res = await fetch(`/api/admin/devoluciones/buscar?tipo=${tipo}&codigo=${codigoBusqueda}`);
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error || "No se encontró la referencia");
 
       setReferencia(data);
-      // Mapear items de la venta/compra al formato del formulario
-      const itemsMapeados = data.items.map((it: any) => ({
+      const itemsMapeados = data.items?.map((it: any) => ({
         varianteId: it.varianteId,
         nombre: it.variante.producto.nombre,
         detalle: `${it.variante.talla.nombre} / ${it.variante.color.nombre}`,
         cantidadOriginal: it.cantidad,
         cantidadADevolver: 0,
-        precioUnitario: Number(it.precioFinal || it.costoUnitario),
+        precioUnitario: Number(tipo === "PROVEEDOR" ? it.costoUnitario : (it.precioFinal || it.costoUnitario)),
         imagen: it.variante.producto.imagenes[0]?.url || null,
         hex: it.variante.color.hex
-      }));
+      })) || [];
       setItems(itemsMapeados);
       toast.success("Referencia encontrada");
     } catch (error: any) {
@@ -126,6 +155,12 @@ export default function DevolucionForm() {
     ));
   };
 
+  const actualizarPrecioNuevo = (id: string, nuevoPrecio: number) => {
+    setItemsNuevos(prev => prev.map(it =>
+      it.id === id ? { ...it, precio: Math.max(0, nuevoPrecio) } : it
+    ));
+  };
+
   const montoTotalDevolucion = useMemo(() => {
     return items.reduce((acc, it) => acc + (it.cantidadADevolver * it.precioUnitario), 0);
   }, [items]);
@@ -134,14 +169,13 @@ export default function DevolucionForm() {
     return itemsNuevos.reduce((acc, it) => acc + (it.cantidad * it.precio), 0);
   }, [itemsNuevos]);
 
-  const diferencia = montoTotalNuevos - montoTotalDevolucion; // + Cliente paga, - Saldo a favor
+  const diferencia = montoTotalNuevos - montoTotalDevolucion;
 
   // --- ENVÍO FINAL ---
   const buscarProductos = async (q: string) => {
     if (!q) return;
-    const res = await fetch(`/api/admin/productos`); // Ojo: Ideal filtrar por query en API, pero cargamos todo por ahora como 'pos-client'
+    const res = await fetch(`/api/admin/productos`);
     const data = await res.json();
-    // Filtro cliente simple
     const filtrados = data.filter((p: any) => p.nombre.toLowerCase().includes(q.toLowerCase()));
     setResultadosProd(filtrados.slice(0, 5));
   };
@@ -151,13 +185,29 @@ export default function DevolucionForm() {
     if (existe) {
       setItemsNuevos(prev => prev.map(i => i.id === variante.id ? { ...i, cantidad: i.cantidad + 1 } : i));
     } else {
+      
+      // LÓGICA INTELIGENTE DE COSTOS PARA PROVEEDORES
+      let precioSugerido = 0;
+      
+      if (tipo === "PROVEEDOR") {
+        // Buscamos si este producto exacto estaba en la compra que estamos devolviendo
+        const itemOriginal = items.find(it => it.varianteId === variante.id);
+        if (itemOriginal) {
+           precioSugerido = itemOriginal.precioUnitario; // Jala el costo real de tu compra
+        } else {
+           precioSugerido = 0; // Si es un producto nuevo, lo dejamos en 0 para que digites el costo manual
+        }
+      } else {
+        precioSugerido = Number(prod.precio); // Si es cliente, jalamos el precio de venta normal
+      }
+
       setItemsNuevos(prev => [...prev, {
         id: variante.id,
         nombre: prod.nombre,
         detalle: `${variante.talla.nombre} / ${variante.color.nombre}`,
-        precio: Number(prod.precio), // Simplificacion MVP
+        precio: precioSugerido,
         cantidad: 1,
-        imagen: prod.imagenes[0]?.url
+        imagen: prod.imagenes?.[0]?.url
       }]);
     }
     setShowBuscador(false);
@@ -178,34 +228,40 @@ export default function DevolucionForm() {
           tipo,
           accion,
           referenciaId: referencia.id,
-          clienteId: referencia.clienteId, // Solo si es cliente
+          clienteId: referencia.clienteId,
           items: itemsFiltrados.map(it => ({ varianteId: it.varianteId, cantidad: it.cantidadADevolver })),
           motivo,
           montoTotal: montoTotalDevolucion,
-          // Nuevos campos
-          itemsNuevos: accion === "CAMBIO" ? itemsNuevos.map(i => ({ varianteId: i.id, cantidad: i.cantidad })) : [],
-          metodoPagoDiferencia: "EFECTIVO" // Default por ahora
+          // Mandamos el precio editado/jalado al backend
+          itemsNuevos: accion === "CAMBIO" ? itemsNuevos.map(i => ({ 
+              varianteId: i.id, 
+              cantidad: i.cantidad,
+              precioAlternativo: i.precio 
+          })) : [],
+          metodoPagoDiferencia: "EFECTIVO"
         })
-      })
+      });
 
-
-      if (!res.ok) throw new Error("Error en el servidor");
+      if (!res.ok) {
+        const dataError = await res.json();
+        throw new Error(dataError.error || "Error en el servidor");
+      }
 
       toast.success("Proceso completado exitosamente");
       router.push("/admin/devoluciones");
       router.refresh();
-    } catch (error) {
-      toast.error("Ocurrió un error inesperado");
+    } catch (error: any) {
+      toast.error(error.message || "Ocurrió un error inesperado");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
+    <div className="grid grid-cols-1 lg:grid-cols-1 gap-5 pb-20">
 
       {/* COLUMNA IZQUIERDA: CONFIGURACIÓN Y BUSQUEDA */}
-      <div className="lg:col-span-1 space-y-6">
+      <div className="lg:col-span-1 space-y-5">
         <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-6">
           <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
             <Undo2 className="w-5 h-5 text-indigo-600" /> 1. Identificación
@@ -216,14 +272,14 @@ export default function DevolucionForm() {
             <div className="flex bg-gray-100 p-1.5 rounded-2xl">
               <button
                 type="button"
-                onClick={() => { setTipo("CLIENTE"); setReferencia(null); }}
+                onClick={() => { setTipo("CLIENTE"); setReferencia(null); setItemsNuevos([]); }}
                 className={`flex-1 py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${tipo === 'CLIENTE' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 <Users className="w-4 h-4" /> De Cliente
               </button>
               <button
                 type="button"
-                onClick={() => { setTipo("PROVEEDOR"); setReferencia(null); }}
+                onClick={() => { setTipo("PROVEEDOR"); setReferencia(null); setItemsNuevos([]); }}
                 className={`flex-1 py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${tipo === 'PROVEEDOR' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 <Truck className="w-4 h-4" /> A Proveedor
@@ -233,14 +289,14 @@ export default function DevolucionForm() {
 
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block ml-1">
-              {tipo === 'CLIENTE' ? 'Código de Venta (WhatsApp)' : 'Código de Compra / RUC'}
+              {tipo === 'CLIENTE' ? 'Código / Nombre (Venta o Pedido)' : 'Nombre de Proveedor o ID'}
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
                 <input
                   className="w-full border border-gray-200 rounded-2xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium"
-                  placeholder="Ej: V-1025..."
+                  placeholder="Buscar..."
                   value={codigoBusqueda}
                   onChange={(e) => setCodigoBusqueda(e.target.value)}
                 />
@@ -268,7 +324,7 @@ export default function DevolucionForm() {
       </div>
 
       {/* COLUMNA DERECHA: SELECCIÓN Y RESOLUCIÓN */}
-      <div className="lg:col-span-2 space-y-6">
+      <div className="lg:col-span-2 space-y-5">
 
         {/* 2. TABLA DE SELECCIÓN DE PRODUCTOS */}
         <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden min-h-[400px] flex flex-col">
@@ -289,9 +345,11 @@ export default function DevolucionForm() {
                 <thead className="bg-gray-50/50 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">
                   <tr>
                     <th className="px-6 py-4">Producto</th>
-                    <th className="px-6 py-4 text-center">En Venta</th>
+                    <th className="px-6 py-4 text-center">Comprados</th>
                     <th className="px-6 py-4 text-center">Devolver</th>
-                    <th className="px-6 py-4 text-right">Valor Unit.</th>
+                    <th className="px-6 py-4 text-right">
+                        {tipo === 'CLIENTE' ? 'Precio Final' : 'Tu Costo'}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -303,7 +361,7 @@ export default function DevolucionForm() {
                             {it.imagen ? <img src={it.imagen} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[8px]">IMG</div>}
                           </div>
                           <div>
-                            <p className="font-bold text-gray-900">{it.nombre}</p>
+                            <p className="font-bold text-gray-900 line-clamp-1 max-w-[200px]">{it.nombre}</p>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-gray-200 font-bold">{it.detalle}</span>
                               {it.hex && <div className="w-2.5 h-2.5 rounded-full border border-gray-300 shadow-sm" style={getColorStyle(it.hex)} />}
@@ -331,7 +389,7 @@ export default function DevolucionForm() {
                           </button>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right font-bold text-slate-700">S/ {it.precioUnitario.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-right font-bold text-slate-700">{formatMoney(it.precioUnitario)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -344,32 +402,88 @@ export default function DevolucionForm() {
         {accion === "CAMBIO" && referencia && (
           <div className="bg-indigo-50/50 rounded-3xl border border-indigo-100 shadow-sm p-6 space-y-4 animate-in fade-in">
             <h2 className="text-lg font-black text-indigo-900 flex items-center justify-between">
-              <span className="flex items-center gap-2"><Package className="w-5 h-5 text-indigo-600" /> Productos de Reemplazo</span>
-              <button onClick={() => setShowBuscador(!showBuscador)} className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-bold transition-colors">
-                + Agregar Producto
-              </button>
+              <span className="flex items-center gap-2">
+                  <Package className="w-5 h-5 text-indigo-600" /> 
+                  {tipo === 'CLIENTE' ? 'Productos de Reemplazo' : 'Mercadería que Recibes'}
+              </span>
+              {!showBuscador && (
+                <button onClick={() => setShowBuscador(true)} className="text-xs bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 font-bold transition-all shadow-md active:scale-95">
+                  + Agregar Producto
+                </button>
+              )}
             </h2>
 
-            {/* Buscador Simple */}
+            {/* Buscador Premium Rediseñado */}
             {showBuscador && (
-              <div className="bg-white p-4 rounded-xl shadow-lg border border-indigo-100 mb-4 animate-in zoom-in-95">
-                <input
-                  className="w-full border border-gray-200 rounded-lg p-2 text-sm mb-2"
-                  placeholder="Buscar producto por nombre..."
-                  value={qProducto}
-                  onChange={e => { setQProducto(e.target.value); buscarProductos(e.target.value); }}
-                  autoFocus
-                />
-                <div className="max-h-40 overflow-y-auto space-y-2">
+              <div className="relative bg-white p-5 rounded-2xl shadow-xl border border-indigo-100 mb-4 animate-in zoom-in-95 z-10">
+                <button
+                  type="button"
+                  onClick={() => setShowBuscador(false)}
+                  className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 bg-gray-50 hover:bg-gray-200 rounded-full p-1.5 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <h3 className="text-sm font-bold text-gray-800 mb-3">Buscar nuevo producto</h3>
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                  <input
+                    className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                    placeholder="Ej: Blusa Siena..."
+                    value={qProducto}
+                    onChange={e => { setQProducto(e.target.value); buscarProductos(e.target.value); }}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="max-h-[300px] overflow-y-auto space-y-3 pr-1">
+                  {resultadosProd.length === 0 && qProducto.trim().length > 0 && (
+                    <p className="text-center text-sm text-gray-400 py-4">No se encontraron productos.</p>
+                  )}
                   {resultadosProd.map(prod => (
-                    <div key={prod.id} className="text-sm">
-                      <p className="font-bold text-gray-800">{prod.nombre}</p>
-                      <div className="flex gap-2 mt-1 overflow-x-auto pb-1">
-                        {prod.variantes.map((v: any) => (
-                          <button key={v.id} onClick={() => agregarNuevo(prod, v)} className="text-[10px] bg-gray-100 hover:bg-indigo-100 px-2 py-1 rounded border border-gray-200">
-                            {v.talla.nombre} - {v.color.nombre}
-                          </button>
-                        ))}
+                    <div key={prod.id} className="flex gap-4 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                      <div className="w-16 h-16 rounded-lg bg-gray-200 border border-gray-200 overflow-hidden shrink-0">
+                        {prod.imagenes?.[0]?.url ? (
+                          <img src={prod.imagenes[0].url} className="w-full h-full object-cover" alt={prod.nombre} />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400">IMG</div>
+                        )}
+                      </div>
+
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start mb-2">
+                          <p className="font-bold text-gray-900 text-sm leading-tight max-w-[200px]">{prod.nombre}</p>
+                          <p className="font-black text-indigo-600 text-sm whitespace-nowrap ml-2">
+                              {tipo === 'CLIENTE' ? formatMoney(prod.precio) : 'Costo Asignable'}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {prod.variantes?.map((v: any) => {
+                            // Si es proveedor NO bloqueamos stock (porque recibimos), si es cliente SÍ.
+                            const sinStock = tipo === 'CLIENTE' ? (v.stockActual <= 0) : false;
+                            return (
+                              <button
+                                type="button"
+                                key={v.id}
+                                disabled={sinStock}
+                                onClick={() => agregarNuevo(prod, v)}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
+                                  sinStock
+                                    ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+                                    : "border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-50 text-gray-700 active:scale-95"
+                                }`}
+                              >
+                                <span>{v.talla.nombre} - {v.color.nombre}</span>
+                                {tipo === 'CLIENTE' && (
+                                    <span className={`text-[10px] ${sinStock ? "text-red-400" : "text-emerald-500"}`}>
+                                    ({v.stockActual || 0})
+                                    </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -381,33 +495,45 @@ export default function DevolucionForm() {
             {itemsNuevos.length > 0 ? (
               <div className="space-y-2">
                 {itemsNuevos.map(it => (
-                  <div key={it.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-indigo-100">
+                  <div key={it.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-3 rounded-xl border border-indigo-100 gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden">
+                      <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden shrink-0">
                         {it.imagen && <img src={it.imagen} className="w-full h-full object-cover" />}
                       </div>
                       <div>
-                        <p className="font-bold text-indigo-900 text-sm">{it.nombre}</p>
+                        <p className="font-bold text-indigo-900 text-sm line-clamp-1">{it.nombre}</p>
                         <p className="text-[10px] text-indigo-500 font-bold">{it.detalle}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-mono font-bold text-sm">S/ {it.precio.toFixed(2)}</p>
+                    <div className="flex items-center justify-between sm:justify-end gap-4">
+                        {/* Editor de Precio Manual (Fundamental para Proveedores) */}
+                        <div className="flex items-center gap-1">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">S/</span>
+                            <input 
+                                type="number"
+                                value={it.precio}
+                                onChange={(e) => actualizarPrecioNuevo(it.id, Number(e.target.value))}
+                                className={`w-20 text-sm font-mono font-black border-b-2 outline-none p-1 text-right transition-colors ${tipo === 'PROVEEDOR' ? 'border-orange-300 focus:border-orange-500 text-orange-700 bg-orange-50 rounded' : 'border-transparent focus:border-indigo-300 bg-transparent'}`}
+                                title={tipo === 'PROVEEDOR' ? "Editar costo del material a recibir" : "Precio del producto"}
+                                disabled={tipo === 'CLIENTE'} // El precio retail no debería editarse aquí
+                            />
+                        </div>
+                        
                       <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
-                        <button onClick={() => setItemsNuevos(p => p.map(x => x.id === it.id ? { ...x, cantidad: x.cantidad - 1 } : x).filter(x => x.cantidad > 0))}>-</button>
-                        <span>x{it.cantidad}</span>
-                        <button onClick={() => setItemsNuevos(p => p.map(x => x.id === it.id ? { ...x, cantidad: x.cantidad + 1 } : x))}>+</button>
+                        <button type="button" className="hover:bg-gray-100 w-6 h-6 rounded flex items-center justify-center border border-gray-200" onClick={() => setItemsNuevos(p => p.map(x => x.id === it.id ? { ...x, cantidad: x.cantidad - 1 } : x).filter(x => x.cantidad > 0))}>-</button>
+                        <span className="font-bold w-4 text-center">x{it.cantidad}</span>
+                        <button type="button" className="hover:bg-gray-100 w-6 h-6 rounded flex items-center justify-center border border-gray-200" onClick={() => setItemsNuevos(p => p.map(x => x.id === it.id ? { ...x, cantidad: x.cantidad + 1 } : x))}>+</button>
                       </div>
                     </div>
                   </div>
                 ))}
-                <div className="flex justify-between items-center pt-2 border-t border-indigo-100">
-                  <span className="text-sm font-bold text-indigo-900">Total Nuevos</span>
-                  <span className="font-black text-indigo-600">S/ {montoTotalNuevos.toFixed(2)}</span>
+                <div className="flex justify-between items-center pt-3 mt-2 border-t border-indigo-100">
+                  <span className="text-sm font-bold text-indigo-900">Total a Favor de la Tienda</span>
+                  <span className="font-black text-indigo-600">{formatMoney(montoTotalNuevos)}</span>
                 </div>
               </div>
             ) : (
-              <p className="text-center text-sm text-indigo-300 italic py-4">No has seleccionado productos de reemplazo</p>
+              !showBuscador && <p className="text-center text-sm text-indigo-300 italic py-4">No has seleccionado productos de reemplazo</p>
             )}
           </div>
         )}
@@ -415,16 +541,16 @@ export default function DevolucionForm() {
 
       {/* 3. RESOLUCIÓN FINAL */}
       {referencia && (
-        <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-6 animate-in slide-in-from-bottom-4 duration-500">
           <h2 className="text-lg font-black text-gray-900 flex items-center gap-2 border-b border-gray-50 pb-4">
             <Wallet className="w-5 h-5 text-indigo-600" /> 3. Resolución Financiera
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { id: "CAMBIO", label: "Cambio Directo", icon: RotateCcw, color: "blue", desc: "Talla o color diferente" },
-              { id: "SALDO_A_FAVOR", label: "Saldo a Favor", icon: Wallet, color: "indigo", desc: "Crédito para WhatsApp" },
-              { id: "REEMBOLSO", label: "Reembolso", icon: AlertTriangle, color: "red", desc: "Devolución de dinero" },
+              { id: "CAMBIO", label: "Cambio Directo", icon: RotateCcw, color: "blue", desc: tipo === 'CLIENTE' ? "Talla o producto diferente" : "Cambio por otra mercadería" },
+              { id: "SALDO_A_FAVOR", label: "Saldo a Favor", icon: Wallet, color: "indigo", desc: tipo === 'CLIENTE' ? "Crédito al cliente" : "Crédito a tu favor" },
+              { id: "REEMBOLSO", label: "Reembolso", icon: AlertTriangle, color: "red", desc: "Retorno de dinero físico" },
             ].map((opt) => (
               <button
                 key={opt.id}
@@ -444,7 +570,7 @@ export default function DevolucionForm() {
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block ml-1">Motivo Detallado (Para Auditoría)</label>
             <textarea
               className="w-full border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none transition-all placeholder:text-gray-300"
-              placeholder="Ej: El cliente indica que la prenda le queda muy ajustada en hombros..."
+              placeholder={tipo === 'CLIENTE' ? "Ej: El cliente indica prenda muy ajustada..." : "Ej: Devolvemos 2 polos rasgados de fábrica por 2 de buen estado."}
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
             />
@@ -452,29 +578,35 @@ export default function DevolucionForm() {
 
           <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-6 bg-slate-900 rounded-2xl text-white shadow-xl">
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Balance Final</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Balance de Operación</p>
               {accion === "CAMBIO" ? (
-                <div className="flex flex-col">
+                <div className="flex flex-col mt-1">
                   {diferencia > 0 ? (
                     <>
-                      <span className="text-xs text-emerald-400 flex items-center gap-1"><ArrowUpCircle className="w-3 h-3" /> Cliente Paga Diferencia</span>
-                      <p className="text-3xl font-black text-white">S/ {diferencia.toFixed(2)}</p>
+                      <span className={`text-xs flex items-center gap-1 ${tipo === 'CLIENTE' ? 'text-emerald-400' : 'text-orange-400'}`}>
+                          <ArrowUpCircle className="w-3 h-3" /> 
+                          {tipo === 'CLIENTE' ? 'Cliente Paga Diferencia' : 'Nosotros Pagamos Diferencia (Proveedor)'}
+                      </span>
+                      <p className="text-3xl font-black text-white">{formatMoney(diferencia)}</p>
                     </>
                   ) : (
                     <>
-                      <span className="text-xs text-orange-400 flex items-center gap-1"><ArrowDownCircle className="w-3 h-3" /> A favor del Cliente</span>
-                      <p className="text-3xl font-black text-white">S/ {Math.abs(diferencia).toFixed(2)}</p>
+                      <span className={`text-xs flex items-center gap-1 ${tipo === 'CLIENTE' ? 'text-orange-400' : 'text-emerald-400'}`}>
+                          <ArrowDownCircle className="w-3 h-3" /> 
+                          {tipo === 'CLIENTE' ? 'A favor del Cliente' : 'A favor nuestro (Proveedor)'}
+                      </span>
+                      <p className="text-3xl font-black text-white">{formatMoney(Math.abs(diferencia))}</p>
                     </>
                   )}
                 </div>
               ) : (
-                <p className="text-3xl font-black text-white">S/ {montoTotalDevolucion.toFixed(2)}</p>
+                <p className="text-3xl font-black text-white mt-1">{formatMoney(montoTotalDevolucion)}</p>
               )}
             </div>
             <button
               onClick={procesarDevolucion}
               disabled={loading || montoTotalDevolucion === 0}
-              className="w-full md:w-auto bg-indigo-500 hover:bg-indigo-400 px-10 py-4 rounded-xl font-black transition-all active:scale-95 disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
+              className="w-full md:w-auto bg-indigo-500 hover:bg-indigo-400 px-8 py-4 rounded-xl font-black transition-all active:scale-95 disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="animate-spin" /> : "Finalizar Proceso"}
               <ArrowRight className="w-5 h-5" />
@@ -486,6 +618,5 @@ export default function DevolucionForm() {
   );
 }
 
-// Subcomponentes simples para el control de cantidad
 function Minus(props: any) { return <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M20 12H4"></path></svg>; }
 function Plus(props: any) { return <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6v12m6-6H6"></path></svg>; }

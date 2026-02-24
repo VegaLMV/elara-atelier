@@ -80,7 +80,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     }
 
     // rate limit
-    const rl = ratelimit(`imgc:${ipFromReq(req)}`, 20, 60_000);
+    const rl = await ratelimit(`imgc:${ipFromReq(req)}`, 20, 60_000);
     if (!rl.ok) return NextResponse.json({ error: "Demasiadas solicitudes" }, { status: 429 });
 
     const { id: productoId } = await ctx.params;

@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect } from "react";
-import { ShoppingBag, Eye } from "lucide-react";
+import { ArrowUpRight, Image as ImageIcon } from "lucide-react";
 import { formatMoney } from "@/lib/precios";
 
 type ProductoCardProps = {
@@ -11,7 +10,7 @@ type ProductoCardProps = {
     id: string;
     nombre: string;
     slug: string;
-    categoria: string | undefined;
+    categoria?: string;
     imagenes: string[];
     precioOriginal: number;
     precioFinal: number;
@@ -24,114 +23,109 @@ type ProductoCardProps = {
 };
 
 export default function ProductoCard({ producto }: ProductoCardProps) {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
-
-  // Lógica del Carrusel Automático al Hover
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isHovered && producto.imagenes.length > 1) {
-      interval = setInterval(() => {
-        setCurrentImageIndex((prev) => (prev + 1) % producto.imagenes.length);
-      }, 1000);
-    } else {
-      setCurrentImageIndex(0);
-    }
-    return () => clearInterval(interval);
-  }, [isHovered, producto.imagenes.length]);
+  const hasImages = producto.imagenes && producto.imagenes.length > 0;
+  const mainImage = hasImages ? producto.imagenes[0] : null;
+  const hoverImage = hasImages && producto.imagenes.length > 1 ? producto.imagenes[1] : null;
 
   return (
     <Link
       href={`/tienda/${producto.slug}`}
-      className="group relative flex flex-col h-full"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      className="group flex flex-col gap-4 cursor-pointer w-full h-full"
     >
-      {/* --- IMAGEN CON EFECTOS --- */}
-      <div className="relative w-full aspect-[4/5] bg-gray-100 rounded-2xl overflow-hidden mb-4 shadow-sm group-hover:shadow-2xl transition-all duration-500">
-
-        {producto.imagenes.length > 0 ? (
-          producto.imagenes.map((img, index) => (
-            <Image
-              key={img}
-              src={img}
-              alt={producto.nombre}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              quality={85}
-              priority={index === 0}
-              className={`object-cover transition-all duration-700 ease-in-out ${index === currentImageIndex
-                  ? 'opacity-100 scale-105'
-                  : 'opacity-0 scale-100'
-                }`}
-            />
-          ))
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs tracking-widest">NO FOTO</div>
-        )}
-
-        {/* Overlay Gradiente en Hover */}
-        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-        {/* BADGES */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start z-10">
+      {/* Contenedor de Imagen de Alta Costura */}
+      <div className="relative aspect-[3/4] overflow-hidden bg-[#f0ebe6] rounded-sm">
+        
+        {/* Badges Flotantes Minimalistas */}
+        <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5 items-start">
           {producto.tieneDescuento && (
-            <span className="bg-[#864d2d] text-white text-[11px] font-black px-3 py-1.5 rounded-md backdrop-blur-md shadow-lg flex items-center gap-1">
+            <span className="bg-[#864d2d] text-white text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1.5 shadow-sm">
               {producto.porcentaje}% OFF
             </span>
           )}
           {producto.esNuevo && (
-            <span className="bg-[#3f2f2f] text-white text-[9px] font-black px-2 py-1 rounded-md backdrop-blur-md shadow-lg">
-              NUEVO
+            <span className="bg-[#3f2f2f] text-[#fcfaf8] text-[9px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 shadow-sm">
+              Nuevo
             </span>
           )}
           {producto.destacado && (
-            <span className="bg-[#e6dad1] text-[#3f2f2f] text-[9px] font-black px-2 py-1 rounded-md backdrop-blur-md shadow-lg">
-              ★ TOP
-            </span>
-          )}
-          {producto.stock === 0 && (
-            <span className="bg-slate-900/80 text-white text-[9px] font-black px-2 py-1 rounded-md backdrop-blur-md shadow-lg">
-              AGOTADO
+            <span className="bg-white/90 backdrop-blur-md text-[#3f2f2f] border border-[#3f2f2f]/10 text-[9px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 shadow-sm">
+              Top
             </span>
           )}
         </div>
 
-        {/* ACCIONES FLOTANTES (Solo en Hover) */}
-        {producto.stock > 0 && (
-          <div className="absolute bottom-4 left-4 right-4 flex gap-2 transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 delay-75 pointer-events-auto">
-            <button className="flex-1 bg-white text-[#3f2f2f] py-3 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#3f2f2f] hover:text-[#e6dad1] transition-colors shadow-lg active:scale-95">
-              <ShoppingBag className="w-3.5 h-3.5" /> Agregar
-            </button>
-            <button className="w-10 h-10 bg-white/20 backdrop-blur-md text-white rounded-xl flex items-center justify-center hover:bg-[#864d2d] hover:text-white transition-colors shadow-lg active:scale-95">
-              <Eye className="w-4 h-4" />
-            </button>
+        {/* Sistema de Imágenes */}
+        {mainImage ? (
+          <>
+            <Image
+              src={mainImage}
+              alt={producto.nombre}
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              quality={90}
+              className={`object-cover transition-transform duration-[1.5s] ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105
+                ${hoverImage ? 'group-hover:opacity-0' : ''}
+              `}
+            />
+            {hoverImage && (
+              <Image
+                src={hoverImage}
+                alt={`${producto.nombre} vista 2`}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                quality={90}
+                className="object-cover absolute inset-0 opacity-0 transition-all duration-[1s] ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:opacity-100 group-hover:scale-105"
+              />
+            )}
+          </>
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-[#3f2f2f]/30 space-y-3">
+            <ImageIcon className="w-8 h-8 opacity-50" />
+            <span className="font-serif italic text-sm">Imagen en curaduría</span>
           </div>
         )}
 
-        {/* Overlay Agotado */}
+        {/* Botón "Ver Pieza" estilo Boutique (Sustituye al Shopping Bag + Ojo) */}
+        {producto.stock > 0 && (
+          <div className="absolute inset-x-4 bottom-4 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 z-20">
+            <div className="w-full bg-white/95 backdrop-blur-md text-[#3f2f2f] text-[10px] font-bold uppercase tracking-[0.2em] py-3.5 text-center flex items-center justify-center gap-2 border border-black/5 hover:bg-[#3f2f2f] hover:text-white transition-colors">
+              Ver detalles <ArrowUpRight className="w-3 h-3" />
+            </div>
+          </div>
+        )}
+
+        {/* Overlay Agotado Total Elegante */}
         {producto.stock === 0 && (
-          <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
-            <div className="bg-slate-900 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl">Agotado temporalmente</div>
+          <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] flex items-center justify-center z-20">
+            <div className="border border-[#3f2f2f] text-[#3f2f2f] bg-white/80 px-6 py-2.5 text-[9px] font-black uppercase tracking-[0.3em] shadow-lg">
+              Agotado
+            </div>
           </div>
         )}
       </div>
 
-      {/* --- INFO --- */}
-      <div className="space-y-1">
-        <h3 className="font-serif text-lg text-slate-900 leading-tight group-hover:text-[#864d2d] transition-colors">
+      {/* Textos del Producto (Centrados y editoriales) */}
+      <div className="space-y-1.5 px-1 text-center">
+        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#864d2d]/70">
+          {producto.categoria || "Colección Exclusiva"}
+        </p>
+        <h3 className="text-sm md:text-base font-serif text-[#3f2f2f] line-clamp-1 group-hover:text-[#864d2d] transition-colors">
           {producto.nombre}
         </h3>
-        <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
-          {producto.categoria || "Colección"}
-        </p>
-        <div className="flex items-center gap-3 pt-1">
-          <span className="font-bold text-slate-900">
-            {formatMoney(producto.precioFinal)}
-          </span>
-          {producto.tieneDescuento && (
-            <span className="text-xs text-slate-400 line-through decoration-slate-300">
-              {formatMoney(producto.precioOriginal)}
+        
+        <div className="flex items-center justify-center gap-3 pt-1">
+          {producto.tieneDescuento ? (
+            <>
+              <span className="text-xs text-[#3f2f2f]/40 line-through">
+                {formatMoney(producto.precioOriginal)}
+              </span>
+              <span className="text-sm font-bold text-[#864d2d]">
+                {formatMoney(producto.precioFinal)}
+              </span>
+            </>
+          ) : (
+            <span className="text-sm font-medium text-[#3f2f2f]/80">
+              {formatMoney(producto.precioFinal)}
             </span>
           )}
         </div>

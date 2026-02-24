@@ -14,7 +14,7 @@ type Settings = {
 export default function IntegracionesClient({ initial }: { initial: Settings }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{type:"ok"|"err"; text:string} | null>(null);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [s, setS] = useState<Settings>(initial);
 
   async function guardar() {
@@ -27,15 +27,17 @@ export default function IntegracionesClient({ initial }: { initial: Settings }) 
         credentials: "include",
         body: JSON.stringify({
           whatsapp: s.whatsapp,
+          // phone también es actualizado para que el footer y otros usos del nro. queden sincronizados
+          phone: s.whatsapp,
           contactEmail: s.contactEmail,
         }),
       });
       const t = await r.text();
       if (!r.ok) throw new Error(t || "Error guardando integraciones");
-      setMsg({type:"ok", text:"Integraciones guardadas ✅"});
+      setMsg({ type: "ok", text: "Integraciones guardadas ✅" });
       router.refresh();
-    } catch (e:any) {
-      setMsg({type:"err", text: e?.message ?? "Error"});
+    } catch (e: any) {
+      setMsg({ type: "err", text: e?.message ?? "Error" });
     } finally {
       setBusy(false);
     }
@@ -65,10 +67,9 @@ export default function IntegracionesClient({ initial }: { initial: Settings }) 
       </div>
 
       {msg && (
-        <div className={`border rounded-2xl px-5 py-4 text-sm font-medium ${
-          msg.type==="ok" ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-          : "bg-red-50 border-red-200 text-red-800"
-        }`}>{msg.text}</div>
+        <div className={`border rounded-2xl px-5 py-4 text-sm font-medium ${msg.type === "ok" ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+            : "bg-red-50 border-red-200 text-red-800"
+          }`}>{msg.text}</div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -88,7 +89,7 @@ export default function IntegracionesClient({ initial }: { initial: Settings }) 
               className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
               placeholder="51999999999"
               value={s.whatsapp ?? ""}
-              onChange={(e)=>setS(p=>({ ...p, whatsapp: e.target.value }))}
+              onChange={(e) => setS(p => ({ ...p, whatsapp: e.target.value }))}
             />
             <p className="text-xs text-slate-400">
               Esto se usa para links tipo wa.me en la tienda pública.
@@ -112,7 +113,7 @@ export default function IntegracionesClient({ initial }: { initial: Settings }) 
               className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
               placeholder="contacto@elara..."
               value={s.contactEmail ?? ""}
-              onChange={(e)=>setS(p=>({ ...p, contactEmail: e.target.value }))}
+              onChange={(e) => setS(p => ({ ...p, contactEmail: e.target.value }))}
             />
             <p className="text-xs text-slate-400">
               Útil para el footer y formularios simples.

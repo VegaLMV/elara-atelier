@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sesionAdmin } from "@/lib/sesion";
 
 /**
  * GET: Retrieve details of a specific order
@@ -8,6 +9,9 @@ export async function GET(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const admin = await sesionAdmin();
+    if (!admin) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
     try {
         const { id } = await params;
         const pedido = await prisma.pedido.findUnique({
@@ -52,6 +56,9 @@ export async function PATCH(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const admin = await sesionAdmin();
+    if (!admin) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+
     try {
         const { id } = await params;
         const body = await req.json();
@@ -181,6 +188,9 @@ export async function DELETE(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const admin = await sesionAdmin();
+    if (!admin) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+
     try {
         const { id } = await params;
 

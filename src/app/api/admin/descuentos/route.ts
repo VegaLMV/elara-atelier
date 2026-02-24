@@ -5,104 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { obtenerSesion } from "@/lib/sesion";
 
 /**
- * ============================================================================
- * 1. MÉTODO GET: SINCRONIZACIÓN AUTOMÁTICA
- * ============================================================================
- * Actúa como "CRON JOB". Se llama periódicamente para mantener los estados
- * (PROGRAMADO -> ACTIVO -> FINALIZADO) y los precios de los productos sincronizados.
+ * NOTA: La sincronización automática (GET) ha sido movida a:
+ * /api/cron/sync-descuentos
+ * para ser ejecutada por un Cron Job real de forma segura.
  */
-export async function GET(request: Request) {
-  try {
-    const sesion = await obtenerSesion();
-    if (!sesion || sesion.rol !== "ADMIN") return new NextResponse("No autorizado", { status: 401 });
-
-    const now = new Date();
-
-    // -----------------------------------------------------------------------
-    // A. PROCESO DE ACTIVACIÓN (Programado -> Activo)
-    // -----------------------------------------------------------------------
-    const campanasParaActivar = await prisma.campana.findMany({
-      where: {
-        estado: "PROGRAMADO",
-        startsAt: { lte: now },
-        endsAt: { gte: now }
-      },
-      include: { detalles: true }
-    });
-
-    for (const campana of campanasParaActivar) {
-      // 1. Activar Campaña Padre
-      await prisma.campana.update({
-        where: { id: campana.id },
-        data: { estado: "ACTIVO" }
-      });
-
-      // 2. Actualizar Productos Masivamente
-      const productoIds = campana.detalles.map(d => d.productoId);
-
-      if (productoIds.length > 0) {
-        await prisma.producto.updateMany({
-          where: { id: { in: productoIds } },
-          data: {
-            descuentoActivo: true,
-            descuentoTipo: campana.tipo,
-            descuentoValor: Number(campana.valor),
-            descuentoInicio: campana.startsAt,
-            descuentoFin: campana.endsAt,
-          }
-        });
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // B. PROCESO DE FINALIZACIÓN (Activo -> Finalizado)
-    // -----------------------------------------------------------------------
-    const campanasParaFinalizar = await prisma.campana.findMany({
-      where: {
-        estado: "ACTIVO",
-        endsAt: { lt: now }
-      },
-      include: { detalles: true }
-    });
-
-    for (const campana of campanasParaFinalizar) {
-      // 1. Finalizar Campaña Padre
-      await prisma.campana.update({
-        where: { id: campana.id },
-        data: { estado: "FINALIZADO" }
-      });
-
-      // 2. Limpiar Productos
-      const productoIds = campana.detalles.map(d => d.productoId);
-
-      if (productoIds.length > 0) {
-        await prisma.producto.updateMany({
-          where: {
-            id: { in: productoIds },
-            descuentoActivo: true
-          },
-          data: {
-            descuentoActivo: false,
-            descuentoTipo: null,
-            descuentoValor: null,
-            descuentoInicio: null,
-            descuentoFin: null,
-          }
-        });
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      activadas: campanasParaActivar.length,
-      finalizadas: campanasParaFinalizar.length
-    });
-
-  } catch (error) {
-    console.error("Error en sincronización:", error);
-    return new NextResponse("Error en sincronización", { status: 500 });
-  }
-}
 
 /**
  * ============================================================================

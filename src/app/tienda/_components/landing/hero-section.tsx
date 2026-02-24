@@ -54,28 +54,21 @@ export default function HeroCarousel({
   const [paused, setPaused] = useState(false);
   const timer = useRef<NodeJS.Timeout | null>(null);
 
-  const current = slides[Math.min(idx, Math.max(0, total - 1))];
-
   function go(nextIdx: number) {
     if (total === 0) return;
     const safe = ((nextIdx % total) + total) % total;
     setIdx(safe);
   }
 
-  function next() {
-    go(idx + 1);
-  }
-
-  function prev() {
-    go(idx - 1);
-  }
+  function next() { go(idx + 1); }
+  function prev() { go(idx - 1); }
 
   useEffect(() => {
     if (total <= 1 || paused) return;
     timer.current && clearInterval(timer.current);
     timer.current = setInterval(() => {
       setIdx((p) => (p + 1) % total);
-    }, 4000); // segundos de intervalo
+    }, 5000); // 5 segundos para que la clienta aprecie la foto
 
     return () => {
       timer.current && clearInterval(timer.current);
@@ -87,128 +80,124 @@ export default function HeroCarousel({
 
   return (
     <section
-      className="relative overflow-hidden text-white min-h-[70vh] flex items-center bg-slate-950"
+      className="relative w-full h-[85vh] md:h-screen overflow-hidden bg-[#3f2f2f]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={() => setPaused(true)}
       onTouchEnd={() => setPaused(false)}
     >
-      {/* Slides Container */}
+      {/* 1. CONTENEDOR DE IMÁGENES (Puras y elegantes) */}
       <div className="absolute inset-0">
         {slides.map((s, i) => (
           <div
             key={s.id}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${i === idx ? "opacity-100 z-10" : "opacity-0 z-0"
-              }`}
+            className={`absolute inset-0 transition-opacity duration-[1.5s] ease-in-out ${
+              i === idx ? "opacity-100 z-10" : "opacity-0 z-0"
+            }`}
           >
-            {/* Image with Zoom Animation */}
+            {/* Imagen con zoom sutil cinematográfico */}
             <Image
               src={s.imagenUrl}
-              alt={s.titulo || "Hero"}
+              alt={s.titulo || "Hero Élara"}
               fill
               priority={i === idx}
-              quality={85}
-              className={`object-cover transition-transform duration-[4000ms] linear ${i === idx ? "scale-110" : "scale-100"
-                }`}
+              quality={90}
+              className={`object-cover transition-transform duration-[10s] ease-out ${
+                i === idx ? "scale-105" : "scale-100"
+              }`}
               sizes="100vw"
             />
-            {/* Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/70" />
-
-            {/* Ambient Glows */}
-            <div
-              className={`absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full blur-[120px] opacity-25 transition-all duration-1000 ${i === idx ? "scale-100" : "scale-50 opacity-0"
-                }`}
-              style={{ background: "var(--brand-accent, #bf8f71)" }}
-            />
+            
+            {/* Degradado Editorial: Transparente arriba, suavemente oscuro abajo-izquierda */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#1a1515]/80 via-[#1a1515]/20 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#1a1515]/60 via-transparent to-transparent opacity-80" />
           </div>
         ))}
       </div>
 
-      <div className="relative z-20 max-w-7xl mx-auto px-6 text-center space-y-8 py-24 md:py-32">
-        {/* Usamos el slide actual para los textos */}
+      {/* 2. TEXTOS (Diseño Asimétrico Inferior Izquierdo) */}
+      <div className="absolute bottom-12 left-6 md:bottom-20 md:left-16 z-30 max-w-2xl pointer-events-none">
         {slides.map((s, i) => {
           if (i !== idx) return null;
 
-          const title = s.titulo || (categoriaNombre ? categoriaNombre : "Vestimos tu Esencia Única");
-          const subtitle =
-            s.subtitulo ||
-            "Descubre piezas exclusivas diseñadas para resaltar tu personalidad.";
-          const ctaText = s.botonTexto || "Ver colección";
+          const title = s.titulo || (categoriaNombre ? categoriaNombre : "Vestimos tu Esencia");
+          const subtitle = s.subtitulo || "Descubre piezas curadas para resaltar tu elegancia natural.";
+          const ctaText = s.botonTexto || "Explorar Colección";
           const href = s.enlace || "#catalogo-grid";
 
           return (
-            <div key={s.id + "-content"} className="animate-in fade-in slide-in-from-bottom-10 duration-1000">
-              <div className="flex items-center justify-center gap-2 mb-6">
-                {categoriaNombre && (
-                  <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[10px] font-black uppercase tracking-widest text-white/80">
-                    Explorando: {categoriaNombre}
-                  </span>
-                )}
-                {total > 1 && (
-                  <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[10px] font-black uppercase tracking-widest text-white/70">
-                    {idx + 1}/{total}
-                  </span>
-                )}
+            <div key={s.id + "-content"} className="animate-in fade-in slide-in-from-bottom-8 duration-[1.5s] ease-out pointer-events-auto">
+              
+              {/* Etiqueta superior sutil */}
+              <div className="flex items-center gap-3 mb-4 md:mb-6">
+                <div className="w-8 h-[1px] bg-white/60" />
+                <span className="text-[9px] md:text-xs font-black uppercase tracking-[0.4em] text-white/80">
+                  Élara Atelier
+                </span>
               </div>
 
-              <h1 className="text-5xl md:text-7xl lg:text-9xl font-serif font-medium tracking-tight leading-[0.85] text-white">
+              {/* Título Elegante */}
+              <h1 className="text-5xl md:text-7xl lg:text-[5rem] font-serif text-white leading-[1.05] tracking-tight mb-6">
                 {title}
               </h1>
 
-              <p className="max-w-2xl mx-auto mt-8 text-base md:text-xl text-white/80 font-light leading-relaxed">
+              {/* Subtítulo refinado */}
+              <p className="text-sm md:text-lg text-white/70 font-light leading-relaxed max-w-lg mb-8 md:mb-10">
                 {subtitle}
               </p>
 
-              <div className="flex justify-center gap-4 mt-10">
-                <CtaLink
-                  href={href}
-                  className="group inline-flex items-center gap-3 bg-white text-slate-900 px-10 py-5 rounded-full font-bold transition-all hover:bg-slate-100 hover:scale-105 active:scale-95 shadow-2xl shadow-white/10"
-                >
-                  {ctaText}
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </CtaLink>
-              </div>
+              {/* Botón de Alta Costura (Transparente con borde) */}
+              <CtaLink
+                href={href}
+                className="group inline-flex items-center gap-4 bg-transparent border border-white/40 text-white px-8 md:px-10 py-3.5 md:py-4 hover:bg-white hover:text-[#3f2f2f] transition-all duration-500 text-[10px] md:text-xs font-bold uppercase tracking-[0.2em]"
+              >
+                {ctaText}
+                <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+              </CtaLink>
             </div>
           );
         })}
+      </div>
 
-        {total > 1 && (
-          <div className="pt-12 flex items-center justify-center gap-3">
+      {/* 3. CONTROLES MINIMALISTAS (Inferior Derecho) */}
+      {total > 1 && (
+        <div className="absolute bottom-12 right-6 md:bottom-20 md:right-16 z-30 flex flex-col items-end gap-6">
+          
+          {/* Navegación (Líneas en lugar de puntos gruesos) */}
+          <div className="flex items-center gap-2">
             {slides.map((s, i) => (
               <button
                 key={s.id + "-dot"}
                 type="button"
                 onClick={() => go(i)}
-                className={`h-1.5 rounded-full transition-all duration-500 border border-white/10 ${i === idx ? "w-12 bg-white" : "w-3 bg-white/20 hover:bg-white/40"
-                  }`}
-                title={s.titulo ? `Ir a: ${s.titulo}` : `Ir al banner ${i + 1}`}
+                className={`h-[2px] transition-all duration-500 ${
+                  i === idx ? "w-10 bg-white" : "w-4 bg-white/30 hover:bg-white/60"
+                }`}
+                aria-label={`Ir al banner ${i + 1}`}
               />
             ))}
           </div>
-        )}
-      </div>
 
-      {total > 1 && (
-        <>
-          <button
-            type="button"
-            onClick={prev}
-            className="absolute left-2 md:left-6 top-1/2 -translate-y-1/2 w-10 h-10 md:w-14 md:h-14 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all z-30 active:scale-90"
-            title="Anterior"
-          >
-            <ArrowLeft className="w-5 h-5 md:w-6 md:h-6" />
-          </button>
-
-          <button
-            type="button"
-            onClick={next}
-            className="absolute right-2 md:right-6 top-1/2 -translate-y-1/2 w-10 h-10 md:w-14 md:h-14 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all z-30 active:scale-90"
-            title="Siguiente"
-          >
-            <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
-          </button>
-        </>
+          {/* Flechas agrupadas (Estilo Dashboard minimalista) */}
+          <div className="flex items-center gap-px bg-white/10 backdrop-blur-md border border-white/10">
+            <button
+              onClick={prev}
+              className="p-3 md:p-4 text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Anterior"
+            >
+              <ArrowLeft className="w-4 h-4 md:w-5 md:h-5 stroke-[1.5]" />
+            </button>
+            <div className="w-px h-6 bg-white/20" /> {/* Separador fino */}
+            <button
+              onClick={next}
+              className="p-3 md:p-4 text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Siguiente"
+            >
+              <ArrowRight className="w-4 h-4 md:w-5 md:h-5 stroke-[1.5]" />
+            </button>
+          </div>
+          
+        </div>
       )}
     </section>
   );

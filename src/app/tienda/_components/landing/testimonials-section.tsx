@@ -1,32 +1,32 @@
 "use client";
 
-import { Star, Quote } from "lucide-react";
+import { Star, MessageCircleHeart } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const testimonials = [
     {
         id: 1,
         name: "Isabella V.",
-        role: "Comprador Verificado",
-        content: "La atención al detalle es simplemente inigualable. Nunca me he sentido más segura con un vestido. No es solo ropa; es una obra de arte.",
+        role: "Clienta de Ica",
+        content: "La atención al detalle es inigualable. Nunca me he sentido más segura con un vestido. No es solo ropa, la curaduría es impecable.",
         rating: 5,
-        location: "Lima, PE"
+        source: "Vía WhatsApp" // Añadimos la fuente para dar autenticidad
     },
     {
         id: 2,
         name: "Camila R.",
-        role: "Comprador Verificado",
-        content: "Elara Atelier ha redefinido completamente la elegancia para mí. La calidad de la tela y el ajuste son perfectos. Una verdadera experiencia de lujo.",
+        role: "Clienta de Lima",
+        content: "Élara Atelier ha redefinido completamente la elegancia para mí. El empaque, el aroma y la calidad de la tela son perfectos.",
         rating: 5,
-        location: "Cusco, PE"
+        source: "Vía Instagram"
     },
     {
         id: 3,
         name: "Sofia M.",
-        role: "Comprador Verificado",
-        content: "Desde el empaque hasta la puntada final, todo grita premium. Se lo recomendé a todas mis amigas.",
+        role: "Clienta de Arequipa",
+        content: "Tenía miedo de pedir a provincia, pero el seguimiento fue excelente. Cuando abrí el paquete supe que era una verdadera experiencia premium.",
         rating: 5,
-        location: "Arequipa, PE"
+        source: "Vía WhatsApp"
     }
 ];
 
@@ -36,66 +36,78 @@ export default function TestimonialsSection() {
     useEffect(() => {
         const interval = setInterval(() => {
             setActiveIndex((current) => (current + 1) % testimonials.length);
-        }, 5000);
+        }, 6000); // Lo aumenté a 6 segundos para dar tiempo a leer con calma
         return () => clearInterval(interval);
     }, []);
 
     return (
-        <section className="bg-[#e6dad1]/10 py-24 overflow-hidden relative">
-            {/* Background Decorations */}
-            <div className="absolute top-0 left-0 w-64 h-64 bg-[#e6dad1]/30 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#864d2d]/5 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
+        <section className="bg-[#fcfaf8] py-24 overflow-hidden relative border-y border-[#e6dad1]/30">
+            {/* Background Decorations (Sutiles y elegantes) */}
+            <div className="absolute top-0 left-0 w-96 h-96 bg-[#e6dad1]/20 rounded-full blur-[100px] -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-[#864d2d]/5 rounded-full blur-[120px] translate-x-1/3 translate-y-1/3 pointer-events-none" />
 
-            <div className="max-w-6xl mx-auto px-6 relative z-10">
+            <div className="max-w-[1200px] mx-auto px-6 relative z-10">
+                {/* Header Editorial */}
                 <div className="text-center mb-16 space-y-4">
-                    <span className="text-[#864d2d] text-xs font-black uppercase tracking-[0.2em]">Amado por Ellas</span>
-                    <h2 className="text-4xl md:text-5xl font-serif text-[#3f2f2f]">Voces de Elara</h2>
+                    <span className="text-xs font-black uppercase tracking-[0.4em] text-[#864d2d] flex items-center justify-center gap-3">
+                        <MessageCircleHeart className="w-4 h-4" /> La Experiencia Élara
+                    </span>
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif text-[#3f2f2f] tracking-tight">
+                        Voces de nuestras clientas
+                    </h2>
+                    <div className="w-16 h-[1px] bg-[#864d2d]/30 mx-auto mt-6" />
                 </div>
 
                 <div className="relative max-w-4xl mx-auto">
-                    {/* Quote Icon Background */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
-                        <Quote size={200} className="text-[#3f2f2f]" />
-                    </div>
-
-                    <div className="relative min-h-[300px] flex items-center justify-center">
+                    {/* Contenedor del Testimonio Activo */}
+                    <div className="relative min-h-[280px] md:min-h-[250px] flex items-center justify-center">
                         {testimonials.map((testimonial, index) => (
                             <div
                                 key={testimonial.id}
-                                className={`absolute inset-0 flex flex-col items-center justify-center text-center transition-all duration-700 ease-in-out px-4 ${index === activeIndex
+                                className={`absolute inset-0 flex flex-col items-center justify-center text-center transition-all duration-[1s] ease-[cubic-bezier(0.25,1,0.5,1)] px-4 
+                                    ${index === activeIndex
                                         ? "opacity-100 translate-x-0 scale-100"
-                                        : "opacity-0 translate-x-8 scale-95 pointer-events-none"
+                                        : "opacity-0 translate-x-12 scale-95 pointer-events-none"
                                     }`}
                             >
-                                <div className="flex gap-1 mb-6 text-[#864d2d]">
+                                {/* Estrellas */}
+                                <div className="flex gap-1.5 mb-8 text-[#864d2d]">
                                     {[...Array(testimonial.rating)].map((_, i) => (
-                                        <Star key={i} size={20} fill="currentColor" />
+                                        <Star key={i} size={18} fill="currentColor" strokeWidth={1} />
                                     ))}
                                 </div>
-                                <blockquote className="text-2xl md:text-4xl font-serif text-[#3f2f2f] leading-snug mb-8 relative">
-                                    "{testimonial.content}"
+                                
+                                {/* Cita Principal */}
+                                <blockquote className="text-2xl md:text-4xl font-serif text-[#3f2f2f] leading-snug mb-8 relative px-4 md:px-12">
+                                    <span className="absolute -top-4 -left-2 text-6xl text-[#e6dad1] opacity-50 font-serif">"</span>
+                                    {testimonial.content}
+                                    <span className="absolute -bottom-8 -right-2 text-6xl text-[#e6dad1] opacity-50 font-serif">"</span>
                                 </blockquote>
-                                <div className="space-y-1">
-                                    <cite className="not-italic text-lg font-bold text-[#3f2f2f] block">
+                                
+                                {/* Autor y Fuente */}
+                                <div className="space-y-2 mt-4">
+                                    <cite className="not-italic text-lg font-bold text-[#3f2f2f] block tracking-wide">
                                         {testimonial.name}
                                     </cite>
-                                    <span className="text-sm text-[#3f2f2f]/60 font-light tracking-wide block">
-                                        {testimonial.role} • {testimonial.location}
-                                    </span>
+                                    <div className="flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-[#864d2d]/70">
+                                        <span>{testimonial.role}</span>
+                                        <span className="w-1 h-1 rounded-full bg-[#864d2d]/30" />
+                                        <span>{testimonial.source}</span>
+                                    </div>
                                 </div>
                             </div>
                         ))}
                     </div>
 
-                    {/* Indicators */}
-                    <div className="flex justify-center gap-3 mt-12">
+                    {/* Indicadores de navegación (Líneas minimalistas) */}
+                    <div className="flex justify-center items-center gap-3 mt-16">
                         {testimonials.map((_, index) => (
                             <button
                                 key={index}
                                 onClick={() => setActiveIndex(index)}
-                                className={`h-1 transition-all duration-300 rounded-full ${index === activeIndex ? "w-12 bg-[#864d2d]" : "w-2 bg-[#3f2f2f]/20 hover:bg-[#3f2f2f]/40"
-                                    }`}
-                                aria-label={`Go to testimonial ${index + 1}`}
+                                className={`h-[2px] transition-all duration-500 rounded-full 
+                                    ${index === activeIndex ? "w-12 bg-[#864d2d]" : "w-4 bg-[#e6dad1] hover:bg-[#864d2d]/50"}`}
+                                aria-label={`Ver testimonio ${index + 1}`}
                             />
                         ))}
                     </div>

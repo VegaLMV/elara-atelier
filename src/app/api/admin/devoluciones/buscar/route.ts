@@ -33,10 +33,14 @@ export async function GET(req: Request) {
       const venta = await prisma.venta.findFirst({
         where: {
           OR: [
-            { codigo: { equals: codigo, mode: "insensitive" } },
-            { id: { equals: codigo } }
+            { codigo: { contains: codigo, mode: "insensitive" } },
+            { id: { equals: codigo } },
+            { cliente: { nombre: { contains: codigo, mode: "insensitive" } } },
+            { clienteNombre: { contains: codigo, mode: "insensitive" } },
+            { pedido: { codigo: { contains: codigo, mode: "insensitive" } } }
           ]
         },
+
         include: {
           cliente: { select: { id: true, nombre: true } },
           items: {
@@ -65,7 +69,12 @@ export async function GET(req: Request) {
     // --- CASO B: BUSCAR COMPRA A PROVEEDOR ---
     if (tipo === "PROVEEDOR") {
       const compra = await prisma.compra.findFirst({
-        where: { id: { equals: codigo } },
+        where: {
+          OR: [
+            { id: { equals: codigo } },
+            { proveedor: { nombre: { contains: codigo, mode: "insensitive" } } }
+          ]
+        },
         include: {
           proveedor: { select: { nombre: true } },
           items: {
@@ -90,6 +99,7 @@ export async function GET(req: Request) {
 
       return NextResponse.json(compra);
     }
+
 
     return NextResponse.json({ error: "Tipo de búsqueda no válido" }, { status: 400 });
 

@@ -63,18 +63,27 @@ export const getCachedHomeSections = unstable_cache(
  * Revalida cada 15 minutos
  */
 export const getCachedCategoriasVisibles = unstable_cache(
-    async () => {
-        return await prisma.categoria.findMany({
-            where: { visible: true },
-            include: {
-                _count: { select: { productos: true } },
-                imagenes: { orderBy: { orden: 'asc' } }
-            },
-            orderBy: { orden: 'asc' }
-        });
-    },
-    ['categorias-visibles'],
-    { revalidate: 900, tags: ['categorias'] }
+  async () => {
+    return await prisma.categoria.findMany({
+      where: { 
+        visible: true // 1. Solo trae las visibles
+      },
+      include: {
+        imagenes: {
+          orderBy: { orden: 'asc' }
+        },
+        // 2. 🔥 ESTA LÍNEA ES LA MAGIA PARA EL "PRÓXIMAMENTE"
+        _count: {
+          select: { productos: true }
+        }
+      },
+      orderBy: {
+        orden: 'asc'
+      }
+    });
+  },
+  ['categorias-visibles-v1'],
+  { revalidate: 60, tags: ['categorias'] }
 );
 
 /**

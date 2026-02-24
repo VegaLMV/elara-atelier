@@ -146,14 +146,47 @@ export async function GET(request: NextRequest) {
             cantidad: c._count,
         }));
 
+        // NUEVO: Cálculos Financieros (COGS, Utilidad, Margen)
+        const itemsVenta = await prisma.itemVenta.findMany({
+            where: {
+                venta: {
+                    fechaVenta: { gte: from, lte: to },
+                    estado: "COMPLETADO",
+                },
+            },
+            include: {
+                variante: {
+                    include: {
+                        itemsCompra: {
+                            orderBy: { compra: { fechaCompra: 'desc' } },
+                            take: 1,
+                            select: { costoUnitario: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        let costoTotal = 0;
+        itemsVenta.forEach(item => {
+            const costo = Number(item.variante.itemsCompra?.[0]?.costoUnitario || 0);
+            costoTotal += item.cantidad * costo;
+        });
+
+        const totalIngresos = Number(ventasTotales._sum.total || 0);
+        const utilidadBruta = totalIngresos - costoTotal;
+        const margenPromedio = totalIngresos > 0 ? (utilidadBruta / totalIngresos) * 100 : 0;
+
         return NextResponse.json({
             resumen: {
-                totalIngresos: Number(ventasTotales._sum.total || 0),
+                totalIngresos,
                 totalDescuentos: Number(ventasTotales._sum.descuentoTotal || 0),
                 cantidadVentas: ventasTotales._count,
                 ticketPromedio: ventasTotales._count > 0
-                    ? Number(ventasTotales._sum.total || 0) / ventasTotales._count
+                    ? totalIngresos / ventasTotales._count
                     : 0,
+                utilidadBruta,
+                margenPromedio,
             },
             ventasPorPeriodo: ventasPorPeriodoArray,
             metodosPago,
