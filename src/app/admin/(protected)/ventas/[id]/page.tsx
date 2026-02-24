@@ -198,6 +198,9 @@ export default async function DetalleVentaPage({ params }: PageProps) {
                                                     />
                                                     {item.variante.color.nombre}
                                                 </div>
+                                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">
+                                                    SKU: <span className="text-indigo-600 font-bold">{item.variante.sku || "—"}</span>
+                                                </div>
                                             </div>
                                             {item.tieneDescuento && (
                                                 <p className="text-[10px] text-red-500 font-bold mt-0.5">

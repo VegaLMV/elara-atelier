@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, X as XIcon, Plus, Eye, Loader2, Printer } from "lucide-react";
+import { ArrowLeft, X as XIcon, Plus, Eye, Loader2, Printer, Save } from "lucide-react";
 import jsPDF from "jspdf";
 
 // ============================================================================
@@ -47,6 +47,7 @@ type Data = {
     color: string;
     colorHex: string | null;
     stockActual: number;
+    sku: string | null;
     activa: boolean;
   }>;
 
@@ -491,14 +492,14 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
       unit: 'mm',
       format: 'a4'
     });
-    
+
     // Configuración de la cuadrícula (Grid)
     const margenX = 15;
     const margenY = 15;
     const columnas = 3;
     const filasPorPagina = 7;
     const gap = 5; // Espacio entre etiquetas
-    
+
     // Cálculo de tamaño de etiqueta
     const anchoEtiqueta = (210 - (margenX * 2) - (gap * (columnas - 1))) / columnas;
     const altoEtiqueta = 35; // 3.5 cm de alto
@@ -555,11 +556,11 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
         doc.text(`${variante.talla} | ${variante.color}`, centroX, posY + 19, { align: "center" });
 
         // 4. SKU (Identificador único corto)
-        doc.setFont("courier", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(100, 116, 139); // slate-500
-        const sku = variante.id.slice(-8).toUpperCase();
-        doc.text(`SKU: ${sku}`, centroX, posY + 25, { align: "center" });
+        doc.setFont("courier", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(15, 23, 42); // slate-900
+        const skuLabel = variante.sku || variante.id.slice(-8).toUpperCase();
+        doc.text(`SKU: ${skuLabel}`, centroX, posY + 25, { align: "center" });
 
         // 5. Precio
         doc.setFont("helvetica", "bold");
@@ -583,76 +584,82 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
   };
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto relative">
+    <div className="p-4 md:p-6 space-y-6 md:space-y-8 max-w-7xl mx-auto relative pb-24 md:pb-6">
       {/* ✅ TOAST NOTIFICATION */}
       {toast && (
-        <div className={`fixed bottom-5 right-5 px-6 py-3 rounded-lg shadow-2xl text-white font-medium text-sm animate-in slide-in-from-bottom-5 fade-in duration-300 z-[9999] flex items-center gap-2 ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-900'}`}>
+        <div className={`fixed bottom-20 md:bottom-5 right-4 md:right-5 px-4 md:px-6 py-3 rounded-lg shadow-2xl text-white font-medium text-xs md:text-sm animate-in slide-in-from-bottom-5 fade-in duration-300 z-[9999] flex items-center gap-2 ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-900'}`}>
           <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
           {toast.msg}
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
+      {/* Header Adaptativo */}
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 border-b border-gray-200 pb-4 md:pb-6">
+        <div className="flex items-start md:items-center gap-3 md:gap-4">
           <button
             type="button"
             onClick={() => router.push("/admin/productos")}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors group"
+            className="p-1.5 md:p-2 hover:bg-gray-100 rounded-full transition-colors group shrink-0 mt-1 md:mt-0"
             title="Volver al listado"
           >
-            <ArrowLeft className="w-6 h-6 text-gray-400 group-hover:text-black" />
+            <ArrowLeft className="w-5 h-5 md:w-6 md:h-6 text-gray-500 group-hover:text-black" />
           </button>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900 uppercase">Editar Producto</h1>
+            <div className="flex flex-wrap items-center gap-2 md:gap-3">
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 uppercase">Editar Producto</h1>
               {descuentoVigente && (
-                <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-green-200 animate-pulse">
+                <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 text-[10px] md:text-xs font-bold px-2 md:px-2.5 py-0.5 rounded-full border border-green-200 animate-pulse">
                   🏷️ Oferta Activa
                 </span>
               )}
             </div>
-            <p className="text-sm text-gray-500 mt-1">
-              SKU: <span className="font-mono text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded">{initialData.producto.id}</span>
+            <p className="text-xs md:text-sm text-gray-500 mt-1">
+              SKU: <span className="font-mono text-[10px] md:text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded break-all">{initialData.producto.id}</span>
             </p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm font-medium text-gray-500">Stock Total</p>
-          <p className="text-3xl font-bold text-gray-900">{stockTotalActivo}</p>
+        <div className="hidden md:block text-right bg-blue-50/50 px-4 py-2 rounded-xl border border-blue-100">
+          <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Stock Total</p>
+          <p className="text-2xl font-black text-blue-700 leading-none">{stockTotalActivo}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* COLUMNA IZQUIERDA */}
-        <div className="xl:col-span-2 space-y-8">
-          <form onSubmit={guardarProducto} className="bg-white border rounded-xl p-6 shadow-sm space-y-6">
-            <h2 className="font-semibold text-lg border-b pb-2 text-gray-800">Detalles Generales</h2>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 md:gap-8">
+        {/* COLUMNA IZQUIERDA (Formulario principal) */}
+        <div className="xl:col-span-2 space-y-6 md:space-y-8">
+          <form onSubmit={guardarProducto} className="bg-white border rounded-xl p-4 md:p-6 shadow-sm space-y-5 md:space-y-6">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h2 className="font-semibold text-base md:text-lg text-gray-800">Detalles Generales</h2>
+              <div className="md:hidden text-right">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block">Stock</span>
+                <span className="text-lg font-black text-blue-700 leading-none">{stockTotalActivo}</span>
+              </div>
+            </div>
 
             <div className="space-y-4">
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Nombre</label>
-                <input className="w-full border rounded-md px-3 py-2 text-gray-900 focus:ring-black/5 outline-none" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+                <label className="text-xs md:text-sm font-medium text-gray-700">Nombre</label>
+                <input className="w-full border rounded-lg px-3 py-2 text-sm md:text-base text-gray-900 focus:ring-black/5 outline-none" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
               </div>
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Descripción</label>
-                <textarea className="w-full border rounded-md px-3 py-2 h-24 text-gray-900 focus:ring-black/5 outline-none" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+                <label className="text-xs md:text-sm font-medium text-gray-700">Descripción</label>
+                <textarea className="w-full border rounded-lg px-3 py-2 h-24 text-sm md:text-base text-gray-900 focus:ring-black/5 outline-none resize-y" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Precio Base (S/)</label>
-                  <input type="number" step="0.01" className="w-full border rounded-md px-3 py-2 text-gray-900" value={precio} onChange={(e) => setPrecio(e.target.value)} required />
+                  <label className="text-xs md:text-sm font-medium text-gray-700">Precio Base (S/)</label>
+                  <input type="number" step="0.01" className="w-full border rounded-lg px-3 py-2 text-sm md:text-base text-gray-900" value={precio} onChange={(e) => setPrecio(e.target.value)} required />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Estado</label>
-                  <select className="w-full border rounded-md px-3 py-2 text-gray-900 bg-white" value={estado} onChange={(e) => setEstado(e.target.value as any)}>
+                  <label className="text-xs md:text-sm font-medium text-gray-700">Estado</label>
+                  <select className="w-full border rounded-lg px-3 py-2 text-sm md:text-base text-gray-900 bg-white" value={estado} onChange={(e) => setEstado(e.target.value as any)}>
                     <option value="ACTIVO">Activo</option>
                     <option value="INACTIVO">Inactivo</option>
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Categoría</label>
-                  <select className="w-full border rounded-md px-3 py-2 text-gray-900 bg-white" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
+                  <label className="text-xs md:text-sm font-medium text-gray-700">Categoría</label>
+                  <select className="w-full border rounded-lg px-3 py-2 text-sm md:text-base text-gray-900 bg-white" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
                     <option value="">Sin categoría</option>
                     {initialData.referencias.categorias.map((c) => (
                       <option key={c.id} value={c.id}>{c.nombre}</option>
@@ -660,9 +667,10 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
                   </select>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-6 pt-2">
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 pt-2 pb-2">
                 <div className="flex items-center gap-2">
-                  <input type="checkbox" id="destacado" checked={destacado} onChange={(e) => setDestacado(e.target.checked)} className="rounded border-gray-300 text-black focus:ring-black" />
+                  <input type="checkbox" id="destacado" checked={destacado} onChange={(e) => setDestacado(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black" />
                   <label htmlFor="destacado" className="text-sm font-medium text-gray-700 cursor-pointer select-none">Destacado en portada</label>
                 </div>
                 <div className="flex items-center gap-2">
@@ -677,153 +685,148 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
                         setEstado("ACTIVO");
                       }
                     }}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <label htmlFor="nuevo" className="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
-                    Marcar como <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-black uppercase">Nuevo</span>
+                  <label htmlFor="nuevo" className="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1.5">
+                    Marcar como <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider">Nuevo</span>
                   </label>
                 </div>
               </div>
 
               {/* SECCIÓN DESCUENTO MANUAL */}
-              <div className={`p-4 rounded-lg border space-y-3 mt-2 ${descuentoVigente ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
-                <div className="flex items-center justify-between">
+              <div className={`p-3 md:p-4 rounded-xl border space-y-3 mt-2 transition-colors ${descuentoVigente ? 'bg-blue-50/50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-800 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={descuentoActivo}
                       onChange={(e) => !descuentoVigente && setDescuentoActivo(e.target.checked)}
                       disabled={!!descuentoVigente}
-                      className="rounded border-gray-300 text-black focus:ring-black disabled:opacity-50"
+                      className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black disabled:opacity-50"
                     />
-                    {descuentoVigente ? "Oferta Programada ACTIVA (Modo Lectura)" : "Aplicar Descuento Manual"}
+                    {descuentoVigente ? "Oferta Programada ACTIVA" : "Aplicar Descuento Manual"}
                   </label>
                   {precioFinal !== null && (
-                    <span className="text-sm font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200">
+                    <span className="text-xs md:text-sm font-bold text-green-700 bg-green-100 px-2 md:px-3 py-1 rounded-md border border-green-200 self-start sm:self-auto">
                       Final: {soles(precioFinal)}
                     </span>
                   )}
                 </div>
 
-                {/* ✅ Mensaje + Botón de Cancelar para la campaña activa (que hemos ocultado de la lista) */}
+                {/* Mensaje + Botón de Cancelar para la campaña activa */}
                 {descuentoVigente && (
-                  <div className="flex items-center justify-between text-xs text-blue-700 mb-2 bg-blue-100/50 p-2 rounded">
-                    <span>ℹ️ Hay una campaña activa gestionada desde el módulo <b>Descuentos</b>.</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-blue-800 mb-2 bg-blue-100/50 p-2.5 md:p-3 rounded-lg border border-blue-100">
+                    <span className="flex items-center gap-1.5"><span>ℹ️</span> <span>Campaña gestionada desde <b>Descuentos</b>.</span></span>
                     <button
                       type="button"
                       onClick={() => eliminarDescuento(descuentoVigente.id)}
-                      className="text-red-600 hover:text-red-800 font-bold underline px-2"
+                      className="text-red-600 hover:text-red-800 font-bold bg-white px-2 py-1 rounded border border-red-100 self-start sm:self-auto"
                     >
-                      Cancelar Campaña
+                      Cancelar Oferta
                     </button>
                   </div>
                 )}
 
                 {descuentoActivo && (
-                  <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 animate-in fade-in slide-in-from-top-2 duration-200 ${descuentoVigente ? 'opacity-70 pointer-events-none' : ''}`}>
-                    <div>
-                      <label className="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1 block">Tipo</label>
-                      <select className="w-full border rounded text-sm p-2 bg-white" value={descuentoTipo} onChange={(e) => setDescuentoTipo(e.target.value as any)}>
+                  <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 animate-in fade-in slide-in-from-top-2 duration-200 ${descuentoVigente ? 'opacity-60 pointer-events-none' : ''}`}>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase text-gray-500 font-bold tracking-wider">Tipo</label>
+                      <select className="w-full border rounded-lg text-sm p-2 md:p-2.5 bg-white" value={descuentoTipo} onChange={(e) => setDescuentoTipo(e.target.value as any)}>
                         <option value="PORCENTAJE">Porcentaje</option>
                         <option value="MONTO">Monto Fijo</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1 block">Valor</label>
-                      <input className="w-full border rounded text-sm p-2" value={descuentoValor} onChange={(e) => setDescuentoValor(e.target.value)} placeholder="0" />
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase text-gray-500 font-bold tracking-wider">Valor</label>
+                      <input type="number" className="w-full border rounded-lg text-sm p-2 md:p-2.5" value={descuentoValor} onChange={(e) => setDescuentoValor(e.target.value)} placeholder="0" />
                     </div>
-                    <div>
-                      <label className="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1 block">Inicio</label>
-                      <input type="date" className="w-full border rounded text-sm p-2 bg-white" value={descuentoInicio} onChange={(e) => setDescuentoInicio(e.target.value)} />
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase text-gray-500 font-bold tracking-wider">Inicio</label>
+                      <input type="date" className="w-full border rounded-lg text-sm p-2 md:p-2.5 bg-white" value={descuentoInicio} onChange={(e) => setDescuentoInicio(e.target.value)} />
                     </div>
-                    <div>
-                      <label className="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1 block">Fin</label>
-                      <input type="date" className="w-full border rounded text-sm p-2 bg-white" value={descuentoFin} onChange={(e) => setDescuentoFin(e.target.value)} />
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase text-gray-500 font-bold tracking-wider">Fin</label>
+                      <input type="date" className="w-full border rounded-lg text-sm p-2 md:p-2.5 bg-white" value={descuentoFin} onChange={(e) => setDescuentoFin(e.target.value)} />
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="flex justify-between items-center pt-4 border-t">
+            {/* BOTONES DE ACCIÓN (Pegajosos en móvil) */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 md:relative md:bg-transparent md:border-t-0 md:p-0 md:pt-4 md:mt-6 z-50 flex flex-col-reverse md:flex-row md:justify-between md:items-center gap-3 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.1)] md:shadow-none">
               <button
                 type="button"
                 onClick={generarEtiquetasPDF}
-                className="flex items-center gap-2 text-slate-600 hover:text-black font-bold text-sm h-10 px-4 rounded-lg border border-gray-200 hover:border-gray-400 transition-all bg-white shadow-sm"
+                className="w-full md:w-auto flex items-center justify-center gap-2 text-slate-600 hover:text-black font-bold text-xs md:text-sm h-11 md:h-10 px-4 rounded-xl border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition-all bg-white shadow-sm"
               >
                 <Printer className="w-4 h-4" /> GENERAR PDF ETIQUETAS
               </button>
 
-              <div className="flex gap-3">
+              <div className="flex gap-2 w-full md:w-auto">
                 <button
                   type="button"
                   onClick={() => router.push("/admin/productos")}
-                  className="px-6 py-2.5 rounded-lg font-medium text-gray-500 hover:bg-gray-100 transition"
+                  className="w-1/3 md:w-auto px-4 md:px-6 py-2.5 rounded-xl font-medium text-gray-500 hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all text-sm"
                 >
                   Cancelar
                 </button>
-                <button type="submit" className="bg-black text-white px-6 py-2.5 rounded-lg font-medium hover:bg-gray-800 transition shadow-sm">
-                  Guardar Cambios
+                <button type="submit" className="w-2/3 md:w-auto bg-black text-white px-6 py-2.5 rounded-xl font-bold hover:bg-gray-800 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 text-sm">
+                  <Save className="w-4 h-4" /> Guardar
                 </button>
               </div>
             </div>
           </form>
 
-          {/* ✅ Pasamos el historial filtrado y la función de eliminar */}
-          <HistorialDescuentos
-            historial={historialFiltrado}
-            onEliminar={eliminarDescuento}
-          />
+          {/* Historial filtrado */}
+          <div className="hidden md:block">
+            <HistorialDescuentos
+              historial={historialFiltrado}
+              onEliminar={eliminarDescuento}
+            />
+          </div>
 
-          {/* GESTIÓN DE VARIANTES (Igual) */}
-          <div className="bg-white border rounded-xl p-6 shadow-sm space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-lg text-gray-800">Variantes y Stock</h2>
-              <div className="text-xs font-medium px-2 py-1 bg-gray-100 rounded text-gray-600">
-                {tallasSel.length} tallas · {coloresSel.length} colores seleccionados
+          {/* GESTIÓN DE VARIANTES */}
+          <div className="bg-white border rounded-xl p-4 md:p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+              <h2 className="font-semibold text-base md:text-lg text-gray-800">Variantes y Stock</h2>
+              <div className="text-[10px] md:text-xs font-bold px-2.5 py-1 bg-gray-100 rounded-md text-gray-600 w-fit">
+                {tallasSel.length} tallas · {coloresSel.length} colores
               </div>
             </div>
-            {/* ... Selectores ... */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">1. Selecciona Tallas</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+              <div className="space-y-3 bg-gray-50/50 p-3 md:p-4 rounded-xl border border-gray-100">
+                <p className="text-[11px] md:text-xs font-bold text-gray-500 uppercase tracking-widest">1. Selecciona Tallas</p>
                 <div className="flex flex-wrap gap-2">
                   {tallasOrdenadas.map((t) => {
                     const selected = tallasSel.includes(t.id);
-                    return <button key={t.id} type="button" onClick={() => setTallasSel((s) => toggle(s, t.id))} className={`px-4 py-1.5 rounded-full border text-sm font-medium transition-all ${selected ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}>{t.nombre}</button>;
+                    return <button key={t.id} type="button" onClick={() => setTallasSel((s) => toggle(s, t.id))} className={`px-4 py-1.5 rounded-lg border text-xs md:text-sm font-bold transition-all ${selected ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 active:bg-gray-100'}`}>{t.nombre}</button>;
                   })}
                 </div>
               </div>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">2. Selecciona Colores</p>
+              <div className="space-y-3 bg-gray-50/50 p-3 md:p-4 rounded-xl border border-gray-100">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] md:text-xs font-bold text-gray-500 uppercase tracking-widest">2. Selecciona Colores</p>
                   <button
                     type="button"
                     onClick={() => setShowNewColorModal(true)}
-                    className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded-md font-bold uppercase tracking-wider transition-colors"
+                    className="text-[10px] bg-white border border-gray-200 hover:bg-gray-50 text-slate-700 px-2 py-1 rounded-md font-bold uppercase tracking-wider transition-colors shadow-sm"
                   >
                     + Nuevo Color
                   </button>
                 </div>
-                <input className="text-xs border rounded-md px-2 py-1 focus:ring-1 focus:ring-black outline-none w-32" placeholder="Filtrar..." value={qColor} onChange={e => setQColor(e.target.value)} />
-                <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1 pr-2 custom-scrollbar">
+                <input className="text-xs border border-gray-300 rounded-lg px-3 py-2 w-full focus:ring-2 focus:ring-black/10 outline-none" placeholder="Filtrar color..." value={qColor} onChange={e => setQColor(e.target.value)} />
+                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1 custom-scrollbar">
                   {coloresSeleccionados.map((c) => (
                     <div key={c.id} className="relative group">
                       <button
                         type="button"
                         onClick={() => setColoresSel((s) => toggle(s, c.id))}
-                        className="pl-1 pr-3 py-1.5 rounded-full border text-xs flex items-center gap-2 bg-black text-white border-black shadow-md transition-all active:scale-95"
+                        className="pl-1 pr-3 py-1 rounded-full border text-[11px] md:text-xs flex items-center gap-1.5 bg-black text-white border-black shadow-md transition-all active:scale-95"
                       >
-                        <span className="w-6 h-6 rounded-full border border-white/30 shrink-0 shadow-inner" style={getColorStyle(c.hex)} />
+                        <span className="w-5 h-5 rounded-full border border-white/30 shrink-0 shadow-inner" style={getColorStyle(c.hex)} />
                         {c.nombre}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setPreviewColor({ nombre: c.nombre, hex: c.hex }); }}
-                        className="absolute -top-1 -right-1 bg-white text-black p-1 rounded-full shadow-lg border opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
-                        title="Ver color"
-                      >
-                        <Eye className="w-3 h-3" />
                       </button>
                     </div>
                   ))}
@@ -833,48 +836,48 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
                         key={c.id}
                         type="button"
                         onClick={() => setColoresSel((s) => toggle(s, c.id))}
-                        className="pl-1 pr-3 py-1.5 rounded-full border text-xs flex items-center gap-2 bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-400 transition-all active:scale-95"
+                        className="pl-1 pr-3 py-1 rounded-full border text-[11px] md:text-xs flex items-center gap-1.5 bg-white text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-400 transition-all active:scale-95 shadow-sm"
                       >
-                        <span className="w-6 h-6 rounded-full border border-gray-200 shrink-0 shadow-inner" style={getColorStyle(c.hex)} />
+                        <span className="w-5 h-5 rounded-full border border-gray-200 shrink-0 shadow-inner" style={getColorStyle(c.hex)} />
                         {c.nombre}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setPreviewColor({ nombre: c.nombre, hex: c.hex }); }}
-                        className="absolute -top-1 -right-1 bg-white text-black p-1 rounded-full shadow-lg border opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
-                        title="Ver color"
-                      >
-                        <Eye className="w-3 h-3" />
                       </button>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-between border-t pt-5 mt-2">
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={crearVariantes} disabled={combinaciones === 0} className="bg-black text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm hover:shadow-md hover:bg-gray-800 disabled:opacity-50 transition-all">Generar Combinaciones</button>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 pt-5">
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                <button type="button" onClick={crearVariantes} disabled={combinaciones === 0} className="w-full sm:w-auto bg-black text-white px-5 py-2.5 md:py-2 rounded-xl text-xs md:text-sm font-bold shadow-md hover:bg-gray-800 disabled:opacity-50 transition-all">
+                  Generar {combinaciones > 0 ? combinaciones : ''} Variantes
+                </button>
                 <Link
                   href={`/admin/compras/nueva?prefillProducto=${initialData.producto.id}`}
-                  className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-5 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-emerald-100 transition-all flex items-center gap-2"
+                  className="w-full sm:w-auto justify-center bg-emerald-50 text-emerald-700 border border-emerald-200 px-5 py-2.5 md:py-2 rounded-xl text-xs md:text-sm font-bold shadow-sm hover:bg-emerald-100 transition-all flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" /> Registrar Compra (Surtir)
                 </Link>
               </div>
-              {combinaciones > 0 && (
-                <p className="text-[10px] text-gray-500 font-medium italic">Se crearán {combinaciones} nuevas variantes.</p>
-              )}
             </div>
-            <div className="border rounded-xl overflow-hidden bg-gray-50/50">
-              {gruposPorTalla.length === 0 ? <div className="p-10 text-center text-gray-400 text-sm">No hay variantes creadas.</div> :
+
+            {/* Lista de Variantes (Tabla con scroll) */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50/50">
+              {gruposPorTalla.length === 0 ? <div className="p-10 text-center text-gray-400 text-sm font-medium">No hay variantes creadas.</div> :
                 <div className="divide-y divide-gray-200">
                   {gruposPorTalla.map((grupo) => (
                     <details key={grupo.talla} className="group bg-white" open>
-                      <summary className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors list-none">
-                        <span className="font-semibold text-gray-900">Talla {grupo.talla}</span>
+                      <summary className="px-4 md:px-5 py-3 md:py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors list-none select-none">
+                        <div className="flex items-center gap-3">
+                          <div className="w-6 h-6 rounded bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-500 group-open:rotate-90 transition-transform">
+                            <ChevronRight className="w-4 h-4" />
+                          </div>
+                          <span className="font-bold text-gray-900 text-sm md:text-base">Talla {grupo.talla}</span>
+                        </div>
+                        <span className="text-[10px] md:text-xs font-bold bg-gray-100 text-gray-600 px-2 py-1 rounded-md border border-gray-200">{grupo.totalStock} items</span>
                       </summary>
-                      <div className="border-t border-gray-100">
-                        <table className="w-full text-sm text-left">
+                      <div className="border-t border-gray-100 overflow-x-auto">
+                        <table className="w-full text-sm text-left min-w-[500px]">
                           <tbody className="divide-y divide-gray-50">
                             {grupo.items.map((variante) => (
                               <FilaVarianteAgrupada
@@ -894,39 +897,46 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
               }
             </div>
           </div>
+
+          <div className="md:hidden">
+            <HistorialDescuentos
+              historial={historialFiltrado}
+              onEliminar={eliminarDescuento}
+            />
+          </div>
         </div>
 
-        {/* COLUMNA DERECHA (Media) */}
-        <div className="space-y-8">
-          {/* ... Galería General (código existente) ... */}
-          <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
-            <h3 className="font-semibold border-b pb-2 text-gray-800">Galería General</h3>
-            <div className="grid grid-cols-2 gap-3">
+        {/* COLUMNA DERECHA (Galería y Colores) */}
+        <div className="space-y-6 md:space-y-8">
+          {/* Galería General */}
+          <div className="bg-white border rounded-xl p-4 md:p-6 shadow-sm space-y-4">
+            <h3 className="font-semibold border-b border-gray-100 pb-2 text-gray-800 text-sm md:text-base">Galería General</h3>
+            <div className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-2 gap-2 md:gap-3">
               {imagenes.sort((a, b) => Number(b.esPortada) - Number(a.esPortada)).map((img) => (
-                <div key={img.id} className="relative group aspect-square rounded-xl overflow-hidden border-2 border-transparent hover:border-black transition-all bg-gray-100 shadow-sm">
+                <div key={img.id} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 hover:border-black transition-all bg-gray-100 shadow-sm">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.url} alt="" className="w-full h-full object-cover cursor-zoom-in transition-transform duration-500 group-hover:scale-110" onClick={() => setPreviewImage(img.url)} />
 
                   {img.esPortada && (
-                    <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black text-white text-[9px] font-black px-2 py-1 rounded-full shadow-lg backdrop-blur-md uppercase tracking-widest z-10">
+                    <div className="absolute top-1 left-1 md:top-2 md:left-2 flex items-center gap-1 bg-black text-white text-[8px] md:text-[9px] font-black px-1.5 md:px-2 py-0.5 md:py-1 rounded-full shadow-lg backdrop-blur-md uppercase tracking-widest z-10">
                       <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
                       Portada
                     </div>
                   )}
 
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-2 backdrop-blur-[2px] pointer-events-none">
-                    <div className="pointer-events-auto flex flex-col gap-2 scale-90 group-hover:scale-100 transition-transform">
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-1.5 md:gap-2 backdrop-blur-[2px] pointer-events-none">
+                    <div className="pointer-events-auto flex flex-col gap-1.5 md:gap-2 scale-90 group-hover:scale-100 transition-transform w-full px-2">
                       {!img.esPortada && (
                         <button
                           onClick={() => ponerPortada(img.id)}
-                          className="text-[10px] bg-white text-black font-black uppercase tracking-tighter px-4 py-2 rounded-full hover:bg-gray-100 shadow-xl"
+                          className="w-full text-[9px] md:text-[10px] bg-white text-black font-black uppercase tracking-tighter py-1.5 md:py-2 rounded-lg hover:bg-gray-100 shadow-xl"
                         >
                           Principal
                         </button>
                       )}
                       <button
                         onClick={() => eliminarImagen(img.id)}
-                        className="text-[10px] bg-red-600 text-white font-black uppercase tracking-tighter px-4 py-2 rounded-full hover:bg-red-700 shadow-xl"
+                        className="w-full text-[9px] md:text-[10px] bg-red-600 text-white font-black uppercase tracking-tighter py-1.5 md:py-2 rounded-lg hover:bg-red-700 shadow-xl"
                       >
                         Eliminar
                       </button>
@@ -934,12 +944,12 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
                   </div>
                 </div>
               ))}
-              <label className="aspect-square border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-gray-50 transition-all group relative overflow-hidden">
-                <div className="flex flex-col items-center gap-1">
-                  <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
-                    <Plus className="w-4 h-4" />
+              <label className="aspect-square border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-gray-50 transition-all group relative overflow-hidden bg-gray-50/50">
+                <div className="flex flex-col items-center gap-1 md:gap-2">
+                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white border shadow-sm flex items-center justify-center group-hover:bg-black group-hover:text-white group-hover:border-black transition-colors">
+                    <Plus className="w-4 h-4 md:w-5 md:h-5" />
                   </div>
-                  <span className="text-[10px] font-bold text-gray-400 group-hover:text-black uppercase tracking-widest">
+                  <span className="text-[9px] md:text-[10px] font-bold text-gray-500 group-hover:text-black uppercase tracking-widest">
                     {subiendo ? 'Subiendo...' : 'Añadir'}
                   </span>
                 </div>
@@ -948,35 +958,35 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
             </div>
           </div>
 
-          {/* ... Fotos por Color (código existente) ... */}
-          <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
-            <h3 className="font-semibold border-b pb-2 text-gray-800">Fotos por Color</h3>
-            <div className="grid grid-cols-1 gap-3">
-              {coloresUsados.length === 0 && <div className="text-center py-6 text-gray-400 text-xs italic bg-gray-50 rounded-lg">Crea variantes con color primero.</div>}
+          {/* Fotos por Color */}
+          <div className="bg-white border rounded-xl p-4 md:p-6 shadow-sm space-y-4">
+            <h3 className="font-semibold border-b border-gray-100 pb-2 text-gray-800 text-sm md:text-base">Fotos por Color</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3">
+              {coloresUsados.length === 0 && <div className="text-center py-6 text-gray-400 text-xs italic bg-gray-50 rounded-xl border border-gray-100">Crea variantes con color primero.</div>}
               {coloresUsados.map((c) => {
                 const img = imagenesColor.find(x => x.colorId === c.id);
                 return (
-                  <div key={c.id} className="flex items-center gap-3 p-2.5 border rounded-xl hover:border-gray-300 transition-all bg-white shadow-sm hover:shadow-md group">
-                    <div className={`w-14 h-14 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0 relative border shadow-sm ${img ? 'cursor-zoom-in group-hover:opacity-90' : ''}`} onClick={() => img && setPreviewImage(img.url)}>
+                  <div key={c.id} className="flex items-center gap-3 p-2 md:p-2.5 border border-gray-200 rounded-xl hover:border-gray-300 transition-all bg-white shadow-sm hover:shadow-md group">
+                    <div className={`w-14 h-14 md:w-16 md:h-16 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0 relative border shadow-inner ${img ? 'cursor-zoom-in group-hover:opacity-90' : ''}`} onClick={() => img && setPreviewImage(img.url)}>
                       {img ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={img.url} className="w-full h-full object-cover" alt="" />
                       ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300"><span className="text-[10px] font-bold uppercase tracking-tighter">Sin foto</span></div>
+                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300"><span className="text-[9px] md:text-[10px] font-bold uppercase tracking-tighter">Sin foto</span></div>
                       )}
                       {!img && (
                         <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <span className="text-[8px] bg-black text-white px-1 rounded">SUBIR</span>
+                          <span className="text-[8px] bg-black text-white px-1.5 py-0.5 rounded font-bold">SUBIR</span>
                         </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="w-4 h-4 rounded-full border shadow-sm ring-1 ring-black/5" style={getColorStyle(c.hex)} />
-                        <span className="text-sm font-bold text-gray-800 truncate">{c.nombre}</span>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full border shadow-sm ring-1 ring-black/5 shrink-0" style={getColorStyle(c.hex)} />
+                        <span className="text-xs md:text-sm font-bold text-gray-800 truncate">{c.nombre}</span>
                       </div>
-                      <label className="text-[10px] text-blue-600 font-bold uppercase tracking-widest hover:text-blue-800 cursor-pointer flex items-center gap-1 transition-colors">
-                        {img ? '↺ Cambiar Imagen' : '+ Subir Imagen'}
+                      <label className="inline-flex w-fit text-[9px] md:text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold uppercase tracking-widest cursor-pointer items-center gap-1 transition-colors px-2 py-1 rounded">
+                        {img ? '↺ Cambiar' : '+ Subir'}
                         <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                           const f = e.target.files?.[0]; if (!f) return;
                           const fd = new FormData(); fd.append("colorId", c.id); fd.append("file", f);
@@ -993,80 +1003,82 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
         </div>
       </div>
 
-      {/* ✅ MODAL DE VISTA PREVIA DE IMAGEN */}
+      {/* ✅ MODALES */}
       {previewImage && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}>
-          <button className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors bg-white/10 hover:bg-white/20 p-2 rounded-full" onClick={() => setPreviewImage(null)}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm p-2 md:p-4 animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}>
+          <button className="absolute top-4 right-4 md:top-6 md:right-6 text-white/70 hover:text-white transition-colors bg-white/10 hover:bg-white/20 p-2.5 rounded-full" onClick={() => setPreviewImage(null)}>
+            <XIcon className="w-5 h-5 md:w-6 md:h-6" />
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={previewImage} alt="Vista previa" className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()} />
+          <img src={previewImage} alt="Vista previa" className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
 
-      {/* ✅ MODAL DE VISTA PREVIA DE COLOR */}
       {previewColor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setPreviewColor(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setPreviewColor(null)}>
           <div
-            className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200 flex flex-col items-center gap-4 relative"
+            className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 w-full max-w-xs animate-in zoom-in-95 duration-200 flex flex-col items-center gap-4 md:gap-5 relative"
             onClick={(e) => e.stopPropagation()}
           >
-            <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 p-2" onClick={() => setPreviewColor(null)}>✕</button>
+            <button className="absolute top-3 right-3 bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 p-2 rounded-full transition-colors" onClick={() => setPreviewColor(null)}>
+              <XIcon className="w-4 h-4" />
+            </button>
 
-            <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg ring-1 ring-gray-100" style={getColorStyle(previewColor.hex)} />
+            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-8 border-gray-50 shadow-inner ring-1 ring-gray-200" style={getColorStyle(previewColor.hex)} />
 
-            <div className="text-center">
-              <h3 className="text-xl font-bold text-gray-900">{previewColor.nombre}</h3>
-              <p className="text-sm text-gray-500 font-mono mt-1 bg-gray-100 px-3 py-1 rounded-full uppercase tracking-widest border">
-                {previewColor.hex || "Sin Hex"}
+            <div className="text-center w-full space-y-2">
+              <h3 className="text-xl md:text-2xl font-black text-gray-900 truncate px-2">{previewColor.nombre}</h3>
+              <p className="text-xs md:text-sm text-gray-500 font-mono bg-gray-50 py-1.5 rounded-lg uppercase tracking-widest border border-gray-100 mx-auto w-fit px-4">
+                {previewColor.hex || "Sin Hexadecimal"}
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* ✅ MODAL PARA NUEVO COLOR RÁPIDO */}
       {showNewColorModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowNewColorModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-black text-gray-900 mb-4">Crear Nuevo Color</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block tracking-widest">Nombre del Color</label>
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowNewColorModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 w-full max-w-sm animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg md:text-xl font-black text-gray-900">Nuevo Color</h3>
+              <button onClick={() => setShowNewColorModal(false)} className="p-1.5 bg-gray-100 rounded-full text-gray-500 hover:text-black hover:bg-gray-200"><XIcon className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest">Nombre del Color</label>
                 <input
                   autoFocus
-                  className="w-full border rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-black outline-none"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm md:text-base focus:ring-2 focus:ring-black/10 focus:border-black outline-none transition-all"
                   placeholder="Ej: Rosa Pastel"
                   value={newColorNombre}
                   onChange={(e) => setNewColorNombre(e.target.value)}
                 />
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block tracking-widest">Código HEX (Opcional)</label>
-                <div className="flex items-center gap-2">
+              <div className="space-y-1.5">
+                <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest">Código HEX (Opcional)</label>
+                <div className="flex items-center gap-3">
                   <input
-                    className="flex-1 border rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-black outline-none font-mono"
+                    className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm md:text-base focus:ring-2 focus:ring-black/10 focus:border-black outline-none font-mono uppercase transition-all"
                     placeholder="#000000"
                     value={newColorHex}
                     onChange={(e) => setNewColorHex(e.target.value)}
                   />
-                  <div className="w-10 h-10 rounded-xl border-2 border-white shadow-lg ring-1 ring-black/5" style={getColorStyle(newColorHex)} />
+                  <div className="w-12 h-12 rounded-xl border-4 border-white shadow-md ring-1 ring-gray-200 shrink-0" style={getColorStyle(newColorHex)} />
                 </div>
-                <p className="text-[9px] text-gray-400 mt-1 italic">Para bicolor usa comas: #HEX1, #HEX2</p>
+                <p className="text-[10px] text-gray-400 mt-1 italic">Para bicolor usa comas: <span className="font-mono bg-gray-50 px-1 rounded">#HEX1, #HEX2</span></p>
               </div>
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowNewColorModal(false)}
-                  className="flex-1 px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                  className="flex-1 px-4 py-3 md:py-2.5 text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
                   disabled={creandoColor || !newColorNombre.trim()}
-                  onClick={crearNuevoColor}
-                  className="flex-1 px-4 py-2 text-sm font-bold bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-3 md:py-2.5 text-sm font-bold bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-md"
                 >
                   {creandoColor ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar'}
                 </button>
@@ -1083,46 +1095,56 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
 // COMPONENTES AUXILIARES
 // ============================================================================
 
+// Pequeño helper visual para la tabla
+const ChevronRight = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6" /></svg>
+);
+
 function FilaVarianteAgrupada({ row, onAjustar, onCambiarActiva, onPreviewColor }: any) {
   const [ajuste, setAjuste] = useState("");
   return (
-    <tr className="hover:bg-blue-50/50 transition-colors group">
-      <td className="px-6 py-4">
+    <tr className="hover:bg-blue-50/50 transition-colors group border-b border-gray-50 last:border-0">
+      <td className="px-4 md:px-6 py-3 md:py-4">
         <div className="flex items-center gap-3">
-          {/* ✅ Botón para ver color */}
           <button
             type="button"
             onClick={() => onPreviewColor({ nombre: row.color, hex: row.colorHex })}
-            className="w-9 h-9 rounded-full border shadow-sm ring-2 ring-transparent hover:ring-black/20 hover:scale-110 transition-all cursor-zoom-in flex-shrink-0"
+            className="w-7 h-7 md:w-8 md:h-8 rounded-full border shadow-sm ring-2 ring-transparent hover:ring-black/20 hover:scale-110 transition-all cursor-zoom-in flex-shrink-0"
             style={getColorStyle(row.colorHex)}
             title="Ver detalle de estilo"
           />
-          <span
-            className="text-gray-900 font-bold text-sm cursor-pointer hover:underline hover:text-blue-600 truncate"
+          <span className="text-gray-900 font-bold text-xs md:text-sm cursor-pointer hover:underline hover:text-blue-600 truncate max-w-[100px] sm:max-w-[200px]"
             onClick={() => onPreviewColor({ nombre: row.color, hex: row.colorHex })}
           >
             {row.color}
           </span>
+          {/* SKU para referencia rápida */}
+          <span className="text-[10px] text-slate-500 font-mono bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 font-bold hidden sm:inline-block">
+            {row.sku || "S/N"}
+          </span>
         </div>
       </td>
-      <td className="px-6 py-3 text-center">{row.stockActual}</td>
-      <td className="px-6 py-3 text-right">
-        <div className="flex items-center justify-end gap-2">
-          <input className="w-16 border rounded-md text-xs px-2 py-1.5 text-center" placeholder="+/-" value={ajuste} onChange={e => setAjuste(e.target.value)} />
-          <button onClick={() => { onAjustar(row.id, Number(ajuste)); setAjuste(""); }} className="text-xs bg-black text-white px-3 py-1.5 rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!ajuste}>Ajustar</button>
+      <td className="px-2 md:px-6 py-3 text-center">
+        <span className={`text-sm md:text-base font-black px-2 py-0.5 rounded-md ${row.stockActual === 0 ? 'bg-red-50 text-red-600 border border-red-100' : 'text-slate-900'}`}>
+          {row.stockActual}
+        </span>
+      </td>
+      <td className="px-2 md:px-6 py-3 text-right">
+        <div className="flex items-center justify-end gap-1.5 md:gap-2">
+          <input className="w-12 md:w-16 border border-gray-300 rounded-lg text-xs px-2 py-2 md:py-1.5 text-center focus:ring-2 focus:ring-black/10 outline-none transition-all" placeholder="+ / -" value={ajuste} onChange={e => setAjuste(e.target.value)} type="number" />
+          <button onClick={() => { onAjustar(row.id, Number(ajuste)); setAjuste(""); }} className="text-[10px] md:text-xs font-bold bg-black text-white px-2.5 md:px-3 py-2 md:py-1.5 rounded-lg hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm transition-all uppercase tracking-wider" disabled={!ajuste}>Ajustar</button>
         </div>
       </td>
-      <td className="px-6 py-3 text-center">
-        {/* ✅ Switch Visual para Activar/Desactivar */}
+      <td className="px-4 md:px-6 py-3 text-center w-16">
         <button
           onClick={() => onCambiarActiva(row.id, !row.activa)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 ${row.activa ? 'bg-green-500' : 'bg-gray-200'}`}
+          className={`relative inline-flex h-6 w-11 md:h-7 md:w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 shadow-inner ${row.activa ? 'bg-emerald-500' : 'bg-gray-300'}`}
           title={row.activa ? "Visible en catálogo" : "Oculto en catálogo"}
         >
-          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${row.activa ? 'translate-x-6' : 'translate-x-1'}`} />
+          <span className={`inline-block h-4 w-4 md:h-5 md:w-5 transform rounded-full bg-white shadow transition-transform ${row.activa ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
       </td>
-    </tr>
+    </tr >
   );
 }
 
@@ -1162,11 +1184,11 @@ function HistorialDescuentos({ historial, onEliminar }: { historial: DescuentoIt
   if (listaOrdenada.length === 0) return null;
 
   return (
-    <div className="bg-white border rounded-xl p-6 shadow-sm">
-      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b pb-4 mb-4">
+    <div className="bg-white border border-gray-200 rounded-xl p-4 md:p-6 shadow-sm">
+      <h4 className="text-xs md:text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-3 md:pb-4 mb-3 md:mb-4">
         Historial de Campañas
       </h4>
-      <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+      <div className="max-h-[300px] overflow-y-auto space-y-2.5 md:space-y-3 pr-1 custom-scrollbar">
         {listaOrdenada.map((desc) => {
           const now = new Date();
           const start = new Date(desc.startsAt);
@@ -1181,28 +1203,28 @@ function HistorialDescuentos({ historial, onEliminar }: { historial: DescuentoIt
           let borderClass = 'border-gray-200';
           let bgClass = 'bg-white';
 
-          if (isActive) { borderClass = 'border-green-200'; bgClass = 'bg-green-50'; }
+          if (isActive) { borderClass = 'border-green-300'; bgClass = 'bg-green-50/50'; }
           else if (isFuture) { borderClass = 'border-blue-200'; bgClass = 'bg-blue-50/30'; }
-          if (isCancelled) { borderClass = 'border-red-100'; bgClass = 'bg-red-50/50 opacity-70'; }
+          if (isCancelled) { borderClass = 'border-gray-200'; bgClass = 'bg-gray-50/50 opacity-70'; }
 
           return (
-            <div key={desc.id} className={`flex items-center justify-between p-4 rounded-xl border ${borderClass} ${bgClass} transition-all`}>
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold text-white text-xs shadow-sm ${isActive ? 'bg-green-600' : isFuture ? 'bg-blue-500' : isCancelled ? 'bg-red-400' : 'bg-gray-400'}`}>
+            <div key={desc.id} className={`flex items-center justify-between p-3 md:p-4 rounded-xl border ${borderClass} ${bgClass} transition-all shadow-sm`}>
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className={`w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-lg font-bold text-white text-[10px] md:text-xs shadow-sm shrink-0 ${isActive ? 'bg-green-600' : isFuture ? 'bg-blue-500' : isCancelled ? 'bg-gray-400' : 'bg-gray-400'}`}>
                   {desc.tipo === "PORCENTAJE" ? "%" : "S/"}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className={`font-bold text-sm ${isCancelled ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                  <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                    <span className={`font-black text-sm md:text-base ${isCancelled ? 'line-through text-gray-400' : 'text-gray-900'}`}>
                       {desc.tipo === "PORCENTAJE" ? `-${desc.valor}%` : `-S/ ${desc.valor}`}
                     </span>
-                    {isActive && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold border border-green-200">ACTIVO</span>}
-                    {isFuture && <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold border border-blue-100">PROGRAMADO</span>}
-                    {isCancelled && <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold border border-red-200">CANCELADO</span>}
+                    {isActive && <span className="text-[9px] md:text-[10px] bg-green-100 text-green-700 px-1.5 md:px-2 py-0.5 rounded-full font-bold border border-green-200 tracking-wider">ACTIVA</span>}
+                    {isFuture && <span className="text-[9px] md:text-[10px] bg-blue-50 text-blue-700 px-1.5 md:px-2 py-0.5 rounded-full font-bold border border-blue-200 tracking-wider">PROG.</span>}
+                    {isCancelled && <span className="text-[9px] md:text-[10px] bg-gray-100 text-gray-500 px-1.5 md:px-2 py-0.5 rounded-full font-bold border border-gray-200 tracking-wider">CANC.</span>}
                   </div>
-                  <div className="text-xs text-gray-500 mt-1 flex gap-1">
+                  <div className="text-[10px] md:text-xs text-gray-500 mt-1 md:mt-1.5 flex items-center gap-1 font-medium">
                     <span>{start.toLocaleDateString()}</span>
-                    <span>➜</span>
+                    <span className="text-gray-300">➜</span>
                     <span>{end.toLocaleDateString()}</span>
                   </div>
                 </div>
@@ -1210,10 +1232,10 @@ function HistorialDescuentos({ historial, onEliminar }: { historial: DescuentoIt
               {!isCancelled && (
                 <button
                   onClick={() => onEliminar(desc.id)}
-                  className="group p-2 rounded-full hover:bg-red-50 transition-colors"
+                  className="group p-1.5 md:p-2 rounded-full hover:bg-red-50 hover:text-red-600 text-gray-400 border border-transparent hover:border-red-100 transition-colors shrink-0"
                   title="Cancelar campaña"
                 >
-                  <span className="text-gray-400 group-hover:text-red-600 transition-colors">🗑️</span>
+                  <XIcon className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
               )}
             </div>

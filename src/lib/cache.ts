@@ -55,7 +55,7 @@ export const getCachedHomeSections = unstable_cache(
         });
     },
     ['home-sections'],
-    { revalidate: 600, tags: ['home-sections'] }
+    { revalidate: 10, tags: ['home-sections'] }
 );
 
 /**
@@ -66,13 +66,12 @@ export const getCachedCategoriasVisibles = unstable_cache(
   async () => {
     return await prisma.categoria.findMany({
       where: { 
-        visible: true // 1. Solo trae las visibles
+        visible: true
       },
       include: {
         imagenes: {
           orderBy: { orden: 'asc' }
         },
-        // 2. 🔥 ESTA LÍNEA ES LA MAGIA PARA EL "PRÓXIMAMENTE"
         _count: {
           select: { productos: true }
         }

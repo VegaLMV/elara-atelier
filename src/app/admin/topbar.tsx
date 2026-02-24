@@ -3,11 +3,18 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
+import { Loader2, Menu, X } from "lucide-react"; // Importamos iconos para mejor UX
 
 export default function AdminTopbar() {
     const router = useRouter();
+    const pathname = usePathname(); // 1. Obtenemos la ruta actual
     const [cargando, setCargando] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+    // 2. ✅ EFECTO: Cuando el pathname cambie (navegación), cerramos el menú
+    useEffect(() => {
+        setMobileMenuOpen(false);
+    }, [pathname]);
 
     async function logout() {
         setCargando(true);
@@ -29,8 +36,6 @@ export default function AdminTopbar() {
 
                     {/* MENÚ DESKTOP */}
                     <div className="hidden md:flex items-center gap-6">
-
-                        {/* --- NUEVO GRUPO: COMERCIAL (Ventas y Devoluciones) --- */}
                         <DropdownMenu title="Comercial">
                             <DropdownItem href="/admin/pedidos">📦 Gestión Pedidos</DropdownItem>
                             <DropdownItem href="/admin/ventas/nueva">➕ Nueva Venta (POS)</DropdownItem>
@@ -39,7 +44,6 @@ export default function AdminTopbar() {
                             <DropdownItem href="/admin/devoluciones">↩️ Devoluciones</DropdownItem>
                         </DropdownMenu>
 
-                        {/* GRUPO 1: CATÁLOGO */}
                         <DropdownMenu title="Catálogo">
                             <DropdownItem href="/admin/productos">📦 Productos</DropdownItem>
                             <DropdownItem href="/admin/categorias">🏷️ Categorías</DropdownItem>
@@ -47,7 +51,6 @@ export default function AdminTopbar() {
                             <DropdownItem href="/admin/descuentos">⚡ Campañas</DropdownItem>
                         </DropdownMenu>
 
-                        {/* GRUPO 2: LOGÍSTICA */}
                         <DropdownMenu title="Logística">
                             <DropdownItem href="/admin/compras">🛒 Mis Compras</DropdownItem>
                             <DropdownItem href="/admin/proveedores">🚚 Proveedores</DropdownItem>
@@ -57,7 +60,6 @@ export default function AdminTopbar() {
                             <DropdownItem href="/admin/reportes">📊 Reportes</DropdownItem>
                         </DropdownMenu>
 
-                        {/* GRUPO 3: CONFIGURACIÓN */}
                         <DropdownMenu title="Ajustes">
                             <DropdownItem href="/admin/tienda">🛠️ Tienda</DropdownItem>
                             <div className="h-px bg-gray-100 my-1"></div>
@@ -75,7 +77,7 @@ export default function AdminTopbar() {
                         disabled={cargando}
                         className="hidden md:block text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors border border-transparent hover:border-red-100"
                     >
-                        {cargando ? "..." : "Cerrar sesión"}
+                        {cargando ? <Loader2 className="w-4 h-4 animate-spin" /> : "Cerrar sesión"}
                     </button>
 
                     {/* Botón Móvil */}
@@ -83,16 +85,17 @@ export default function AdminTopbar() {
                         className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                        {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                     </button>
                 </div>
             </div>
 
             {/* MENÚ MÓVIL */}
             {mobileMenuOpen && (
-                <div className="md:hidden border-t border-gray-100 bg-white p-4 space-y-4 shadow-xl absolute w-full left-0 z-50 max-h-[90vh] overflow-y-auto">
+                <div className="md:hidden border-t border-gray-100 bg-white p-4 space-y-4 shadow-xl absolute w-full left-0 z-50 max-h-[90vh] overflow-y-auto animate-in slide-in-from-top-2 duration-200">
 
                     <MobileGroup title="Comercial">
+                        <Link href="/admin/pedidos" className="block py-2 pl-4 text-sm text-gray-600">Pedidos</Link>
                         <Link href="/admin/ventas/nueva" className="block py-2 pl-4 text-sm font-medium text-blue-600">Nueva Venta (POS)</Link>
                         <Link href="/admin/ventas" className="block py-2 pl-4 text-sm text-gray-600">Historial Ventas</Link>
                         <Link href="/admin/devoluciones" className="block py-2 pl-4 text-sm text-gray-600">Devoluciones</Link>
@@ -108,6 +111,7 @@ export default function AdminTopbar() {
                         <Link href="/admin/compras" className="block py-2 pl-4 text-sm text-gray-600">Compras</Link>
                         <Link href="/admin/proveedores" className="block py-2 pl-4 text-sm text-gray-600">Proveedores</Link>
                         <Link href="/admin/kardex" className="block py-2 pl-4 text-sm text-gray-600">Kardex</Link>
+                        <Link href="/admin/clientes" className="block py-2 pl-4 text-sm text-gray-600">Clientes</Link>
                         <Link href="/admin/reportes" className="block py-2 pl-4 text-sm text-blue-600 font-medium">📊 Reportes</Link>
                     </MobileGroup>
 
@@ -118,7 +122,7 @@ export default function AdminTopbar() {
                     </MobileGroup>
 
                     <button onClick={logout} className="w-full text-left py-3 text-sm font-bold text-red-600 border-t border-gray-100 mt-2">
-                        Cerrar Sesión
+                        {cargando ? "Cerrando..." : "Cerrar Sesión"}
                     </button>
                 </div>
             )}
@@ -126,14 +130,13 @@ export default function AdminTopbar() {
     );
 }
 
-// --- SUBCOMPONENTES ---
+// --- SUBCOMPONENTES (Se mantienen igual) ---
 
 function DropdownMenu({ title, children }: { title: string, children: React.ReactNode }) {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const pathname = usePathname();
 
-    // Cerrar al hacer click fuera
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {

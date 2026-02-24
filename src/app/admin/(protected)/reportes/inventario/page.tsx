@@ -49,6 +49,7 @@ interface ReporteInventario {
         stockActual: number;
         stockMinimo: number;
         valorUnitario: number;
+        sku?: string | null;
         imagenUrl?: string | null;
         proveedor?: {
             nombre: string;
@@ -68,6 +69,7 @@ interface ReporteInventario {
         colorHex: string;
         stockActual: number;
         precio: number;
+        sku?: string | null;
         imagenUrl?: string | null;
         ultimaVenta?: string | null;
     }[];
@@ -76,6 +78,7 @@ interface ReporteInventario {
 const ALL_COLUMNS = [
     { id: "imagen", label: "Imagen", enabled: true },
     { id: "producto", label: "Producto", enabled: true },
+    { id: "sku", label: "SKU", enabled: true },
     { id: "talla", label: "Talla", enabled: true },
     { id: "color", label: "Color", enabled: true },
     { id: "stockActual", label: "Stock Actual", enabled: true },
@@ -84,13 +87,11 @@ const ALL_COLUMNS = [
 ];
 
 function getColorStyle(hex: string | null) {
-    if (!hex) return { backgroundColor: '#e2e8f0' }; // slate-200
+    if (!hex) return { backgroundColor: '#e2e8f0' };
     const codes = hex.split(",").map(c => c.trim()).filter(Boolean);
 
     if (codes.length <= 1) return { backgroundColor: codes[0] || '#e2e8f0' };
 
-    // Si hay dos o más colores, hacemos un corte vertical limpio al 50%
-    // Esto evita sombras o mezclas entre los dos tonos
     return {
         background: `linear-gradient(90deg, ${codes[0]} 0%, ${codes[0]} 50%, ${codes[1]} 50%, ${codes[1]} 100%)`
     };
@@ -100,14 +101,11 @@ export default function InventarioReportePage() {
     const [data, setData] = useState<ReporteInventario | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Estados para personalización
     const [columns, setColumns] = useState(ALL_COLUMNS);
     const [note, setNote] = useState("");
 
-    // Estado para el gráfico
     const [chartView, setChartView] = useState<"categoria" | "producto">("categoria");
 
-    // Estados para paginación de tablas
     const ITEMS_PER_PAGE = 5;
     const [pageProveedores, setPageProveedores] = useState(1);
     const [pageAlertas, setPageAlertas] = useState(1);
@@ -157,6 +155,7 @@ export default function InventarioReportePage() {
                     const prodName = a.proveedor ? `${a.producto} - ${a.proveedor.nombre}` : a.producto;
                     row.push(prodName);
                 }
+                if (columns.find(c => c.id === "sku")?.enabled) row.push(a.sku || "-");
                 if (columns.find(c => c.id === "talla")?.enabled) row.push(a.talla);
                 if (columns.find(c => c.id === "color")?.enabled) {
                     const hex = a.colorHex || "#ccc";
@@ -170,9 +169,10 @@ export default function InventarioReportePage() {
         },
         {
             title: "Stock Estancado (Sin ventas > 60 días)",
-            headers: ["Producto", "Variante", "Stock Actual", "Precio", "Última Venta"],
+            headers: ["Producto", "SKU", "Variante", "Stock Actual", "Precio", "Última Venta"],
             data: data.variantesEstancadas.map(v => [
                 v.producto,
+                v.sku || "-",
                 `${v.talla} / ${v.color}`,
                 v.stockActual,
                 v.precio,
@@ -449,6 +449,7 @@ export default function InventarioReportePage() {
                                     <tr>
                                         <th className="text-left py-3 px-2">Imagen</th>
                                         <th className="text-left py-3 px-2">Producto - Proveedor</th>
+                                        <th className="text-left py-3 px-2">SKU</th>
                                         <th className="text-left py-3 px-2">Variante</th>
                                         <th className="text-right py-3 px-2">Stock Actual</th>
                                         <th className="text-right py-3 px-2">Mínimo</th>
@@ -478,6 +479,11 @@ export default function InventarioReportePage() {
                                                             {a.proveedor.nombre}
                                                         </span>
                                                     )}
+                                                </td>
+                                                <td className="py-3 px-2">
+                                                    <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                                                        {a.sku || "N/A"}
+                                                    </span>
                                                 </td>
                                                 <td className="py-3 px-2">
                                                     <div className="flex items-center gap-3">
@@ -552,6 +558,7 @@ export default function InventarioReportePage() {
                                     <tr>
                                         <th className="text-left py-3 px-2">Imagen</th>
                                         <th className="text-left py-3 px-2">Producto</th>
+                                        <th className="text-left py-3 px-2">SKU</th>
                                         <th className="text-left py-3 px-2">Variante</th>
                                         <th className="text-right py-3 px-2">Stock Actual</th>
                                         <th className="text-right py-3 px-2">Precio</th>
@@ -575,6 +582,9 @@ export default function InventarioReportePage() {
                                                     </div>
                                                 </td>
                                                 <td className="py-3 px-2 font-bold text-gray-900">{v.producto}</td>
+                                                <td className="py-3 px-2 text-[10px] font-mono text-slate-400">
+                                                    {v.sku || "N/A"}
+                                                </td>
                                                 <td className="py-3 px-2">
                                                     <div className="flex items-center gap-3">
                                                         <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-black text-slate-500 uppercase tracking-tighter">

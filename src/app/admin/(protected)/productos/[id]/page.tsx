@@ -89,6 +89,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         color: v.color.nombre,
         colorHex: v.color.hex ?? null,
         stockActual: v.stockActual,
+        sku: v.sku,
         activa: v.activa,
       })),
 

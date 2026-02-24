@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
     // 2. Subir imagen a Supabase (si existe)
     if (file && file.size > 0) {
-        const bucket = bucketProductos(); // Tu bucket configurado
+        const bucket = bucketProductos();
         const ext = file.name.split(".").pop();
         const fileName = `empaques/${Date.now()}_${Math.random().toString(36).substring(2)}.${ext}`;
         

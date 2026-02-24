@@ -10,6 +10,7 @@ import {
     ShoppingCart,
     ClipboardList,
     TicketPercent,
+    Users,
     Truck,
     Ruler,
     Palette,
@@ -37,13 +38,23 @@ export default async function AdminHome() {
     if (!sesion) redirect("/admin/login");
 
     // --- DATOS REALES PARA EL DASHBOARD ---
+    const hoy = new Date();
+    const hace30Dias = new Date(hoy);
+    hace30Dias.setDate(hoy.getDate() - 30);
+    const inicioHoy = new Date(hoy.setHours(0, 0, 0, 0));
+
     const [
         totalProductos,
         totalCategorias,
         campanasActivas,
         ultimasVentas,
         ventasHoy,
-        pedidosPendientes // <-- NUEVO: Consulta de Pedidos
+        pedidosPendientes,
+        metricasMes,
+        movimientosMes,
+        empaquesMes,
+        nuevosClientesMes,
+        devolucionesMes
     ] = await Promise.all([
         // 1. Productos Activos
         prisma.producto.count({ where: { estado: 'ACTIVO' } }),
@@ -60,35 +71,78 @@ export default async function AdminHome() {
             }
         }),
 
-        // 4. Últimas 5 Ventas (Actividad Reciente)
+        // 4. Últimas 5 Ventas
         prisma.venta.findMany({
             take: 5,
             orderBy: { fechaVenta: 'desc' },
             include: { cliente: { select: { nombre: true } } }
         }),
 
-        // 5. Ventas de Hoy (Total)
+        // 5. Ventas de Hoy
         prisma.venta.aggregate({
             _sum: { total: true },
-            where: { fechaVenta: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } }
+            where: { fechaVenta: { gte: inicioHoy }, estado: "COMPLETADO" }
         }),
 
-        // 6. Pedidos Pendientes (NUEVO)
+        // 6. Pedidos Pendientes
         prisma.pedido.count({
             where: { estado: 'PENDIENTE' }
-        }).catch(() => 0) // Previene error si no hay pedidos
+        }).catch(() => 0),
+
+        // 7. Métricas del Mes (Ventas y Descuentos)
+        prisma.venta.aggregate({
+            where: { fechaVenta: { gte: hace30Dias }, estado: "COMPLETADO" },
+            _sum: { total: true },
+            _count: true
+        }),
+
+        // 8. COGS Histórico (Movimientos de Venta)
+        prisma.movimientoInventario.findMany({
+            where: {
+                venta: { fechaVenta: { gte: hace30Dias }, estado: "COMPLETADO" },
+                tipo: "VENTA"
+            },
+            select: { costoUnitario: true, cambioCantidad: true }
+        }),
+
+        // 9. Costos de Empaque (Mes)
+        prisma.usoEmpaque.aggregate({
+            where: {
+                venta: { fechaVenta: { gte: hace30Dias }, estado: "COMPLETADO" }
+            },
+            _sum: { costoTotal: true }
+        }),
+
+        // 10. Crecimiento: Nuevos Clientes
+        prisma.cliente.count({
+            where: { creadoEn: { gte: hace30Dias } }
+        }),
+
+        // 11. Riesgo: Devoluciones
+        prisma.devolucion.count({
+            where: { creadoEn: { gte: hace30Dias } }
+        })
     ]);
 
+    // Cálculos Financieros
+    const totalVentasMes = Number(metricasMes._sum.total || 0);
+    const totalCostoVentas = movimientosMes.reduce((acc, m) => {
+        const costo = Number(m.costoUnitario || 0);
+        const cantidad = Math.abs(m.cambioCantidad);
+        return acc + (costo * cantidad);
+    }, 0);
+    const totalCostoEmpaque = Number(empaquesMes._sum.costoTotal || 0);
+    const utilidadBrutaMes = totalVentasMes - totalCostoVentas - totalCostoEmpaque;
+
     const variantesParaAlertas = await prisma.variante.findMany({
-        where: { 
-            activa: true, 
-            producto: { estado: 'ACTIVO' } 
+        where: {
+            activa: true,
+            producto: { estado: 'ACTIVO' }
         },
         select: { stockActual: true, stockMinimo: true }
     });
 
     const totalAlertasStock = variantesParaAlertas.filter(v => v.stockActual < v.stockMinimo).length;
-
     const totalVentasHoy = Number(ventasHoy._sum.total || 0);
 
     return (
@@ -130,45 +184,50 @@ export default async function AdminHome() {
                 </div>
             </div>
 
-            {/* 2. BENTO GRID - KPIs Principales (Modificado a 5 columnas) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
-                
-                {/* NUEVO KPI: Pedidos Pendientes */}
-                <StatCard
-                    label="Pedidos Pendientes"
-                    value={pedidosPendientes.toString()}
-                    icon={<ClipboardList className="w-6 h-6 text-white" />}
-                    color={pedidosPendientes > 0 ? "bg-amber-500 text-white shadow-xl shadow-amber-500/20" : "bg-teal-500 text-white shadow-xl shadow-teal-500/20"}
-                    trend={pedidosPendientes > 0 ? { value: pedidosPendientes, label: "por procesar" } : undefined}
-                />
+            {/* 2. BENTO GRID - KPIs Principales (6 columnas) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
 
                 <StatCard
                     label="Ventas Hoy"
                     value={formatMoney(totalVentasHoy)}
                     icon={<TicketPercent className="w-6 h-6 text-white" />}
                     color="bg-slate-900 text-white shadow-xl shadow-slate-900/20"
-                    trend={{ value: 12, label: "vs ayer" }}
                 />
-                
+
                 <StatCard
-                    label="Productos Activos"
-                    value={totalProductos.toString()}
-                    icon={<Package className="w-6 h-6 text-white" />}
-                    color="bg-indigo-600 text-white shadow-xl shadow-indigo-600/20"
+                    label="Utilidad (30d)"
+                    value={formatMoney(utilidadBrutaMes)}
+                    icon={<BarChart4 className="w-6 h-6 text-white" />}
+                    color="bg-emerald-600 text-white shadow-xl shadow-emerald-500/20"
                 />
-                
+
+                <StatCard
+                    label="Pedidos Pendientes"
+                    value={pedidosPendientes.toString()}
+                    icon={<ClipboardList className="w-6 h-6 text-white" />}
+                    color={pedidosPendientes > 0 ? "bg-amber-500 text-white shadow-xl shadow-amber-500/20" : "bg-teal-500 text-white shadow-xl shadow-teal-500/20"}
+                    trend={pedidosPendientes > 0 ? { value: pedidosPendientes, label: "pendientes" } : undefined}
+                />
+
                 <StatCard
                     label="Alertas Stock"
                     value={totalAlertasStock.toString()}
                     icon={<AlertTriangle className="w-6 h-6 text-white" />}
                     color={totalAlertasStock > 0 ? "bg-red-500 text-white shadow-xl shadow-red-500/20" : "bg-emerald-500 text-white shadow-xl shadow-emerald-500/20"}
                 />
-                
+
                 <StatCard
-                    label="Campañas"
-                    value={campanasActivas.toString()}
-                    icon={<Zap className="w-6 h-6 text-white" />}
-                    color="bg-purple-600 text-white shadow-xl shadow-purple-600/20"
+                    label="Nuevos Clientes"
+                    value={nuevosClientesMes.toString()}
+                    icon={<Users className="w-6 h-6 text-white" />}
+                    color="bg-indigo-600 text-white shadow-xl shadow-indigo-600/20"
+                />
+
+                <StatCard
+                    label="Devoluciones"
+                    value={devolucionesMes.toString()}
+                    icon={<History className="w-6 h-6 text-white" />}
+                    color={devolucionesMes > 0 ? "bg-rose-500 text-white shadow-xl shadow-rose-500/20" : "bg-slate-400 text-white shadow-xl shadow-slate-400/20"}
                 />
             </div>
 
@@ -182,10 +241,10 @@ export default async function AdminHome() {
                         <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                             <LayoutGrid className="w-4 h-4" /> Accesos Directos
                         </h2>
-                        
+
                         {/* Se actualizó a grid-cols-3 md:grid-cols-5 para acomodar el nuevo botón mejor */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                            
+
                             {/* NUEVO BOTÓN: Pedidos */}
                             <QuickActionButton
                                 href="/admin/pedidos"
@@ -241,7 +300,7 @@ export default async function AdminHome() {
                                 icon={<Settings className="w-6 h-6 text-blue-600" />}
                                 label="Ajustes Tienda"
                                 color="bg-blue-50 border-blue-100 hover:border-blue-300"
-                            />  
+                            />
                         </div>
                     </div>
 

@@ -157,14 +157,18 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
     return (
         <div className="bg-[#fcfaf8] min-h-screen">
 
-            {/* SECCIONES EDITORIALES SUPERIORES (Videos o Focos) */}
+            {/* SECCIONES EDITORIALES SUPERIORES */}
             {headerEditorials.map(s => {
                 const content = s.content as any;
                 if (s.type === "VIDEO_BANNER") {
-                    return <VideoBannerSection key={s.id} {...content} />;
+                    return <VideoBannerSection 
+                    key={s.id} 
+                    {...content} 
+                    description={s.descripcion || null}
+                    />;
                 }
                 if (s.type === "CATEGORY_SPOTLIGHT") {
-                    return <CategorySpotlightSection key={s.id} {...content} />;
+                    return <CategorySpotlightSection key={s.id} {...content} description={s.descripcion || null}/>;
                 }
                 return null;
             })}
@@ -233,12 +237,10 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
                 </div>
             </div>
 
-            {/* SECCIONES EDITORIALES INFERIORES (Shop The Look) */}
+            {/* SECCIONES EDITORIALES INFERIORES */}
             {footerEditorials.map(s => {
                 const content = s.content as any;
                 const specificProductIds = Array.isArray(content?.manualProductIds) ? content.manualProductIds : [];
-
-                // Mapeamos los productos específicos de esta sección usando los IDs guardados
                 const specificProducts = specificProductIds
                     .map((id: string) => cleanShopProducts.find(p => p.id === id))
                     .filter(Boolean);
@@ -249,6 +251,7 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
                             key={s.id}
                             title={content.title}
                             subtitle={content.subtitle}
+                            description={s.descripcion || null}
                             imageUrl={content.imageUrl}
                             products={specificProducts}
                         />

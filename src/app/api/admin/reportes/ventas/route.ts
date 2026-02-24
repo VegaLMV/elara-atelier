@@ -146,35 +146,40 @@ export async function GET(request: NextRequest) {
             cantidad: c._count,
         }));
 
-        // NUEVO: Cálculos Financieros (COGS, Utilidad, Margen)
-        const itemsVenta = await prisma.itemVenta.findMany({
-            where: {
-                venta: {
-                    fechaVenta: { gte: from, lte: to },
-                    estado: "COMPLETADO",
+        // NUEVO: Cálculos Financieros Reales (COGS Histórico + Gastos Empaque)
+        const [movimientosVenta, empaquesVenta] = await Promise.all([
+            // Costo real del inventario vendido (basado en el costo congelado al momento de la venta)
+            prisma.movimientoInventario.findMany({
+                where: {
+                    venta: {
+                        fechaVenta: { gte: from, lte: to },
+                        estado: "COMPLETADO",
+                    },
+                    tipo: "VENTA",
                 },
-            },
-            include: {
-                variante: {
-                    include: {
-                        itemsCompra: {
-                            orderBy: { compra: { fechaCompra: 'desc' } },
-                            take: 1,
-                            select: { costoUnitario: true }
-                        }
-                    }
-                }
-            }
-        });
+                select: { costoUnitario: true, cambioCantidad: true },
+            }),
+            // Gastos de empaque asociados
+            prisma.usoEmpaque.aggregate({
+                where: {
+                    venta: {
+                        fechaVenta: { gte: from, lte: to },
+                        estado: "COMPLETADO",
+                    },
+                },
+                _sum: { costoTotal: true },
+            }),
+        ]);
 
-        let costoTotal = 0;
-        itemsVenta.forEach(item => {
-            const costo = Number(item.variante.itemsCompra?.[0]?.costoUnitario || 0);
-            costoTotal += item.cantidad * costo;
-        });
+        const totalCostoVentas = movimientosVenta.reduce((acc, m) => {
+            const costo = Number(m.costoUnitario || 0);
+            const cantidad = Math.abs(m.cambioCantidad);
+            return acc + costo * cantidad;
+        }, 0);
 
+        const totalCostoEmpaque = Number(empaquesVenta._sum.costoTotal || 0);
         const totalIngresos = Number(ventasTotales._sum.total || 0);
-        const utilidadBruta = totalIngresos - costoTotal;
+        const utilidadBruta = totalIngresos - totalCostoVentas - totalCostoEmpaque;
         const margenPromedio = totalIngresos > 0 ? (utilidadBruta / totalIngresos) * 100 : 0;
 
         return NextResponse.json({
@@ -182,11 +187,11 @@ export async function GET(request: NextRequest) {
                 totalIngresos,
                 totalDescuentos: Number(ventasTotales._sum.descuentoTotal || 0),
                 cantidadVentas: ventasTotales._count,
-                ticketPromedio: ventasTotales._count > 0
-                    ? totalIngresos / ventasTotales._count
-                    : 0,
+                ticketPromedio: ventasTotales._count > 0 ? totalIngresos / ventasTotales._count : 0,
                 utilidadBruta,
                 margenPromedio,
+                costoMercancia: totalCostoVentas,
+                costoEmpaque: totalCostoEmpaque,
             },
             ventasPorPeriodo: ventasPorPeriodoArray,
             metodosPago,

@@ -27,7 +27,7 @@ export default async function ReportesPage() {
     const hace30Dias = new Date(hoy);
     hace30Dias.setDate(hoy.getDate() - 30);
 
-    const [ventasMes, clientesActivos, productosVendidos, comprasMes] = await Promise.all([
+    const [ventasMes, clientesActivos, productosVendidos, comprasMes, pedidosMes] = await Promise.all([
         // Total ventas último mes
         prisma.venta.aggregate({
             where: {
@@ -63,6 +63,13 @@ export default async function ReportesPage() {
             },
             _count: true,
         }),
+        // Total pedidos último mes
+        prisma.pedido.aggregate({
+            where: {
+                creadoEn: { gte: hace30Dias },
+            },
+            _count: true,
+        }),
     ]);
 
     const totalVentas = Number(ventasMes._sum.total || 0);
@@ -78,11 +85,18 @@ export default async function ReportesPage() {
             color: "bg-emerald-50 text-emerald-600",
         },
         {
+            title: "Pedidos",
+            description: "Estado de envíos, tasas de conversión y geografía",
+            href: "/admin/reportes/pedidos",
+            icon: Package,
+            color: "bg-blue-50 text-blue-600",
+        },
+        {
             title: "Inventario",
             description: "Stock actual, alertas de productos bajos y valorización",
             href: "/admin/reportes/inventario",
-            icon: Package,
-            color: "bg-blue-50 text-blue-600",
+            icon: BarChart3,
+            color: "bg-slate-50 text-slate-600",
         },
         {
             title: "Clientes",
@@ -131,7 +145,7 @@ export default async function ReportesPage() {
                     <ScrollText className="w-4 h-4" />
                     Resumen Últimos 30 Días
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
                     <StatCard
                         label="Ingresos Totales"
                         value={`S/ ${totalVentas.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`}
@@ -145,15 +159,27 @@ export default async function ReportesPage() {
                         color="bg-blue-50"
                     />
                     <StatCard
+                        label="Pedidos"
+                        value={`${pedidosMes._count}`}
+                        icon={<Package className="w-6 h-6 text-indigo-600" />}
+                        color="bg-indigo-50"
+                    />
+                    <StatCard
                         label="Ticket Promedio"
                         value={`S/ ${ticketPromedio.toFixed(2)}`}
                         icon={<TrendingUp className="w-6 h-6 text-purple-600" />}
                         color="bg-purple-50"
                     />
                     <StatCard
-                        label="Unidades Vendidas"
-                        value={`${productosVendidos._sum.cantidad || 0}`}
-                        icon={<Package className="w-6 h-6 text-amber-600" />}
+                        label="Clientes Activos"
+                        value={`${clientesActivos.length}`}
+                        icon={<Users className="w-6 h-6 text-rose-600" />}
+                        color="bg-rose-50"
+                    />
+                    <StatCard
+                        label="Compras"
+                        value={`${comprasMes._count}`}
+                        icon={<Truck className="w-6 h-6 text-amber-600" />}
                         color="bg-amber-50"
                     />
                 </div>

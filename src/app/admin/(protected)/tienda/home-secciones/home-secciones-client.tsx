@@ -16,18 +16,22 @@ import {
     Trash2,
     Check,
     Loader2,
-    X
+    X,
+    Type,
+    Link as LinkIcon,
+    Image as ImageIcon,
+    ShoppingBag
 } from "lucide-react";
 import { UploaderImage } from "@/components/ui/uploader-image";
 import { formatMoney } from "@/lib/precios";
 
-// Agregamos las nuevas secciones premium
+// Tipos de sección
 type TipoSeccionHome =
     | "HERO"
+    | "CATEGORY_SPOTLIGHT"
     | "BEST_SELLERS"
     | "PROMO_CAMPAIGN"
     | "VIDEO_BANNER"
-    | "CATEGORY_SPOTLIGHT"
     | "SHOP_THE_LOOK";
 
 type HomeSection = {
@@ -36,9 +40,9 @@ type HomeSection = {
     enabled: boolean;
     order: number;
     content: any;
+    descripcion: string | null;
 };
 
-// 👇 NUEVA INTERFAZ PARA RECIBIR LAS CATEGORÍAS 👇
 interface CategoriaBasica {
     id: string;
     nombre: string;
@@ -47,20 +51,40 @@ interface CategoriaBasica {
 
 const LABEL: Record<TipoSeccionHome, string> = {
     HERO: "Hero principal",
+    CATEGORY_SPOTLIGHT: "Foco de Categoría",
     BEST_SELLERS: "Más vendidos / Novedades",
     PROMO_CAMPAIGN: "Campaña Publicitaria",
     VIDEO_BANNER: "Banner de Video",
-    CATEGORY_SPOTLIGHT: "Foco de Categoría",
     SHOP_THE_LOOK: "Shop The Look",
 };
 
+// 👇 EL ORDEN MAESTRO: Forzamos la estructura lógica de la tienda 👇
+const TYPE_ORDER: TipoSeccionHome[] = [
+    "HERO",
+    "CATEGORY_SPOTLIGHT",
+    "BEST_SELLERS",
+    "PROMO_CAMPAIGN",
+    "VIDEO_BANNER",
+    "SHOP_THE_LOOK"
+];
+
+// Agrupa y recalcula el orden global respetando los grupos
 function normalizeOrders(sections: HomeSection[]) {
-    const sorted = [...sections].sort((a, b) => a.order - b.order);
-    return sorted.map((s, i) => ({ ...s, order: i }));
+    let newOrder = 0;
+    const result: HomeSection[] = [];
+    
+    TYPE_ORDER.forEach(type => {
+        const ofType = sections.filter(s => s.type === type).sort((a, b) => a.order - b.order);
+        ofType.forEach(s => {
+            result.push({ ...s, order: newOrder++ });
+        });
+    });
+
+    return result;
 }
 
 // ============================================================
-// ProductPicker (Reutilizable para Best Sellers y Shop the Look)
+// ProductPicker (Reutilizable)
 // ============================================================
 function ProductPicker({
     selectedIds,
@@ -94,14 +118,14 @@ function ProductPicker({
             <div className="relative">
                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                 <input
-                    className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs"
+                    className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs bg-white"
                     placeholder="Buscar producto..."
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                 />
             </div>
 
-            <div className="max-h-[300px] overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50">
+            <div className="max-h-[300px] overflow-y-auto border border-slate-200 bg-white rounded-xl divide-y divide-slate-50 shadow-inner">
                 {loading ? (
                     <div className="p-8 text-center">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-300" />
@@ -121,8 +145,7 @@ function ProductPicker({
                             <div
                                 key={p.id}
                                 onClick={() => onToggle(p.id)}
-                                className={`p-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition-colors ${isSelected ? "bg-slate-50" : ""
-                                    }`}
+                                className={`p-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition-colors ${isSelected ? "bg-slate-50/80" : ""}`}
                             >
                                 <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0">
                                     {img && <img src={img} className="w-full h-full object-cover" />}
@@ -143,7 +166,7 @@ function ProductPicker({
                                     </div>
                                 </div>
                                 {isSelected ? (
-                                    <div className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center">
+                                    <div className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-sm">
                                         <Check className="w-3 h-3" />
                                     </div>
                                 ) : (
@@ -184,7 +207,7 @@ function CampaignPicker({
 
     return (
         <div className="space-y-4">
-            <div className="max-h-[250px] overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50">
+            <div className="max-h-[250px] overflow-y-auto border border-slate-200 bg-white rounded-xl divide-y divide-slate-50 shadow-inner">
                 {loading ? (
                     <div className="p-8 text-center">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-300" />
@@ -200,8 +223,7 @@ function CampaignPicker({
                             <div
                                 key={c.id}
                                 onClick={() => onSelect(isSelected ? null : c)}
-                                className={`p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors ${isSelected ? "bg-slate-50 border-l-4 border-slate-900" : ""
-                                    }`}
+                                className={`p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors ${isSelected ? "bg-slate-50/80 border-l-4 border-slate-900" : ""}`}
                             >
                                 <div>
                                     <p className="text-xs font-bold text-slate-900">{c.nombre}</p>
@@ -213,7 +235,7 @@ function CampaignPicker({
                                     </p>
                                 </div>
                                 {isSelected ? (
-                                    <div className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center">
+                                    <div className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-sm">
                                         <Check className="w-3 h-3" />
                                     </div>
                                 ) : (
@@ -225,11 +247,11 @@ function CampaignPicker({
                 )}
             </div>
             {selected && (
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Productos en esta campaña:</p>
                     <div className="flex flex-wrap gap-2">
                         {selected.detalles?.slice(0, 5).map((d: any) => (
-                            <div key={d.producto.id} className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-md">
+                            <div key={d.producto.id} className="text-[10px] bg-slate-50 border border-slate-200 px-2 py-1 rounded-md text-slate-600 font-medium">
                                 {d.producto.nombre}
                             </div>
                         ))}
@@ -246,11 +268,13 @@ function CampaignPicker({
 // ============================================================
 // Componente principal
 // ============================================================
-// 👇 SE RECIBEN LAS CATEGORÍAS COMO PROP (default vacio para evitar errores) 👇
 export default function HomeSeccionesClient({ initial, categorias = [] }: { initial: HomeSection[], categorias?: CategoriaBasica[] }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+    // Estado para responsividad en móvil (Controlador de vistas)
+    const [isEditingMobile, setIsEditingMobile] = useState(false);
 
     const [sections, setSections] = useState<HomeSection[]>(normalizeOrders(initial as HomeSection[]));
     const [selectedId, setSelectedId] = useState<string>(sections[0]?.id ?? "");
@@ -268,24 +292,39 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
 
     const updateSelectedContent = useCallback((patch: any) => {
         setSections((prev) => {
-            const sec = prev.find(s => s.id === selectedId);
-            if (!sec) return prev;
             return prev.map((s) => s.id === selectedId ? { ...s, content: { ...(s.content ?? {}), ...patch } } : s);
         });
     }, [selectedId]);
 
+    // Función Move Corregida (Mueve elementos SÓLO dentro de su propio grupo)
     const move = useCallback((id: string, dir: "up" | "down") => {
         setSections((prev) => {
-            const sorted = normalizeOrders(prev);
-            const idx = sorted.findIndex((s) => s.id === id);
-            if (idx < 0) return prev;
+            const section = prev.find(s => s.id === id);
+            if (!section) return prev;
 
-            const swapWith = dir === "up" ? idx - 1 : idx + 1;
-            if (swapWith < 0 || swapWith >= sorted.length) return prev;
+            const ofType = prev.filter(s => s.type === section.type).sort((a, b) => a.order - b.order);
+            const idx = ofType.findIndex(s => s.id === id);
 
-            const copy = [...sorted];
-            [copy[idx], copy[swapWith]] = [copy[swapWith], copy[idx]];
-            return normalizeOrders(copy);
+            if (dir === "up" && idx > 0) {
+                const copy = [...prev];
+                const s1Index = copy.findIndex(s => s.id === ofType[idx].id);
+                const s2Index = copy.findIndex(s => s.id === ofType[idx - 1].id);
+                // Intercambiamos el orden para que la recarga lo ordene bien
+                const temp = copy[s1Index].order;
+                copy[s1Index].order = copy[s2Index].order;
+                copy[s2Index].order = temp;
+                return normalizeOrders(copy);
+            } else if (dir === "down" && idx < ofType.length - 1) {
+                const copy = [...prev];
+                const s1Index = copy.findIndex(s => s.id === ofType[idx].id);
+                const s2Index = copy.findIndex(s => s.id === ofType[idx + 1].id);
+                // Intercambiamos el orden
+                const temp = copy[s1Index].order;
+                copy[s1Index].order = copy[s2Index].order;
+                copy[s2Index].order = temp;
+                return normalizeOrders(copy);
+            }
+            return prev; // Si ya está arriba del todo o abajo del todo, no hace nada
         });
     }, []);
 
@@ -295,6 +334,7 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
 
     const deleteSection = useCallback((id: string) => {
         setSections((prev) => normalizeOrders(prev.filter(s => s.id !== id)));
+        setIsEditingMobile(false);
         setSelectedId((prev) => prev === id ? "" : prev);
     }, []);
 
@@ -306,6 +346,7 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
             enabled: true,
             order: sections.length,
             content: {},
+            descripcion: null,
         };
 
         if (type === "HERO") base.content = { title: "Título", subtitle: "Subtítulo", ctaText: "Ver catálogo", ctaHref: "/tienda/catalogo", imageUrl: null, overlayOpacity: 0.25 };
@@ -322,6 +363,7 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
 
         setSections((prev) => normalizeOrders([...prev, base]));
         setSelectedId(id);
+        setIsEditingMobile(true);
     }
 
     async function guardar() {
@@ -336,6 +378,7 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                     enabled: s.enabled,
                     order: s.order,
                     content: s.content ?? {},
+                    descripcion: s.descripcion,
                 }))
             };
 
@@ -354,7 +397,7 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
             const data = (await r.json()) as HomeSection[];
             setSections(normalizeOrders(data as HomeSection[]));
             setSelectedId(data[0]?.id ?? "");
-            setMsg({ type: "ok", text: "Secciones guardadas ✅" });
+            setMsg({ type: "ok", text: "Estructura de tienda actualizada ✅" });
             router.refresh();
         } catch (e: any) {
             setMsg({ type: "err", text: e?.message ?? "Error inesperado" });
@@ -363,14 +406,22 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
         }
     }
 
+    // Helpers UI para el Editor
+    const renderSectionHeader = (icon: any, title: string) => (
+        <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-200/60">
+            {icon}
+            <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500">{title}</h3>
+        </div>
+    );
+
     return (
-        <div className="p-6 md:p-8 max-w-[1600px] mx-auto space-y-8 bg-gray-50/50 min-h-screen">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-gray-200 pb-6">
+        <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8 bg-gray-50/50 min-h-screen">
+            {/* Header Global */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-200 pb-6">
                 <div className="flex items-start gap-4">
                     <Link
                         href="/admin/tienda"
-                        className="p-2 hover:bg-gray-100 rounded-full transition-colors group mt-1"
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors group mt-1 hidden md:block"
                         title="Volver"
                     >
                         <ArrowLeft className="w-6 h-6 text-gray-400 group-hover:text-black" />
@@ -379,11 +430,11 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <div className="p-2 bg-slate-900 text-white rounded-lg shadow-lg shadow-slate-900/20">
-                                <LayoutPanelTop className="w-6 h-6" />
+                                <LayoutPanelTop className="w-5 h-5 md:w-6 md:h-6" />
                             </div>
-                            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Home Secciones</h1>
+                            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Home Secciones</h1>
                         </div>
-                        <p className="text-sm text-gray-500 max-w-2xl ml-1">
+                        <p className="text-xs md:text-sm text-gray-500 max-w-2xl ml-1">
                             Ordena, activa/desactiva y edita las secciones del home público.
                         </p>
                     </div>
@@ -392,16 +443,16 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                 <button
                     onClick={guardar}
                     disabled={busy}
-                    className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2 disabled:opacity-60"
+                    className="w-full md:w-auto bg-slate-900 text-white px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                     <Save className="w-4 h-4 text-emerald-400" />
-                    {busy ? "Guardando..." : "Guardar cambios"}
+                    {busy ? "Guardando..." : "Guardar cambios públicos"}
                 </button>
             </div>
 
             {msg && (
                 <div
-                    className={`border rounded-2xl px-5 py-4 text-sm font-medium ${msg.type === "ok"
+                    className={`border rounded-2xl px-5 py-4 text-sm font-medium shadow-sm ${msg.type === "ok"
                         ? "bg-emerald-50 border-emerald-200 text-emerald-800"
                         : "bg-red-50 border-red-200 text-red-800"
                         }`}
@@ -410,28 +461,31 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                {/* LEFT: LIST */}
-                <div className="lg:col-span-4 sticky top-6 space-y-6">
-                    <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden">
-                        <div className="bg-slate-900 p-6 text-white">
-                            <div className="flex items-center justify-between gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
+                
+                {/* ==================== LEFT: LISTA ESTRUCTURAL ==================== */}
+                <div className={`lg:col-span-4 lg:sticky lg:top-6 space-y-6 ${isEditingMobile ? 'hidden lg:block' : 'block'}`}>
+                    <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden">
+                        <div className="bg-slate-900 p-6 text-white relative overflow-hidden">
+                            {/* Decorative blur */}
+                            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
+
+                            <div className="flex items-center justify-between gap-3 relative z-10">
                                 <div>
-                                    <h3 className="font-bold text-lg tracking-tight">Secciones</h3>
-                                    <p className="text-slate-400 text-xs">Orden y visibilidad</p>
+                                    <h3 className="font-bold text-lg tracking-tight">Estructura Global</h3>
+                                    <p className="text-slate-400 text-xs">Añade o reorganiza</p>
                                 </div>
                             </div>
 
                             {/* Botones de añadir sección */}
-                            <div className="mt-4 space-y-2">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Añadir sección premium</p>
+                            <div className="mt-5 space-y-3 relative z-10">
                                 <div className="flex flex-wrap gap-2">
-                                    {(Object.keys(LABEL) as TipoSeccionHome[]).map((t) => (
+                                    {TYPE_ORDER.map((t) => (
                                         <button
                                             key={t}
                                             type="button"
                                             onClick={() => addSection(t)}
-                                            className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 flex items-center gap-1.5 transition-colors"
+                                            className="text-[10px] font-bold px-3 py-2 rounded-lg bg-white/10 hover:bg-white border border-white/10 hover:border-white hover:text-slate-900 flex items-center gap-1.5 transition-all"
                                         >
                                             <Plus className="w-3 h-3" />
                                             {LABEL[t]}
@@ -441,122 +495,121 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                             </div>
                         </div>
 
-                        <div className="divide-y divide-slate-50 max-h-[70vh] overflow-y-auto">
-                            {sections
-                                .slice()
-                                .sort((a, b) => a.order - b.order)
-                                .map((sec) => {
-                                    const active = sec.id === selectedId;
-                                    return (
-                                        <div
-                                            key={sec.id}
-                                            onClick={() => setSelectedId(sec.id)}
-                                            className={`w-full cursor-pointer text-left p-4 flex items-start justify-between gap-3 hover:bg-slate-50 transition-colors ${active ? "bg-slate-50 ring-2 ring-slate-900/10" : ""
-                                                }`}
-                                        >
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                                    {sec.type} • #{sec.order + 1}
-                                                </p>
-                                                <p className="font-bold text-slate-900 truncate">{LABEL[sec.type as TipoSeccionHome] ?? sec.type}</p>
-                                                <p className="text-xs text-slate-500 truncate mt-1">
-                                                    {sec.content?.title || sec.content?.subtitle || "Sin título"}
-                                                </p>
-                                            </div>
+                        {/* LISTA AGRUPADA POR TIPOS */}
+                        <div className="bg-slate-50 max-h-[60vh] overflow-y-auto">
+                            {TYPE_ORDER.map(type => {
+                                const items = sections.filter(s => s.type === type).sort((a, b) => a.order - b.order);
+                                if (items.length === 0) return null;
 
-                                            <div className="flex flex-col items-end gap-2 shrink-0">
-                                                {/* Toggle */}
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        toggle(sec.id);
-                                                    }}
-                                                    className="text-slate-600 hover:text-slate-900"
-                                                    title={sec.enabled ? "Desactivar" : "Activar"}
-                                                >
-                                                    {sec.enabled ? (
-                                                        <ToggleRight className="w-6 h-6 text-emerald-600" />
-                                                    ) : (
-                                                        <ToggleLeft className="w-6 h-6 text-slate-300" />
-                                                    )}
-                                                </button>
+                                return (
+                                    <div key={type} className="mb-2 last:mb-0">
+                                        <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 bg-slate-100/80 px-5 py-2.5 sticky top-0 z-10 border-y border-slate-200/50 backdrop-blur-md">
+                                            {LABEL[type as TipoSeccionHome]}
+                                        </h4>
+                                        <div className="divide-y divide-slate-100 bg-white">
+                                            {items.map((sec, index) => {
+                                                const active = sec.id === selectedId;
+                                                const isFirst = index === 0;
+                                                const isLast = index === items.length - 1;
 
-                                                {/* Order controls */}
-                                                <div className="flex items-center gap-1">
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            move(sec.id, "up");
+                                                return (
+                                                    <div
+                                                        key={sec.id}
+                                                        onClick={() => {
+                                                            setSelectedId(sec.id);
+                                                            setIsEditingMobile(true);
                                                         }}
-                                                        className="p-1 rounded-lg hover:bg-white border border-transparent hover:border-slate-200"
-                                                        title="Subir"
+                                                        className={`w-full cursor-pointer text-left p-4 flex items-start justify-between gap-3 transition-all ${active ? "bg-slate-50 border-l-4 border-l-slate-900" : "hover:bg-slate-50/50 border-l-4 border-l-transparent"}`}
                                                     >
-                                                        <ChevronUp className="w-4 h-4 text-slate-500" />
-                                                    </button>
+                                                        <div className="min-w-0 pt-1">
+                                                            <p className="font-bold text-sm text-slate-900 truncate leading-tight">
+                                                                {sec.content?.title || "Sin título configurado"}
+                                                            </p>
+                                                            <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                                {sec.content?.subtitle || "Sin subtítulo"}
+                                                            </p>
+                                                        </div>
 
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            move(sec.id, "down");
-                                                        }}
-                                                        className="p-1 rounded-lg hover:bg-white border border-transparent hover:border-slate-200"
-                                                        title="Bajar"
-                                                    >
-                                                        <ChevronDown className="w-4 h-4 text-slate-500" />
-                                                    </button>
+                                                        <div className="flex flex-col items-end gap-2 shrink-0">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault(); e.stopPropagation(); toggle(sec.id);
+                                                                }}
+                                                                className="transition-transform hover:scale-105"
+                                                                title={sec.enabled ? "Desactivar" : "Activar"}
+                                                            >
+                                                                {sec.enabled ? <ToggleRight className="w-6 h-6 text-emerald-500" /> : <ToggleLeft className="w-6 h-6 text-slate-300" />}
+                                                            </button>
 
-                                                    {/* Delete button */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            if (confirm(`¿Eliminar sección "${LABEL[sec.type as TipoSeccionHome] ?? sec.type}"?`)) {
-                                                                deleteSection(sec.id);
-                                                            }
-                                                        }}
-                                                        className="p-1 rounded-lg hover:bg-red-50 hover:border-red-100 border border-transparent"
-                                                        title="Eliminar sección"
-                                                    >
-                                                        <Trash2 className="w-4 h-4 text-red-400" />
-                                                    </button>
-                                                </div>
-                                            </div>
+                                                            {/* Flechas Inteligentes (Solo aparecen si se pueden usar) */}
+                                                            {items.length > 1 && (
+                                                                <div className="flex items-center bg-white rounded-lg border border-slate-200 shadow-sm">
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={isFirst}
+                                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); move(sec.id, "up"); }}
+                                                                        className="p-1 hover:bg-slate-50 text-slate-400 hover:text-slate-900 rounded-l-lg border-r border-slate-200 disabled:opacity-30 disabled:hover:bg-white"
+                                                                    >
+                                                                        <ChevronUp className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={isLast}
+                                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); move(sec.id, "down"); }}
+                                                                        className="p-1 hover:bg-slate-50 text-slate-400 hover:text-slate-900 rounded-r-lg disabled:opacity-30 disabled:hover:bg-white"
+                                                                    >
+                                                                        <ChevronDown className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
-                                    );
-                                })}
+                                    </div>
+                                );
+                            })}
+                            
                             {sections.length === 0 && (
-                                <div className="p-10 text-center text-slate-400 text-sm">
-                                    Sin secciones. Añade una arriba.
+                                <div className="p-12 text-center text-slate-400 text-sm font-medium bg-white">
+                                    El layout está vacío. <br /> Añade una sección desde arriba.
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* RIGHT: EDITOR */}
-                <div className="lg:col-span-8 space-y-6">
+                {/* ==================== RIGHT: EDITOR VISUAL ==================== */}
+                <div className={`lg:col-span-8 space-y-6 ${isEditingMobile ? 'block' : 'hidden lg:block'}`}>
                     {!selected ? (
-                        <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-500">
-                            Selecciona una sección para editar.
+                        <div className="bg-white border border-slate-200 border-dashed rounded-3xl p-16 text-center text-slate-400 flex flex-col items-center justify-center">
+                            <LayoutPanelTop className="w-12 h-12 mb-4 text-slate-200" />
+                            <h3 className="text-lg font-bold text-slate-900 mb-2">Selecciona una sección</h3>
+                            <p className="text-sm max-w-sm">Haz clic en una de las secciones del panel izquierdo para comenzar a editar su contenido.</p>
                         </div>
                     ) : (
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                        Editor • {selected.type}
-                                    </p>
-                                    <h2 className="font-bold text-slate-900">{LABEL[selected.type] ?? selected.type}</h2>
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        Edita el contenido que se renderizará en el home público.
-                                    </p>
+                        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden flex flex-col">
+                            
+                            {/* Editor Header */}
+                            <div className="px-5 py-4 border-b border-slate-100 bg-white flex items-center justify-between sticky top-0 z-20 shadow-sm">
+                                <div className="flex items-center gap-4">
+                                    <button 
+                                        onClick={() => setIsEditingMobile(false)}
+                                        className="lg:hidden p-2 -ml-2 hover:bg-slate-100 rounded-full text-slate-500"
+                                    >
+                                        <ArrowLeft className="w-5 h-5" />
+                                    </button>
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></span>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                                Modo Edición
+                                            </p>
+                                        </div>
+                                        <h2 className="text-lg md:text-xl font-bold text-slate-900">{LABEL[selected.type] ?? selected.type}</h2>
+                                    </div>
                                 </div>
                                 <button
                                     type="button"
@@ -565,137 +618,145 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                                             deleteSection(selected.id);
                                         }
                                     }}
-                                    className="p-2 rounded-xl border border-red-100 bg-red-50 text-red-500 hover:bg-red-100 transition-colors flex items-center gap-1.5 text-xs font-bold"
-                                    title="Eliminar sección"
+                                    className="px-3 py-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors flex items-center gap-2 text-xs font-bold"
+                                    title="Eliminar sección permanentemente"
                                 >
-                                    <Trash2 className="w-4 h-4" /> Eliminar
+                                    <Trash2 className="w-4 h-4" /> <span className="hidden md:inline">Eliminar</span>
                                 </button>
                             </div>
 
-                            <div className="p-6 space-y-5">
+                            {/* Editor Content Area */}
+                            <div className="p-4 md:p-8 space-y-6 md:space-y-8 bg-slate-50/30">
 
                                 {/* === HERO === */}
                                 {selected.type === "HERO" && (
                                     <>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all text-sm font-medium"
-                                                value={selected.content?.title ?? ""}
-                                                onChange={(e) => updateSelectedContent({ title: e.target.value })}
-                                            />
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtítulo</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all text-sm font-medium"
-                                                value={selected.content?.subtitle ?? ""}
-                                                onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
-                                            />
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">CTA Text</label>
-                                                <input
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                    value={selected.content?.ctaText ?? ""}
-                                                    onChange={(e) => updateSelectedContent({ ctaText: e.target.value })}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">CTA Href</label>
-                                                <input
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                    value={selected.content?.ctaHref ?? ""}
-                                                    onChange={(e) => updateSelectedContent({ ctaHref: e.target.value })}
-                                                />
+                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                            {renderSectionHeader(<Type className="w-4 h-4 text-slate-400" />, "Textos Principales")}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Título Principal</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all text-sm font-medium bg-slate-50 focus:bg-white"
+                                                        value={selected.content?.title ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ title: e.target.value })}
+                                                        placeholder="Ej: Nueva Colección"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Subtítulo (Opcional)</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all text-sm font-medium bg-slate-50 focus:bg-white"
+                                                        value={selected.content?.subtitle ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <UploaderImage
-                                            label="Imagen de Fondo"
-                                            url={selected.content?.imageUrl || null}
-                                            onUpload={(url) => updateSelectedContent({ imageUrl: url })}
-                                        />
+                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                            {renderSectionHeader(<LinkIcon className="w-4 h-4 text-slate-400" />, "Botón de Acción (CTA)")}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Texto del Botón</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.ctaText ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ ctaText: e.target.value })}
+                                                        placeholder="Ej: Ver Colección"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Enlace del Botón (URL)</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.ctaHref ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ ctaHref: e.target.value })}
+                                                        placeholder="Ej: /tienda/catalogo"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Overlay opacity (0 - 1)</label>
-                                            <input
-                                                type="number"
-                                                step="0.05"
-                                                min={0}
-                                                max={1}
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                value={selected.content?.overlayOpacity ?? 0.25}
-                                                onChange={(e) =>
-                                                    updateSelectedContent({ overlayOpacity: Number(e.target.value) })
-                                                }
+                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                            {renderSectionHeader(<ImageIcon className="w-4 h-4 text-slate-400" />, "Estilo Visual")}
+                                            <UploaderImage
+                                                modulo="home-secciones"
+                                                label="Imagen de Fondo (Desktop & Mobile)"
+                                                url={selected.content?.imageUrl || null}
+                                                onUpload={(url) => updateSelectedContent({ imageUrl: url })}
                                             />
+                                            <div className="space-y-2 pt-2 border-t border-slate-100 mt-4">
+                                                <label className="text-xs font-bold text-slate-600 ml-1">Filtro Oscurecedor (0 al 1)</label>
+                                                <p className="text-[10px] text-slate-400 ml-1 mb-2">Ayuda a que el texto blanco se lea mejor sobre fotos claras.</p>
+                                                <input
+                                                    type="number" step="0.05" min={0} max={1}
+                                                    className="w-full max-w-[200px] px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900"
+                                                    value={selected.content?.overlayOpacity ?? 0.25}
+                                                    onChange={(e) => updateSelectedContent({ overlayOpacity: Number(e.target.value) })}
+                                                />
+                                            </div>
                                         </div>
                                     </>
                                 )}
 
                                 {/* === BEST_SELLERS === */}
                                 {selected.type === "BEST_SELLERS" && (
-                                    <div className="space-y-6">
-
-                                        {/* Nombres de pestañas */}
-                                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-4">
-                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nombres de Pestañas</h3>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Pestaña "Novedades"</label>
+                                    <>
+                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                            {renderSectionHeader(<Type className="w-4 h-4 text-slate-400" />, "Textos de Pestañas")}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Pestaña Principal (Recientes)</label>
                                                     <input
-                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
                                                         value={selected.content?.title ?? ""}
                                                         onChange={(e) => updateSelectedContent({ title: e.target.value })}
-                                                        placeholder="Novedades"
+                                                        placeholder="Ej: Novedades"
                                                     />
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Pestaña "Más Vendidos"</label>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Pestaña Secundaria</label>
                                                     <input
-                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
                                                         value={selected.content?.subtitle ?? ""}
                                                         onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
-                                                        placeholder="Más Vendidos"
+                                                        placeholder="Ej: Más Vendidos"
                                                     />
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* Modo de selección */}
-                                        <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
-                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Selección de Productos</h3>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Modo</label>
-                                                <div className="flex gap-2">
+                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                            {renderSectionHeader(<ShoppingBag className="w-4 h-4 text-slate-400" />, "Gestión de Productos")}
+                                            <div className="space-y-3">
+                                                <label className="text-xs font-bold text-slate-600 ml-1">Modo de Visualización</label>
+                                                <div className="flex gap-3 bg-slate-50 p-1.5 rounded-xl border border-slate-200 w-fit">
                                                     {["automático", "manual"].map((m) => (
                                                         <button
                                                             key={m}
                                                             type="button"
                                                             onClick={() => updateSelectedContent({ mode: m })}
-                                                            className={`flex-1 py-3 rounded-xl border font-bold text-xs uppercase tracking-widest transition-all ${(selected.content?.mode || "automático") === m
-                                                                ? "bg-slate-900 border-slate-900 text-white shadow-lg"
-                                                                : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
-                                                                }`}
+                                                            className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                                                                (selected.content?.mode || "automático") === m
+                                                                    ? "bg-white text-slate-900 shadow-sm border border-slate-200/60"
+                                                                    : "text-slate-500 hover:text-slate-900"
+                                                            }`}
                                                         >
                                                             {m}
                                                         </button>
                                                     ))}
                                                 </div>
-                                                <p className="text-[10px] text-slate-400 ml-1 mt-1">
+                                                <p className="text-[11px] text-slate-500 ml-1 bg-slate-50 p-3 rounded-lg border border-slate-100 inline-block mt-2">
                                                     {(selected.content?.mode || "automático") === "automático"
-                                                        ? "Modo automático: Se muestran los productos destacados más recientes."
-                                                        : "Modo manual: Selecciona exactamente qué productos quieres mostrar."}
+                                                        ? "🪄 El sistema buscará automáticamente los productos más recientes y más vendidos de tu tienda."
+                                                        : "✍️ Modo Curador: Tú decides exactamente qué productos mostrar en el grid."}
                                                 </p>
                                             </div>
 
                                             {(selected.content?.mode || "automático") === "manual" && (
-                                                <div className="space-y-4 pt-2">
-                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Seleccionar Productos (máx. 8)</label>
+                                                <div className="space-y-4 pt-4 border-t border-slate-100">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Seleccionar Productos (Máximo 8 recomendados)</label>
                                                     <ProductPicker
                                                         selectedIds={selected.content?.manualProductIds || []}
                                                         onToggle={(id) => {
@@ -708,294 +769,341 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                                                     />
 
                                                     {selected.content?.manualProductIds?.length > 0 && (
-                                                        <div className="flex flex-wrap gap-2 pt-2">
-                                                            <p className="w-full text-[10px] text-slate-400 font-bold uppercase">
-                                                                {selected.content.manualProductIds.length} producto(s) seleccionado(s)
+                                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                                            <p className="w-full text-[10px] text-slate-500 font-bold uppercase mb-3">
+                                                                Productos seleccionados ({selected.content.manualProductIds.length})
                                                             </p>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {selected.content.manualProductIds.map((id: string) => (
+                                                                    <div key={id} className="bg-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1.5 border border-slate-200 shadow-sm">
+                                                                        <span className="text-slate-400">ID:</span> {id.slice(-6)}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const next = selected.content.manualProductIds.filter((x: string) => x !== id);
+                                                                                updateSelectedContent({ manualProductIds: next });
+                                                                            }}
+                                                                            className="hover:text-red-500 hover:bg-red-50 rounded-full p-0.5 transition-colors"
+                                                                        >
+                                                                            <X className="w-3 h-3" />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* === PROMO_CAMPAIGN === */}
+                                {selected.type === "PROMO_CAMPAIGN" && (
+                                    <>
+                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                            {renderSectionHeader(<ShoppingBag className="w-4 h-4 text-slate-400" />, "Vincular Descuento Activo")}
+                                            
+                                            <div className="bg-amber-50 border border-amber-200/60 p-4 rounded-xl">
+                                                <p className="text-xs text-amber-800 font-medium">
+                                                    💡 La fecha, porcentaje de descuento y portada se tomarán automáticamente de la campaña que elijas.
+                                                </p>
+                                            </div>
+
+                                            <div className="pt-2">
+                                                <label className="text-xs font-bold text-slate-600 ml-1 block mb-3">Selecciona la campaña de la base de datos</label>
+                                                <CampaignPicker
+                                                    selectedId={selected.content?.selectedCampaignId || null}
+                                                    onSelect={(c) => {
+                                                        if (c) {
+                                                            updateSelectedContent({
+                                                                selectedCampaignId: c.id,
+                                                                title: c.nombre,
+                                                                subtitle: c.descripcion || ""
+                                                            });
+                                                        } else {
+                                                            updateSelectedContent({
+                                                                selectedCampaignId: null,
+                                                                title: "",
+                                                                subtitle: ""
+                                                            });
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                            {renderSectionHeader(<Type className="w-4 h-4 text-slate-400" />, "Textos Promocionales (Opcional)")}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Título Visual (Reemplaza al original)</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.title ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ title: e.target.value })}
+                                                        placeholder="Ej: Gran Oportunidad!"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Mensaje de Urgencia</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.subtitle ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
+                                                        placeholder="Ej: Solo por este fin de semana"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* === VIDEO BANNER === */}
+                                {selected.type === "VIDEO_BANNER" && (
+                                    <>
+                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                            {renderSectionHeader(<ImageIcon className="w-4 h-4 text-slate-400" />, "Contenido Multimedia")}
+                                            
+                                            <div className="bg-slate-900 text-white p-4 rounded-xl shadow-inner mb-2">
+                                                <p className="text-xs font-medium text-slate-300">
+                                                    ⚡ Ingresa la URL directa de un archivo de video <strong className="text-white">.mp4</strong>.
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-600 ml-1">URL del Video</label>
+                                                <input
+                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all font-mono"
+                                                    value={selected.content?.videoUrl ?? ""}
+                                                    onChange={(e) => updateSelectedContent({ videoUrl: e.target.value })}
+                                                    placeholder="https://.../mi-video-campana.mp4"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2 pt-2 border-t border-slate-100">
+                                                <label className="text-xs font-bold text-slate-600 ml-1">Opacidad de Fondo Oscuro (0 al 1)</label>
+                                                <input
+                                                    type="number" step="0.1" min={0} max={1}
+                                                    className="w-full max-w-[200px] px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900"
+                                                    value={selected.content?.overlayOpacity ?? 0.3}
+                                                    onChange={(e) => updateSelectedContent({ overlayOpacity: Number(e.target.value) })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                            {renderSectionHeader(<Type className="w-4 h-4 text-slate-400" />, "Textos & CTA")}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Título</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.title ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ title: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Subtítulo Corto</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.subtitle ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Texto del Botón</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.ctaText ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ ctaText: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Enlace del Botón</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.ctaHref ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ ctaHref: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* === CATEGORY SPOTLIGHT === */}
+                                {selected.type === "CATEGORY_SPOTLIGHT" && (
+                                    <>
+                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                            {renderSectionHeader(<Type className="w-4 h-4 text-slate-400" />, "Enfoque de Colección")}
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-2">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Título (Ej: Vestidos de Noche)</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.title ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ title: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Etiqueta Superior (Subtítulo)</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.subtitle ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2 pt-4 border-t border-slate-100">
+                                                <label className="text-xs font-bold text-slate-600 ml-1">Vincular a Categoría Real (Base de Datos)</label>
+                                                <select
+                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold focus:border-slate-900 outline-none bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+                                                    value={selected.content?.categorySlug ?? ""}
+                                                    onChange={(e) => updateSelectedContent({ categorySlug: e.target.value })}
+                                                >
+                                                    <option value="">-- Redirigir al Catálogo General --</option>
+                                                    {categorias.map(cat => (
+                                                        <option key={cat.id} value={cat.slug}>
+                                                            {cat.nombre}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                                {renderSectionHeader(<ImageIcon className="w-4 h-4 text-slate-400" />, "Fotografía Editorial")}
+                                                <UploaderImage
+                                                    modulo="home-secciones"
+                                                    label="Subir Imagen Vertical"
+                                                    url={selected.content?.imageUrl || null}
+                                                    onUpload={(url) => updateSelectedContent({ imageUrl: url })}
+                                                />
+                                            </div>
+                                            
+                                            <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                                {renderSectionHeader(<LinkIcon className="w-4 h-4 text-slate-400" />, "Botón (CTA)")}
+                                                <div className="space-y-4">
+                                                    <div className="space-y-2">
+                                                        <label className="text-xs font-bold text-slate-600 ml-1">Texto del Botón</label>
+                                                        <input
+                                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                            value={selected.content?.ctaText ?? ""}
+                                                            onChange={(e) => updateSelectedContent({ ctaText: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* === SHOP THE LOOK === */}
+                                {selected.type === "SHOP_THE_LOOK" && (
+                                    <>
+                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                            {renderSectionHeader(<Type className="w-4 h-4 text-slate-400" />, "Identidad del Look")}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Título del Look</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.title ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ title: e.target.value })}
+                                                        placeholder="Ej: Elegancia Urbana"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-bold text-slate-600 ml-1">Etiqueta Superior (Subtítulo)</label>
+                                                    <input
+                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
+                                                        value={selected.content?.subtitle ?? ""}
+                                                        onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <div className="space-y-6">
+                                                <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 h-full">
+                                                    {renderSectionHeader(<ImageIcon className="w-4 h-4 text-slate-400" />, "Referencia Visual")}
+                                                    <UploaderImage
+                                                        modulo="home-secciones"
+                                                        label="Fotografía del Outfit"
+                                                        url={selected.content?.imageUrl || null}
+                                                        onUpload={(url) => updateSelectedContent({ imageUrl: url })}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                                                {renderSectionHeader(<ShoppingBag className="w-4 h-4 text-slate-400" />, "Prendas que componen el Look")}
+                                                <p className="text-[11px] text-slate-500 mb-2">Selecciona las piezas individuales que la modelo lleva puestas en la fotografía.</p>
+                                                
+                                                <ProductPicker
+                                                    selectedIds={selected.content?.manualProductIds || []}
+                                                    onToggle={(id) => {
+                                                        const current = selected.content?.manualProductIds || [];
+                                                        const next = current.includes(id)
+                                                            ? current.filter((x: string) => x !== id)
+                                                            : [...current, id];
+                                                        updateSelectedContent({ manualProductIds: next });
+                                                    }}
+                                                />
+
+                                                {selected.content?.manualProductIds?.length > 0 && (
+                                                    <div className="mt-4 pt-4 border-t border-slate-100">
+                                                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-3">
+                                                            {selected.content.manualProductIds.length} prenda(s) en este outfit
+                                                        </p>
+                                                        <div className="flex flex-col gap-2">
                                                             {selected.content.manualProductIds.map((id: string) => (
-                                                                <div key={id} className="bg-slate-100 text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 border border-slate-200">
-                                                                    ID: {id.slice(-6)}
+                                                                <div key={id} className="bg-slate-50 text-xs font-medium px-3 py-2 rounded-xl flex items-center justify-between border border-slate-200 shadow-sm">
+                                                                    <span className="text-slate-500">Prod. ID: <span className="text-slate-900 font-mono">{id.slice(-6)}</span></span>
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => {
                                                                             const next = selected.content.manualProductIds.filter((x: string) => x !== id);
                                                                             updateSelectedContent({ manualProductIds: next });
                                                                         }}
-                                                                        className="hover:text-red-500"
+                                                                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1 rounded-md transition-colors"
                                                                     >
-                                                                        <X className="w-3 h-3" />
+                                                                        <Trash2 className="w-3.5 h-3.5" />
                                                                     </button>
                                                                 </div>
                                                             ))}
                                                         </div>
-                                                    )}
-                                                </div>
-                                            )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
+                                    </>
                                 )}
 
-                                {/* === PROMO_CAMPAIGN === */}
-                                {selected.type === "PROMO_CAMPAIGN" && (
-                                    <div className="space-y-6">
-                                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-4">
-                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Seleccionar Campaña</h3>
-                                            <CampaignPicker
-                                                selectedId={selected.content?.selectedCampaignId || null}
-                                                onSelect={(c) => {
-                                                    if (c) {
-                                                        updateSelectedContent({
-                                                            selectedCampaignId: c.id,
-                                                            title: c.nombre,
-                                                            subtitle: c.descripcion || ""
-                                                        });
-                                                    } else {
-                                                        updateSelectedContent({
-                                                            selectedCampaignId: null,
-                                                            title: "",
-                                                            subtitle: ""
-                                                        });
-                                                    }
-                                                }}
+                                {/* ========================================================= */}
+                                {/* CAMPO TRANSVERSAL: DESCRIPCIÓN EDITORIAL                  */}
+                                {/* ========================================================= */}
+                                {selected.type !== "BEST_SELLERS" && selected.type !== "PROMO_CAMPAIGN" && selected.type !== "HERO" && (
+                                    <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                                        {renderSectionHeader(<Type className="w-4 h-4 text-slate-400" />, "Storytelling y Contexto")}
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-600 ml-1">
+                                                Descripción Editorial
+                                            </label>
+                                            <textarea
+                                                className="w-full px-4 py-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all text-sm font-medium min-h-[120px] bg-slate-50 focus:bg-white leading-relaxed"
+                                                placeholder="Escribe el storytelling para esta sección (Ej: 'Una paleta inspirada en los atardeceres de Ica...') "
+                                                value={selected.descripcion ?? ""}
+                                                onChange={(e) => updateSelected({ descripcion: e.target.value })}
                                             />
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl">
-                                                <p className="text-[11px] text-amber-800 font-medium">
-                                                    💡 <strong>Nota:</strong> Los datos como fechas y valor del descuento se obtienen automáticamente de la campaña seleccionada. La imagen de la campaña debe configurarse en "Descuentos".
-                                                </p>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título de Publicidad (Override)</label>
-                                                <input
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                    value={selected.content?.title ?? ""}
-                                                    onChange={(e) => updateSelectedContent({ title: e.target.value })}
-                                                    placeholder="Ej: Gran Oportunidad!"
-                                                />
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Descripción corta (Override)</label>
-                                                <textarea
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium min-h-[80px]"
-                                                    value={selected.content?.subtitle ?? ""}
-                                                    onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
-                                                    placeholder="Ej: Aprovecha antes que se agoten"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* === VIDEO BANNER === */}
-                                {selected.type === "VIDEO_BANNER" && (
-                                    <div className="space-y-5">
-                                        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-4">
-                                            <p className="text-[11px] text-amber-800 font-medium">
-                                                💡 <strong>Importante:</strong> Pega el enlace directo a un archivo de video terminado en <strong>.mp4</strong>. Para mejor rendimiento, te sugerimos alojarlo en un servicio como Cloudinary o tu propio hosting.
+                                            <p className="text-[10px] text-slate-400 ml-1 italic">
+                                                Este texto se mostrará en el frontend con una tipografía ligera y elegante, debajo de los títulos principales.
                                             </p>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">URL del Video (.mp4)</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-slate-900 outline-none"
-                                                value={selected.content?.videoUrl ?? ""}
-                                                onChange={(e) => updateSelectedContent({ videoUrl: e.target.value })}
-                                                placeholder="https://tudominio.com/video.mp4"
-                                            />
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-slate-900 outline-none"
-                                                value={selected.content?.title ?? ""}
-                                                onChange={(e) => updateSelectedContent({ title: e.target.value })}
-                                            />
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtítulo (Opcional)</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-slate-900 outline-none"
-                                                value={selected.content?.subtitle ?? ""}
-                                                onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
-                                            />
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Botón: Texto</label>
-                                                <input
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                    value={selected.content?.ctaText ?? ""}
-                                                    onChange={(e) => updateSelectedContent({ ctaText: e.target.value })}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Botón: Enlace</label>
-                                                <input
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                    value={selected.content?.ctaHref ?? ""}
-                                                    onChange={(e) => updateSelectedContent({ ctaHref: e.target.value })}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Filtro Oscuro (0 a 1)</label>
-                                            <input
-                                                type="number" step="0.1" min={0} max={1}
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                value={selected.content?.overlayOpacity ?? 0.3}
-                                                onChange={(e) => updateSelectedContent({ overlayOpacity: Number(e.target.value) })}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* === CATEGORY SPOTLIGHT === */}
-                                {selected.type === "CATEGORY_SPOTLIGHT" && (
-                                    <div className="space-y-5">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título de la Colección</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                value={selected.content?.title ?? ""}
-                                                onChange={(e) => updateSelectedContent({ title: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtítulo</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                value={selected.content?.subtitle ?? ""}
-                                                onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
-                                            />
-                                        </div>
-                                        {/* 👇 AQUI USAMOS EL SELECT PARA LA CATEGORÍA 👇 */}
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Asignar a Categoría</label>
-                                            <select
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-slate-900 outline-none bg-white cursor-pointer"
-                                                value={selected.content?.categorySlug ?? ""}
-                                                onChange={(e) => updateSelectedContent({ categorySlug: e.target.value })}
-                                            >
-                                                <option value="">-- Catálogo General (Se muestra a todos) --</option>
-                                                {categorias.map(cat => (
-                                                    <option key={cat.id} value={cat.slug}>
-                                                        {cat.nombre}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Botón: Texto</label>
-                                                <input
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                    value={selected.content?.ctaText ?? ""}
-                                                    onChange={(e) => updateSelectedContent({ ctaText: e.target.value })}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Botón: Enlace</label>
-                                                <input
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                    value={selected.content?.ctaHref ?? ""}
-                                                    onChange={(e) => updateSelectedContent({ ctaHref: e.target.value })}
-                                                />
-                                            </div>
-                                        </div>
-                                        <UploaderImage
-                                            label="Imagen Principal (Editorial)"
-                                            url={selected.content?.imageUrl || null}
-                                            onUpload={(url) => updateSelectedContent({ imageUrl: url })}
-                                        />
-                                    </div>
-                                )}
-
-                                {/* === SHOP THE LOOK === */}
-                                {selected.type === "SHOP_THE_LOOK" && (
-                                    <div className="space-y-5">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título del Look</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                value={selected.content?.title ?? ""}
-                                                onChange={(e) => updateSelectedContent({ title: e.target.value })}
-                                                placeholder="Ej: Elegancia Urbana"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Subtítulo</label>
-                                            <input
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                                                value={selected.content?.subtitle ?? ""}
-                                                onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
-                                            />
-                                        </div>
-                                        
-                                        {/* 👇 AQUI TAMBIEN USAMOS EL SELECT PARA LA CATEGORÍA 👇 */}
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Asignar a Categoría</label>
-                                            <select
-                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-slate-900 outline-none bg-white cursor-pointer"
-                                                value={selected.content?.categorySlug ?? ""}
-                                                onChange={(e) => updateSelectedContent({ categorySlug: e.target.value })}
-                                            >
-                                                <option value="">-- Catálogo General (Se muestra a todos) --</option>
-                                                {categorias.map(cat => (
-                                                    <option key={cat.id} value={cat.slug}>
-                                                        {cat.nombre}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        <UploaderImage
-                                            label="Fotografía del Outfit (Cuerpo completo)"
-                                            url={selected.content?.imageUrl || null}
-                                            onUpload={(url) => updateSelectedContent({ imageUrl: url })}
-                                        />
-                                        <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
-                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Prendas que componen el Look</h3>
-                                            <ProductPicker
-                                                selectedIds={selected.content?.manualProductIds || []}
-                                                onToggle={(id) => {
-                                                    const current = selected.content?.manualProductIds || [];
-                                                    const next = current.includes(id)
-                                                        ? current.filter((x: string) => x !== id)
-                                                        : [...current, id];
-                                                    updateSelectedContent({ manualProductIds: next });
-                                                }}
-                                            />
-                                            {selected.content?.manualProductIds?.length > 0 && (
-                                                <div className="flex flex-wrap gap-2 pt-2">
-                                                    <p className="w-full text-[10px] text-slate-400 font-bold uppercase">
-                                                        {selected.content.manualProductIds.length} prenda(s) en el outfit
-                                                    </p>
-                                                    {selected.content.manualProductIds.map((id: string) => (
-                                                        <div key={id} className="bg-slate-100 text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 border border-slate-200">
-                                                            ID: {id.slice(-6)}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const next = selected.content.manualProductIds.filter((x: string) => x !== id);
-                                                                    updateSelectedContent({ manualProductIds: next });
-                                                                }}
-                                                                className="hover:text-red-500"
-                                                            >
-                                                                <X className="w-3 h-3" />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                 )}

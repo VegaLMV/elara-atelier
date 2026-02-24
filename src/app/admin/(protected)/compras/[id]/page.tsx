@@ -4,9 +4,11 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { TipoMovimientoInventario } from "@prisma/client";
 import { sesionAdmin } from "@/lib/sesion";
-import { ArrowLeft, Printer, FileText, Calendar, Box, Truck, MapPin, Phone, CreditCard, RotateCcw } from "lucide-react";
-import { PurchaseActions } from "./purchase-actions";
+import { ArrowLeft, FileText, Calendar, Box, Truck, MapPin, Phone, CreditCard, RotateCcw } from "lucide-react";
+import { PurchaseActions, CompraPDFData } from "./purchase-actions";
+import Pagination from "@/components/ui/pagination"; // ✅ Importamos paginación
 
 // Helpers
 function soles(v: any) {
@@ -25,23 +27,24 @@ function getColorStyle(hex: string | null) {
     return { background: `linear-gradient(135deg, ${stops})` };
 }
 
-/**
- * ============================================================================
- * PÁGINA: DETALLE DE COMPRA
- * ============================================================================
- * Muestra el desglose completo de una compra: proveedor, ítems, costos y 
- * movimientos de inventario posteriores (trazabilidad).
- */
 export default async function Page({
     params,
+    searchParams,
 }: {
     params: Promise<{ id: string }>;
+    searchParams: Promise<{ page?: string }>;
 }) {
     const sesion = await sesionAdmin();
     if (!sesion) redirect("/admin/login");
 
     const { id } = await params;
     if (!id) return notFound();
+
+    // PAGINACIÓN CONFIG
+    const sp = await searchParams;
+    const currentPage = Number(sp.page) || 1;
+    const ITEMS_PER_PAGE = 15;
+    const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
     // 1. Consulta Maestra
     const compra = await prisma.compra.findUnique({
@@ -73,26 +76,64 @@ export default async function Page({
     const otros = Number(compra.otrosCostos ?? 0);
     const total = subtotal + envio + otros;
 
-    // 3. Trazabilidad (Movimientos posteriores de los productos comprados)
+    // 3. Trazabilidad Paginada
     const varianteIds = Array.from(new Set(compra.items.map((it) => it.varianteId).filter((id): id is string => id !== null)));
 
+    const movimientosWhere = {
+        OR: [
+            { compraId: compra.id },
+            {
+                varianteId: { in: varianteIds },
+                tipo: { in: [TipoMovimientoInventario.AJUSTE, TipoMovimientoInventario.DEVOLUCION, TipoMovimientoInventario.VENTA, TipoMovimientoInventario.COMPRA] },
+                creadoEn: { gte: compra.fechaCompra },
+            },
+        ],
+    };
+
     const movimientos = await prisma.movimientoInventario.findMany({
-        where: {
-            OR: [
-                { compraId: compra.id }, // Movimiento original de entrada
-                {
-                    varianteId: { in: varianteIds },
-                    tipo: { in: ["AJUSTE", "DEVOLUCION"] },
-                    creadoEn: { gte: compra.fechaCompra },
-                },
-            ],
-        },
+        where: movimientosWhere,
         include: {
-            variante: { include: { producto: true, talla: true, color: true } },
+            variante: {
+                include: {
+                    producto: true,
+                    talla: true,
+                    color: true
+                }
+            },
         },
         orderBy: { creadoEn: "desc" },
-        take: 50,
+        take: ITEMS_PER_PAGE,
+        skip: skip,
     });
+
+    const totalMovimientos = await prisma.movimientoInventario.count({
+        where: movimientosWhere,
+    });
+
+    const totalPages = Math.ceil(totalMovimientos / ITEMS_PER_PAGE);
+
+    // 4. Preparar datos limpios para el PDF (No se pueden pasar fechas, etc. a un Client Component)
+    const datosPDF: CompraPDFData = {
+        id: compra.id,
+        fecha: new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeZone: 'America/Lima' }).format(new Date(compra.fechaCompra)),
+        proveedor: compra.proveedor?.nombre ?? "Proveedor General",
+        ruc: compra.proveedor?.ruc ?? null,
+        razonSocial: compra.proveedor?.razonSocial ?? null,
+        telefono: compra.proveedor?.telefono ?? null,
+        direccion: compra.proveedor?.direccion ?? null,
+        distrito: compra.proveedor?.distrito ?? null,
+        provincia: compra.proveedor?.provincia ?? null,
+        items: compra.items.map(it => ({
+            nombre: it.variante ? `${it.variante.producto.nombre} (${it.variante.color.nombre} - ${it.variante.talla.nombre})` : (it.tipoEmpaque?.nombre ?? "Insumo"),
+            cantidad: it.cantidad,
+            costoUnitario: Number(it.costoUnitario),
+            total: Number(it.costoUnitario) * it.cantidad
+        })),
+        subtotal,
+        envio,
+        otros,
+        total
+    };
 
     return (
         <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-8 bg-gray-50 min-h-screen">
@@ -124,11 +165,11 @@ export default async function Page({
                     >
                         <RotateCcw className="w-4 h-4 mr-2" /> Registrar Devolución
                     </Link>
-                    <PurchaseActions compraId={compra.id} />
+                    <PurchaseActions compraId={compra.id} pdfData={datosPDF} />
                 </div>
             </div>
 
-
+            {/* BLOQUES INFO Y TABLA DE ITEMS (Quedan exactamente igual a tu código) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Info General */}
                 <div className="md:col-span-2 bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-6">
@@ -142,7 +183,7 @@ export default async function Page({
                                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Fecha de Emisión</label>
                                 <div className="flex items-center gap-2 text-slate-900 font-medium">
                                     <Calendar className="w-4 h-4 text-slate-400" />
-                                    {new Date(compra.fechaCompra).toLocaleDateString("es-PE", { dateStyle: 'long' })}
+                                    {new Intl.DateTimeFormat('es-PE', { dateStyle: 'long', timeZone: 'America/Lima' }).format(new Date(compra.fechaCompra))}
                                 </div>
                             </div>
 
@@ -246,6 +287,7 @@ export default async function Page({
                                 <th className="px-6 py-3 w-16 text-center">Img</th>
                                 <th className="px-6 py-3">Producto / Ítem</th>
                                 <th className="px-6 py-3 text-center">Color</th>
+                                <th className="px-6 py-3">SKU</th>
                                 <th className="px-6 py-3 text-right">Cant.</th>
                                 <th className="px-6 py-3 text-right">Costo U.</th>
                                 <th className="px-6 py-3 text-right">Total</th>
@@ -256,7 +298,6 @@ export default async function Page({
                                 const cu = Number(it.costoUnitario);
                                 const imp = cu * it.cantidad;
 
-                                // Lógica visual híbrida
                                 let nombre = "", detalle = "", imgUrl: string | null = null, hexColor: string | null = null;
                                 const esProducto = !!it.variante;
 
@@ -296,6 +337,9 @@ export default async function Page({
                                                 <span className="w-4 h-4 rounded-full border border-gray-300 shadow-sm inline-block" style={getColorStyle(hexColor)} title={it.variante?.color.nombre}></span>
                                             ) : <span className="text-gray-300">-</span>}
                                         </td>
+                                        <td className="px-6 py-4 font-mono text-[10px] text-gray-500">
+                                            {it.variante?.sku || "—"}
+                                        </td>
                                         <td className="px-6 py-4 text-right font-mono text-gray-700 font-medium">{it.cantidad}</td>
                                         <td className="px-6 py-4 text-right text-gray-500 text-xs">{soles(cu)}</td>
                                         <td className="px-6 py-4 text-right font-bold text-gray-900 font-mono">{soles(imp)}</td>
@@ -319,7 +363,7 @@ export default async function Page({
                             <tr>
                                 <th className="px-6 py-3">Fecha</th>
                                 <th className="px-6 py-3">Tipo</th>
-                                <th className="px-6 py-3">Producto Afectado</th>
+                                <th className="px-6 py-3">Producto Afectado / SKU</th>
                                 <th className="px-6 py-3 text-right">Cambio</th>
                                 <th className="px-6 py-3">Nota</th>
                             </tr>
@@ -328,15 +372,16 @@ export default async function Page({
                             {movimientos.map((m) => (
                                 <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-3 text-gray-500 whitespace-nowrap text-xs">
-                                        {new Date(m.creadoEn).toLocaleString("es-PE", { dateStyle: 'short', timeStyle: 'short' })}
+                                        {new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Lima' }).format(new Date(m.creadoEn))}
                                     </td>
                                     <td className="px-6 py-3">
                                         <span className="bg-gray-100 px-2 py-0.5 rounded text-[10px] font-bold text-gray-600">{m.tipo}</span>
                                     </td>
                                     <td className="px-6 py-3 text-xs">
-                                        <span className="font-bold text-gray-700">{m.variante.producto.nombre}</span>
+                                        <span className="font-bold text-gray-700">{m.variante?.producto?.nombre || "Producto desconocido"}</span>
                                         <span className="text-gray-400 mx-1">•</span>
-                                        <span>{m.variante.talla.nombre} / {m.variante.color.nombre}</span>
+                                        <span className="text-gray-600">{m.variante?.talla?.nombre || "?"} / {m.variante?.color?.nombre || "?"}</span>
+                                        <div className="text-[10px] text-indigo-500 font-mono font-bold mt-0.5">{m.variante?.sku || "—"}</div>
                                     </td>
                                     <td className={`px-6 py-3 text-right font-mono font-bold text-xs ${m.cambioCantidad > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                         {m.cambioCantidad > 0 ? `+${m.cambioCantidad}` : m.cambioCantidad}
@@ -350,6 +395,13 @@ export default async function Page({
                         </tbody>
                     </table>
                 </div>
+
+                {/* ✅ Inyección de la Paginación en la tabla */}
+                {totalPages > 1 && (
+                    <div className="p-4 border-t border-gray-100 flex justify-center bg-gray-50/30">
+                        <Pagination totalPages={totalPages} />
+                    </div>
+                )}
             </div>
         </div>
     );

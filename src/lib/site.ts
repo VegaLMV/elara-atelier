@@ -2,7 +2,7 @@ export function baseUrl() {
   const env = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
   if (env) return env.startsWith("http") ? env : `https://${env}`;
 
-  const vercel = process.env.VERCEL_URL; // en prod Vercel
+  const vercel = process.env.VERCEL_URL;
   if (vercel) return `https://${vercel}`;
 
   return "http://localhost:3000";

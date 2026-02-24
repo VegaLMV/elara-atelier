@@ -49,7 +49,7 @@ export const useCartStore = create<CartStore>()(
                 } else {
                     set({ items: [...currentItems, newItem] });
                 }
-                set({ isOpen: true }); // Abrir el carrito al añadir un item
+                set({ isOpen: true });
             },
             removeItem: (varianteId) =>
                 set({

@@ -188,18 +188,21 @@ export default function IdentidadClient({ initial }: { initial: Settings }) {
 
                         <div className="p-6 space-y-6">
                             <UploaderImage
+                                modulo="identidad"
                                 label="Logo Principal"
                                 url={s.logoUrl || null}
                                 onUpload={(url) => setS((p) => ({ ...p, logoUrl: url }))}
                             />
 
                             <UploaderImage
+                                modulo="identidad"
                                 label="Favicon"
                                 url={s.faviconUrl || null}
                                 onUpload={(url) => setS((p) => ({ ...p, faviconUrl: url }))}
                             />
 
                             <UploaderImage
+                                modulo="identidad"
                                 label="Imagen OG / Redes"
                                 url={s.ogImageUrl || null}
                                 onUpload={(url) => setS((p) => ({ ...p, ogImageUrl: url }))}

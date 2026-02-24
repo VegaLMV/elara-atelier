@@ -106,7 +106,7 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start relative">
       
       {/* TOAST NOTIFICATION */}
       {successMsg && (
@@ -117,11 +117,11 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
       )}
 
       {/* ---------------- COLUMNA IZQUIERDA: FORMULARIO ---------------- */}
-      <div className="lg:col-span-4 sticky top-6">
+      <div className="lg:col-span-4 lg:sticky lg:top-6">
         <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden">
           
           {/* Form Header */}
-          <div className="bg-slate-900 p-6 text-white">
+          <div className="bg-slate-900 p-5 md:p-6 text-white">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
                  <Plus className="w-5 h-5 text-white" />
@@ -131,7 +131,7 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
             <p className="text-slate-400 text-xs">Define las dimensiones disponibles para tus productos.</p>
           </div>
 
-          <div className="p-6">
+          <div className="p-5 md:p-6">
             <form onSubmit={crear} className="space-y-5">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Etiqueta</label>
@@ -141,9 +141,8 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
                     placeholder="Ej. XL, 42, Standar"
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
-                    autoFocus
                    />
-                   <Ruler className="absolute left-3 top-3 w-4 h-4 text-slate-400 group-focus-within:text-slate-800 transition-colors" />
+                   <Ruler className="absolute left-3 top-3.5 w-4 h-4 text-slate-400 group-focus-within:text-slate-800 transition-colors" />
                 </div>
               </div>
 
@@ -157,7 +156,7 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
                       value={orden}
                       onChange={(e) => setOrden(e.target.value)}
                     />
-                    <ListOrdered className="absolute left-3 top-3 w-4 h-4 text-slate-400 group-focus-within:text-slate-800 transition-colors" />
+                    <ListOrdered className="absolute left-3 top-3.5 w-4 h-4 text-slate-400 group-focus-within:text-slate-800 transition-colors" />
                 </div>
                 <p className="text-[10px] text-slate-400 flex items-center gap-1">
                    <AlertCircle className="w-3 h-3" />
@@ -174,7 +173,7 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
 
               <button
                 type="submit"
-                className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-slate-900/10 flex justify-center items-center gap-2"
+                className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex justify-center items-center gap-2"
                 disabled={busy || !canCreate}
               >
                 {busy ? (
@@ -193,12 +192,12 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
 
       {/* ---------------- COLUMNA DERECHA: LISTADO ---------------- */}
       <div className="lg:col-span-8">
-         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[500px]">
+         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[400px] lg:min-h-[500px]">
             
             {/* Header Listado */}
-            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-               <div className="flex items-center gap-2">
-                  <span className="bg-white p-2 rounded-lg border border-slate-200 shadow-sm text-slate-600">
+            <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+               <div className="flex items-center gap-3">
+                  <span className="bg-white p-2 rounded-lg border border-slate-200 shadow-sm text-slate-600 shrink-0">
                      <Ruler className="w-4 h-4" />
                   </span>
                   <div>
@@ -212,7 +211,7 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
                <div className="relative w-full sm:w-64 group">
                   <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 group-focus-within:text-slate-600 transition-colors" />
                   <input 
-                      className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none bg-white transition-all shadow-sm"
+                      className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none bg-white transition-all shadow-sm"
                       placeholder="Buscar talla..."
                       value={busqueda}
                       onChange={e => setBusqueda(e.target.value)}
@@ -222,7 +221,7 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
             
             <div className="divide-y divide-slate-50 max-h-[600px] overflow-y-auto custom-scrollbar">
                {rowsFiltradas.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
                      <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-3">
                         <Ruler className="w-8 h-8 text-slate-300" />
                      </div>
@@ -235,8 +234,8 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
                   </div>
                ) : (
                   <>
-                    {/* Header Tabla Falsa */}
-                    <div className="grid grid-cols-12 px-6 py-2 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                    {/* Header Tabla Falsa (Oculto en móviles muy pequeños) */}
+                    <div className="hidden md:grid grid-cols-12 px-6 py-2 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                         <div className="col-span-2 text-center">Orden</div>
                         <div className="col-span-5">Nombre</div>
                         <div className="col-span-2 text-center">Prioridad</div>
@@ -278,63 +277,66 @@ function Fila({
   const changed = nombre.trim() !== row.nombre || Number(orden || 0) !== row.orden;
 
   return (
-    <div className="group grid grid-cols-12 items-center px-6 py-4 hover:bg-slate-50 transition-colors gap-4">
+    <div className="group flex flex-col md:grid md:grid-cols-12 md:items-center px-4 md:px-6 py-4 hover:bg-slate-50 transition-colors gap-3 md:gap-4 border-b border-slate-50 last:border-0">
        
-       {/* Columna Orden Visual */}
-       <div className="col-span-2 flex justify-center">
-          <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-xs font-mono font-bold text-indigo-600 border border-indigo-100 shadow-sm">
-             {row.orden}
-          </div>
+       {/* Sección Superior: Orden visual y Nombre (Móvil) / Columnas 1 y 2 (PC) */}
+       <div className="flex items-center gap-3 md:col-span-7">
+           <div className="w-8 h-8 shrink-0 rounded-full bg-indigo-50 flex items-center justify-center text-xs font-mono font-bold text-indigo-600 border border-indigo-100 shadow-sm md:mx-auto md:w-8 md:h-8">
+              {row.orden}
+           </div>
+           
+           <div className="w-full">
+              <input
+                className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:ring-0 outline-none px-0 py-1 font-bold text-slate-700 transition-colors placeholder:font-normal"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder="Nombre de talla"
+              />
+           </div>
        </div>
 
-       {/* Columna Nombre Editable */}
-       <div className="col-span-5">
-          <input
-            className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-900 focus:ring-0 outline-none px-0 py-1 font-bold text-slate-700 transition-colors placeholder:font-normal"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Nombre"
-          />
+       {/* Sección Inferior: Input Orden y Botones (Móvil) / Columnas 3 y 4 (PC) */}
+       <div className="flex items-center justify-between md:col-span-5 w-full pl-11 md:pl-0">
+           
+           <div className="flex items-center gap-2">
+               <span className="text-[10px] text-slate-400 font-bold uppercase md:hidden">Prioridad:</span>
+               <div className="relative w-16 group/input">
+                  <input
+                    type="number"
+                    step={1}
+                    className="w-full bg-transparent border border-slate-200 md:border-transparent hover:border-slate-300 focus:border-slate-900 rounded px-1 py-1 text-sm text-slate-600 text-center transition-all font-mono"
+                    value={orden}
+                    onChange={(e) => setOrden(e.target.value)}
+                  />
+                  <ArrowUpDown className="absolute right-1 top-2 w-3 h-3 text-slate-300 opacity-0 group-hover/input:opacity-100 pointer-events-none hidden md:block" />
+               </div>
+           </div>
+
+           <div className="flex items-center justify-end gap-2 md:opacity-40 md:group-hover:opacity-100 transition-opacity">
+              {changed && (
+                 <button
+                   type="button"
+                   className="bg-green-600 text-white text-[10px] md:text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-green-700 transition-all shadow-sm animate-in zoom-in flex items-center gap-1"
+                   disabled={disabled || !nombre.trim()}
+                   onClick={() => onSave({ nombre: nombre.trim(), orden: Number.parseInt(orden || "0", 10) || 0 })}
+                 >
+                   <Save className="w-3 h-3" />
+                   <span className="hidden sm:inline">Guardar</span>
+                 </button>
+              )}
+              
+              <button 
+                 type="button" 
+                 className="text-slate-400 hover:text-red-600 p-2 bg-slate-50 md:bg-transparent hover:bg-red-50 rounded-lg transition-colors border border-slate-100 md:border-none" 
+                 disabled={disabled} 
+                 onClick={onDelete}
+                 title="Eliminar talla"
+              >
+                 <Trash2 className="w-4 h-4" />
+              </button>
+           </div>
        </div>
 
-       {/* Columna Input Orden */}
-       <div className="col-span-2 flex justify-center">
-          <div className="relative w-16 group/input">
-             <input
-               type="number"
-               step={1}
-               className="w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-slate-900 rounded px-1 py-1 text-sm text-slate-600 text-center transition-all font-mono"
-               value={orden}
-               onChange={(e) => setOrden(e.target.value)}
-             />
-             <ArrowUpDown className="absolute right-1 top-2 w-3 h-3 text-slate-300 opacity-0 group-hover/input:opacity-100 pointer-events-none" />
-          </div>
-       </div>
-
-       {/* Columna Acciones */}
-       <div className="col-span-3 flex items-center justify-end gap-2 opacity-100 sm:opacity-40 sm:group-hover:opacity-100 transition-opacity">
-          {changed && (
-             <button
-               type="button"
-               className="bg-green-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-green-700 transition-all shadow-sm animate-in zoom-in flex items-center gap-1"
-               disabled={disabled || !nombre.trim()}
-               onClick={() => onSave({ nombre: nombre.trim(), orden: Number.parseInt(orden || "0", 10) || 0 })}
-             >
-               <Save className="w-3 h-3" />
-               Guardar
-             </button>
-          )}
-          
-          <button 
-             type="button" 
-             className="text-slate-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors" 
-             disabled={disabled} 
-             onClick={onDelete}
-             title="Eliminar talla"
-          >
-             <Trash2 className="w-4 h-4" />
-          </button>
-       </div>
     </div>
   );
 }

@@ -107,6 +107,7 @@ export async function GET() {
 
             return {
                 id: v.id,
+                sku: v.sku,
                 producto: v.producto.nombre,
                 talla: v.talla.nombre,
                 color: v.color.nombre,
@@ -130,6 +131,7 @@ export async function GET() {
         // 5. Formatear Variantes Estancadas
         const variantesEstancadas = estancadasDB.map(v => ({
             id: v.id,
+            sku: v.sku,
             producto: v.producto.nombre,
             talla: v.talla.nombre,
             color: v.color.nombre,

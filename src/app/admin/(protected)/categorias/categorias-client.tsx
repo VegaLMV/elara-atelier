@@ -14,7 +14,10 @@ import {
   EyeOff,
   Image as ImageIcon,
   X,
-  Check
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Loader2
 } from "lucide-react";
 import { UploaderImage } from "@/components/ui/uploader-image";
 
@@ -41,6 +44,9 @@ export default function CategoriasClient({ initialRows }: { initialRows: Categor
   const [busqueda, setBusqueda] = useState("");
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // NUEVO: Estado para manejar la confirmación de borrado de imágenes individualmente
+  const [imgToDelete, setImgToDelete] = useState<string | null>(null);
 
   async function crear(e: React.FormEvent) {
     e.preventDefault();
@@ -86,6 +92,7 @@ export default function CategoriasClient({ initialRows }: { initialRows: Categor
     await fetch(`/api/admin/categorias/${categoriaId}/imagenes/${imagenId}`, {
       method: "DELETE",
     });
+    setImgToDelete(null); // Limpiar estado tras borrar
     router.refresh();
   }
 
@@ -96,60 +103,55 @@ export default function CategoriasClient({ initialRows }: { initialRows: Categor
     router.refresh();
   }
 
-  // Lógica de Filtrado
   const categoriasFiltradas = initialRows.filter(c =>
     c.nombre.toLowerCase().includes(busqueda.toLowerCase())
   );
 
-  const categoriaEdit = editingId ? initialRows.find(c => c.id === editingId) : null;
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start relative">
 
       {/* ----------------- COLUMNA IZQUIERDA: FORMULARIO ----------------- */}
-      <div className="lg:col-span-4 sticky top-6">
+      <div className="lg:col-span-4 lg:sticky lg:top-6">
         <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden">
-          {/* Form Header */}
-          <div className="bg-slate-900 p-6 text-white">
+          <div className="bg-slate-900 p-5 md:p-6 text-white">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
                 <Plus className="w-5 h-5 text-white" />
               </div>
               <h3 className="font-bold text-lg tracking-tight">Crear Categoría</h3>
             </div>
-            <p className="text-slate-400 text-xs">Agrega nuevas secciones para organizar tu catálogo.</p>
+            <p className="text-slate-400 text-xs">Agrega nuevas secciones para tu catálogo.</p>
           </div>
 
-          {/* Form Body */}
-          <div className="p-6">
+          <div className="p-5 md:p-6">
             <form onSubmit={crear} className="space-y-5">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Nombre</label>
                 <div className="relative group">
                   <input
-                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300 text-sm font-medium"
+                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300 text-sm font-medium bg-slate-50 focus:bg-white"
                     placeholder="Ej: Vestidos de Noche"
                     value={nombre}
                     onChange={e => setNombre(e.target.value)}
                     disabled={busy}
                   />
-                  <Tag className="absolute left-3 top-3 w-4 h-4 text-slate-400 group-focus-within:text-slate-800 transition-colors" />
+                  <Tag className="absolute left-3 top-3.5 w-4 h-4 text-slate-400 group-focus-within:text-slate-800 transition-colors" />
                 </div>
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
-                <p className="text-xs text-amber-800">
-                  💡 <strong>Nota:</strong> Las categorías nuevas estarán <strong>ocultas</strong> por defecto. Configura sus imágenes y productos antes de hacerlas visibles.
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl">
+                <p className="text-[11px] md:text-xs text-amber-800 leading-relaxed">
+                  💡 <strong>Nota:</strong> Las categorías nuevas estarán <strong>ocultas</strong> por defecto. Configura sus imágenes antes de publicarlas.
                 </p>
               </div>
 
               <button
                 disabled={busy || !nombre.trim()}
-                className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-slate-900/10 flex justify-center items-center gap-2"
+                className="w-full bg-slate-900 text-white py-3.5 md:py-3 rounded-xl font-bold hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex justify-center items-center gap-2"
               >
                 {busy ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     Guardando...
                   </>
                 ) : (
@@ -163,12 +165,11 @@ export default function CategoriasClient({ initialRows }: { initialRows: Categor
 
       {/* ----------------- COLUMNA DERECHA: LISTADO ----------------- */}
       <div className="lg:col-span-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[500px]">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[400px] lg:min-h-[500px]">
 
-          {/* Header con Buscador y Stats */}
-          <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="bg-white p-2 rounded-lg border border-slate-200 shadow-sm text-slate-600">
+          <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="bg-white p-2 rounded-lg border border-slate-200 shadow-sm text-slate-600 shrink-0">
                 <FolderOpen className="w-4 h-4" />
               </span>
               <div>
@@ -179,10 +180,10 @@ export default function CategoriasClient({ initialRows }: { initialRows: Categor
               </div>
             </div>
 
-            <div className="relative w-full sm:w-72 group">
+            <div className="relative w-full sm:w-64 group">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 group-focus-within:text-slate-600 transition-colors" />
               <input
-                className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none bg-white transition-all shadow-sm"
+                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none bg-white transition-all shadow-sm"
                 placeholder="Buscar por nombre..."
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
@@ -190,157 +191,178 @@ export default function CategoriasClient({ initialRows }: { initialRows: Categor
             </div>
           </div>
 
-          {/* Resultados */}
-          <div className="divide-y divide-slate-50 max-h-[600px] overflow-y-auto custom-scrollbar">
+          <div className="divide-y divide-slate-50 overflow-y-auto max-h-[600px] custom-scrollbar">
             {categoriasFiltradas.map(c => {
               const tieneProductos = c._count.productos > 0;
               const isEditing = editingId === c.id;
 
               return (
-                <div key={c.id} className="group p-4 hover:bg-slate-50 transition-colors">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                    <div className="flex items-start gap-4 flex-1">
-                      {/* Icono de Item */}
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border ${c.visible ? 'bg-green-50 text-green-600 border-green-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
-                        <Tag className="w-5 h-5" />
-                      </div>
-
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-bold text-slate-900 text-base">{c.nombre}</p>
-                          {tieneProductos && (
-                            <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold border border-green-200 flex items-center gap-1">
-                              <Package className="w-3 h-3" /> {c._count.productos}
-                            </span>
-                          )}
-                          {c.visible ? (
-                            <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold border border-green-200 flex items-center gap-1">
-                              <Eye className="w-3 h-3" /> Visible
-                            </span>
-                          ) : (
-                            <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5 rounded-full font-bold border border-slate-200 flex items-center gap-1">
-                              <EyeOff className="w-3 h-3" /> Oculta
-                            </span>
-                          )}
+                <div key={c.id} className={`group p-4 md:p-5 transition-all ${isEditing ? 'bg-slate-50/50' : 'hover:bg-slate-50'}`}>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 md:gap-4 flex-1">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm ${c.visible ? 'bg-green-50 text-green-600 border-green-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                          <Tag className="w-5 h-5" />
                         </div>
-
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-xs font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                            /{c.slug}
-                          </span>
-                          <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
-                            <ImageIcon className="w-3 h-3" /> {c.imagenes.length} {c.imagenes.length === 1 ? 'imagen' : 'imágenes'}
-                          </span>
-                        </div>
-
-                        {/* Galería de imágenes */}
-                        {isEditing && (
-                          <div className="mt-4 space-y-3">
-                            <div className="flex flex-wrap gap-2">
-                              {c.imagenes.map((img) => (
-                                <div key={img.id} className="relative group/img">
-                                  <img
-                                    src={img.url}
-                                    alt=""
-                                    className={`w-20 h-20 object-cover rounded-lg border-2 ${img.esPortada ? 'border-green-500' : 'border-slate-200'}`}
-                                  />
-                                  <button
-                                    onClick={() => removeImage(c.id, img.id)}
-                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover/img:opacity-100 transition-opacity"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                  {!img.esPortada && (
-                                    <button
-                                      onClick={() => setPortada(c.id, img.id)}
-                                      className="absolute bottom-1 right-1 bg-white/90 text-green-600 rounded px-1.5 py-0.5 text-[9px] font-bold opacity-0 group-hover/img:opacity-100 transition-opacity"
-                                    >
-                                      Portada
-                                    </button>
-                                  )}
-                                  {img.esPortada && (
-                                    <div className="absolute bottom-1 right-1 bg-green-500 text-white rounded px-1.5 py-0.5 text-[9px] font-bold flex items-center gap-0.5">
-                                      <Check className="w-2 h-2" /> Portada
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-bold text-slate-900 text-sm md:text-base truncate">{c.nombre}</p>
+                            <div className="flex gap-1.5 items-center">
+                              {tieneProductos && (
+                                <span className="bg-blue-50 text-blue-700 text-[9px] px-2 py-0.5 rounded-md font-bold border border-blue-100 flex items-center gap-1">
+                                  <Package className="w-2.5 h-2.5" /> {c._count.productos}
+                                </span>
+                              )}
+                              <span className={`text-[9px] px-2 py-0.5 rounded-md font-bold border flex items-center gap-1 ${c.visible ? 'bg-green-50 text-green-700 border-green-100' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                                {c.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                                {c.visible ? 'Visible' : 'Oculta'}
+                              </span>
                             </div>
-
-                            <UploaderImage
-                              label="Agregar Imagen"
-                              url={null}
-                              onUpload={(url) => { if (url) addImage(c.id, url); }}
-                            />
                           </div>
-                        )}
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                              /{c.slug}
+                            </span>
+                          </div>
+                        </div>
                       </div>
+                      <button 
+                        onClick={() => setEditingId(isEditing ? null : c.id)}
+                        className="p-2 bg-white border border-slate-200 rounded-lg text-slate-400 md:hidden"
+                      >
+                        {isEditing ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className={`${isEditing ? 'flex' : 'hidden md:flex'} flex-wrap items-center gap-2 pt-2 border-t border-slate-100 md:border-0 md:pt-0 justify-end`}>
                       <button
                         onClick={() => setEditingId(isEditing ? null : c.id)}
-                        className="text-xs font-bold px-4 py-2 rounded-lg border transition-all flex items-center gap-2 text-slate-700 bg-white border-slate-200 hover:bg-slate-50"
+                        className={`text-[11px] font-bold px-3 py-2 rounded-lg border transition-all flex items-center gap-2 ${isEditing ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-700 bg-white border-slate-200 hover:bg-slate-50'}`}
                       >
                         <ImageIcon className="w-3.5 h-3.5" />
-                        {isEditing ? 'Cerrar' : 'Imágenes'}
+                        {isEditing ? 'Cerrar Galería' : 'Imágenes'}
                       </button>
 
                       <button
                         onClick={() => toggleVisibility(c.id, c.visible)}
-                        className={`text-xs font-bold px-4 py-2 rounded-lg border transition-all flex items-center gap-2 ${c.visible
-                          ? 'text-slate-600 bg-slate-50 border-slate-200 hover:bg-slate-100'
+                        className={`text-[11px] font-bold px-3 py-2 rounded-lg border transition-all flex items-center gap-2 ${c.visible
+                          ? 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
                           : 'text-green-600 bg-green-50 border-green-200 hover:bg-green-100'
-                          }`}
+                        }`}
                       >
                         {c.visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        {c.visible ? 'Ocultar' : 'Mostrar'}
+                        {c.visible ? 'Ocultar' : 'Publicar'}
                       </button>
 
                       <button
                         onClick={() => eliminar(c.id)}
                         disabled={tieneProductos}
-                        title={tieneProductos ? "No se puede eliminar: tiene productos asociados" : "Eliminar categoría"}
-                        className={`text-xs font-bold px-4 py-2 rounded-lg border transition-all flex items-center gap-2 ${tieneProductos
-                          ? 'text-slate-400 bg-slate-50 border-transparent cursor-not-allowed opacity-70'
-                          : 'text-red-600 bg-white border-red-100 hover:bg-red-50 hover:border-red-200 hover:shadow-sm'
-                          }`}
+                        className={`text-[11px] font-bold px-3 py-2 rounded-lg border transition-all flex items-center gap-2 ${tieneProductos
+                          ? 'text-slate-300 bg-slate-50 border-slate-100 cursor-not-allowed'
+                          : 'text-red-600 bg-white border-red-100 hover:bg-red-50 hover:border-red-200'
+                        }`}
                       >
-                        {tieneProductos ? (
-                          <>
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            Protegido
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Eliminar
-                          </>
-                        )}
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {tieneProductos ? 'Protegido' : 'Eliminar'}
                       </button>
                     </div>
+
+                    {isEditing && (
+                      <div className="mt-2 p-4 bg-white rounded-xl border border-slate-200 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center gap-2 mb-2">
+                           <ImageIcon className="w-4 h-4 text-slate-400" />
+                           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Galería de Categoría</h4>
+                        </div>
+
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                          {c.imagenes.map((img) => (
+                            <div key={img.id} className="relative group/img aspect-square rounded-lg overflow-hidden border-2 bg-slate-50 transition-all border-slate-100">
+                              <img
+                                src={img.url}
+                                alt=""
+                                className={`w-full h-full object-cover transition-opacity ${img.esPortada ? 'opacity-100' : 'opacity-80 group-hover/img:opacity-100'}`}
+                              />
+                              
+                              {/* Overlay de acciones normales */}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => setImgToDelete(img.id)}
+                                  className="p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg"
+                                  title="Eliminar"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                                {!img.esPortada && (
+                                  <button
+                                    onClick={() => setPortada(c.id, img.id)}
+                                    className="p-1.5 bg-green-500 text-white rounded-full hover:bg-green-600 shadow-lg"
+                                    title="Poner como portada"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* MEJORA UX: Overlay de confirmación de borrado */}
+                              {imgToDelete === img.id && (
+                                <div className="absolute inset-0 bg-red-600/95 z-10 flex flex-col items-center justify-center p-2 text-center animate-in zoom-in duration-200">
+                                  <AlertTriangle className="w-5 h-5 text-white mb-1" />
+                                  <p className="text-[9px] text-white font-black uppercase leading-tight mb-2">¿Confirmar borrado?</p>
+                                  <div className="flex gap-1 w-full">
+                                    <button 
+                                      onClick={() => removeImage(c.id, img.id)}
+                                      className="flex-1 bg-white text-red-600 py-1 rounded-md text-[10px] font-bold"
+                                    >SÍ</button>
+                                    <button 
+                                      onClick={() => setImgToDelete(null)}
+                                      className="flex-1 bg-slate-800 text-white py-1 rounded-md text-[10px] font-bold"
+                                    >NO</button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {img.esPortada && (
+                                <div className="absolute top-1 left-1 bg-green-500 text-white rounded-md p-0.5 shadow-sm">
+                                  <Check className="w-3 h-3" />
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="max-w-md pt-2">
+                          <UploaderImage
+                            modulo="categorias"
+                            label="Añadir Imagen Editorial"
+                            url={null}
+                            onUpload={(url) => { if (url) addImage(c.id, url); }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })}
 
             {categoriasFiltradas.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="flex flex-col items-center justify-center py-20 text-center px-4">
                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-3">
                   <Search className="w-8 h-8 text-slate-300" />
                 </div>
                 <h3 className="text-slate-900 font-bold">No se encontraron categorías</h3>
-                <p className="text-slate-400 text-sm max-w-xs mx-auto mt-1">
-                  {busqueda
-                    ? `No hay resultados para "${busqueda}". Intenta con otro término.`
-                    : "Aún no has registrado ninguna categoría en el sistema."}
-                </p>
               </div>
             )}
           </div>
         </div>
       </div>
-
     </div>
+  );
+}
+
+// Pequeño componente adicional para el icono de advertencia
+function AlertTriangle({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
   );
 }

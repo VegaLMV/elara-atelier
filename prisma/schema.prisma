@@ -507,6 +507,7 @@ model HomeSection {
   enabled       Boolean         @default(true)
   order         Int             @default(0)
   content       Json
+  descripcion String?
 
   creadoEn      DateTime        @default(now())
   actualizadoEn DateTime        @updatedAt

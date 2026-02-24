@@ -7,6 +7,7 @@ interface VideoBannerProps {
     videoUrl: string;
     title?: string;
     subtitle?: string;
+    description?: string | null;
     ctaText?: string;
     ctaHref?: string;
     overlayOpacity?: number;
@@ -16,6 +17,7 @@ export default function VideoBannerSection({
     videoUrl,
     title,
     subtitle,
+    description,
     ctaText,
     ctaHref,
     overlayOpacity = 0.3
@@ -36,7 +38,7 @@ export default function VideoBannerSection({
                 Tu navegador no soporta videos.
             </video>
 
-            {/* Overlay Oscuro para que el texto sea legible */}
+            {/* Overlay Oscuro */}
             <div 
                 className="absolute inset-0 bg-black transition-opacity duration-500"
                 style={{ opacity: overlayOpacity }}
@@ -51,9 +53,17 @@ export default function VideoBannerSection({
                 )}
                 
                 {title && (
-                    <h2 className="text-4xl md:text-6xl lg:text-7xl font-serif text-white mb-8 md:mb-10 max-w-4xl leading-[1.1] animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-150 fill-mode-both">
+                    <h2 className="text-4xl md:text-6xl lg:text-7xl font-serif text-white mb-4 md:mb-6 max-w-4xl leading-[1.1] animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-150 fill-mode-both">
                         {title}
                     </h2>
+                )}
+
+                {description && (
+                    <div className="max-w-2xl mb-8 md:mb-10 animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-200 fill-mode-both">
+                        <p className="text-white/70 font-light leading-relaxed text-sm md:text-base lg:text-lg italic font-serif">
+                            {description}
+                        </p>
+                    </div>
                 )}
                 
                 {ctaText && ctaHref && (

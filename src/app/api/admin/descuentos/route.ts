@@ -44,19 +44,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Faltan datos obligatorios" }, { status: 400 });
     }
 
-    // --- 2. Lógica de Fechas ---
-    const fechaInicio = new Date(startsAt);
-    const fechaFin = new Date(endsAt);
-    fechaFin.setHours(23, 59, 59, 999);
+    // --- 2. Lógica de Fechas (Perú UTC-5) ---
+    const now = new Date();
 
-    const hoySinHora = new Date();
-    hoySinHora.setHours(0, 0, 0, 0);
-    const inicioCheck = new Date(startsAt);
-    inicioCheck.setHours(0, 0, 0, 0);
+    // Si el usuario elige "2026-02-25", queremos que inicie a las 00:00 de Perú.
+    // 00:00 Lima = 05:00 UTC.
+    const fechaInicio = new Date(`${startsAt}T05:00:00.000Z`);
 
-    if (inicioCheck < hoySinHora) {
-      return NextResponse.json({ error: "⚠️ No puedes crear una campaña con fecha de inicio en el pasado." }, { status: 400 });
+    // Y queremos que termine a las 23:59:59 de Perú del día seleccionado.
+    // 23:59:59 Lima = 04:59:59 UTC del día siguiente.
+    const fechaFin = new Date(`${endsAt}T04:59:59.999Z`);
+    fechaFin.setUTCDate(fechaFin.getUTCDate() + 1);
+
+    // Calcular Estado Inicial anticipadamente para validaciones
+    let estadoInicial = "PROGRAMADO";
+    if (now >= fechaInicio && now <= fechaFin) estadoInicial = "ACTIVO";
+
+    // Para validación "no pasado", comparamos con el inicio del día hoy en Lima.
+    const hoyLima = new Date();
+    hoyLima.setUTCHours(5, 0, 0, 0);
+
+    if (fechaInicio < hoyLima && estadoInicial !== "ACTIVO") {
+      // Nota: Permitimos iniciar hoy si la hora actual > 05:00 UTC
+      if (fechaInicio.getTime() + (24 * 60 * 60 * 1000) < hoyLima.getTime()) {
+        return NextResponse.json({ error: "⚠️ No puedes crear una campaña con fecha de inicio en el pasado." }, { status: 400 });
+      }
     }
+
     if (fechaFin < fechaInicio) {
       return NextResponse.json({ error: "⚠️ La fecha de fin no puede ser anterior a la de inicio" }, { status: 400 });
     }
@@ -105,18 +119,14 @@ export async function POST(request: Request) {
     if (conflictos) {
       const c = conflictos.campana;
       const p = conflictos.producto;
-      const fInicio = new Date(c.startsAt).toLocaleDateString();
-      const fFin = new Date(c.endsAt).toLocaleDateString();
+      const fmt = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Lima' });
+      const fInicio = fmt.format(new Date(c.startsAt));
+      const fFin = fmt.format(new Date(c.endsAt));
 
       return NextResponse.json({
         error: `⚠️ CONFLICTO: El producto "${p.nombre}" ya está en la campaña "${c.nombre}" (${c.estado}) del ${fInicio} al ${fFin}.`
       }, { status: 409 });
     }
-
-    // --- 5. Determinar Estado Inicial ---
-    const now = new Date();
-    let estadoInicial = "PROGRAMADO";
-    if (now >= fechaInicio && now <= fechaFin) estadoInicial = "ACTIVO";
 
     // --- 6. Crear Campaña y Vínculos ---
     const nuevaCampana = await prisma.campana.create({

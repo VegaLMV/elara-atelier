@@ -63,10 +63,11 @@ export async function PATCH(
             return NextResponse.json({ error: "⚠️ La nueva fecha de inicio no puede ser en el pasado." }, { status: 400 });
         }
 
+        // 3. Validación de Fechas (Perú UTC-5)
         const now = new Date();
-        const fechaInicio = new Date(startsAt);
-        const fechaFin = new Date(endsAt);
-        fechaFin.setHours(23, 59, 59, 999);
+        const fechaInicio = new Date(`${startsAt}T05:00:00.000Z`);
+        const fechaFin = new Date(`${endsAt}T04:59:59.999Z`);
+        fechaFin.setUTCDate(fechaFin.getUTCDate() + 1);
 
         if (fechaFin < fechaInicio) {
             return NextResponse.json({ error: "⚠️ La fecha fin debe ser posterior al inicio" }, { status: 400 });

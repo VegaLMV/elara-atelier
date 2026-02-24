@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
+import { revalidateCache } from "@/lib/cache";
 
 // Función simplificada solo con lo esencial (Hero y Best Sellers)
 async function ensureDefaults() {
@@ -23,6 +24,7 @@ async function ensureDefaults() {
           imageUrl: null,
           overlayOpacity: 0.25,
         },
+        descripcion: null,
       },
     }),
     prisma.homeSection.create({
@@ -36,6 +38,7 @@ async function ensureDefaults() {
           mode: "automático",
           manualProductIds: []
         },
+        descripcion: null,
       },
     })
   ]);
@@ -65,7 +68,6 @@ export async function PUT(req: Request) {
 
   const sections = body.sections as any[];
 
-  // 🔥 MAGIA APLICADA: Obtener los IDs que SÍ existen para no borrarlos
   const idsToKeep = sections
     .map((s) => s.id)
     .filter((id) => id && !String(id).startsWith("temp_"));
@@ -90,16 +92,21 @@ export async function PUT(req: Request) {
       if (s.id && !String(s.id).startsWith("temp_")) {
         return prisma.homeSection.update({
           where: { id: String(s.id) },
-          data: { enabled, order, type: type as any, content },
+          data: { enabled, order, type: type as any, content, descripcion: s.descripcion },
         });
       }
 
       return prisma.homeSection.create({
-        data: { enabled, order, type: type as any, content },
+        data: { enabled, order, type: type as any, content, descripcion: s.descripcion },
       });
     });
 
+    // 3. Ejecutar todos los cambios en la base de datos
     const updated = await prisma.$transaction(ops);
+    
+    // 4. ROMPER LA CACHÉ: Le decimos a Next.js que los datos cambiaron
+    await revalidateCache('home-sections');
+
     return NextResponse.json(updated);
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Error actualizando secciones" }, { status: 500 });

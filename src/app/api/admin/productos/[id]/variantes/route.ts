@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { obtenerSesion } from "@/lib/sesion";
+import { generateNextSkus } from "@/lib/sku";
 
 export async function GET(_: Request, ctx: { params: Promise<{ id: string }> }) {
   const sesion = await obtenerSesion();
@@ -56,7 +57,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "Selecciona al menos 1 talla y 1 color" }, { status: 400 });
   }
 
-  const data = tallaIds.flatMap((tallaId) =>
+  const combinations = tallaIds.flatMap((tallaId) =>
     colorIds.map((colorId) => ({
       productoId: id,
       tallaId,
@@ -65,6 +66,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       stockActual: 0,
     }))
   );
+
+  // Generar SKUs para todas las combinaciones
+  const nextSkus = await generateNextSkus(combinations.length);
+
+  const data = combinations.map((combo, idx) => ({
+    ...combo,
+    sku: nextSkus[idx],
+  }));
 
   const res = await prisma.variante.createMany({
     data,

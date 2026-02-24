@@ -27,18 +27,26 @@ export default function PromoCampaignSection({
     campaign
 }: PromoCampaignSectionProps) {
     // --- Estados ---
-    const [timeLeft, setTimeLeft] = useState<{ d: number; h: number; m: number; s: number } | null>(null);
+    const [timeLeft, setTimeLeft] = useState<{ d: number; h: number; m: number; s: number; isFuture: boolean } | null>(null);
 
     // --- Lógica del Countdown ---
     useEffect(() => {
         const calculateTimeLeft = () => {
             const now = new Date();
+            const start = new Date(campaign.startsAt);
             const end = new Date(campaign.endsAt);
-            const diff = end.getTime() - now.getTime();
+
+            // Determinar a qué fecha estamos contando
+            const isFuture = now < start;
+            const target = isFuture ? start : end;
+            const diff = target.getTime() - now.getTime();
 
             if (diff <= 0) {
-                setTimeLeft(null); // Ya terminó
-                return;
+                // Si ya pasó el fin, o si justo cambió de futuro a activo, recalculamos
+                if (!isFuture && now > end) {
+                    setTimeLeft(null);
+                    return;
+                }
             }
 
             const d = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -46,14 +54,14 @@ export default function PromoCampaignSection({
             const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const s = Math.floor((diff % (1000 * 60)) / 1000);
 
-            setTimeLeft({ d, h, m, s });
+            setTimeLeft({ d, h, m, s, isFuture });
         };
 
         calculateTimeLeft();
         const timer = setInterval(calculateTimeLeft, 1000);
 
         return () => clearInterval(timer);
-    }, [campaign.endsAt]);
+    }, [campaign.startsAt, campaign.endsAt]);
 
     // --- Mapeo de Datos ---
     const finalTitle = title || campaign.nombre;
@@ -63,7 +71,8 @@ export default function PromoCampaignSection({
     // Formato de Fechas (DD MMM)
     const formatDate = (dateStr: string) => {
         const d = new Date(dateStr);
-        return new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short' }).format(d);
+        // Forzamos la visualización en la zona horaria de Perú (America/Lima)
+        return new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', timeZone: 'America/Lima' }).format(d);
     };
 
     const rangoFechas = `Del ${formatDate(campaign.startsAt)} al ${formatDate(campaign.endsAt)}`;
@@ -104,7 +113,9 @@ export default function PromoCampaignSection({
                             <div className="py-8 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-8">
                                 <div className="flex items-center gap-3 text-[#3f2f2f]/60">
                                     <Clock className="w-5 h-5 text-[#864d2d]" />
-                                    <span className="text-sm font-bold uppercase tracking-wider">Termina en:</span>
+                                    <span className="text-sm font-bold uppercase tracking-wider">
+                                        {(timeLeft as any).isFuture ? "Inicia en:" : "Termina en:"}
+                                    </span>
                                 </div>
 
                                 <div className="flex gap-4">
@@ -124,7 +135,7 @@ export default function PromoCampaignSection({
                                     className="inline-flex items-center justify-center bg-[#3f2f2f] text-[#e6dad1] px-10 py-5 rounded-full font-bold text-lg transition-all duration-300 hover:bg-[#864d2d] hover:text-white hover:shadow-2xl hover:shadow-[#864d2d]/30 hover:-translate-y-1 active:translate-y-0 group/btn"
                                 >
                                     <span className="relative z-10 flex items-center gap-4">
-                                        Aprovechar Oferta   
+                                        Aprovechar Oferta
                                         <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
                                     </span>
                                 </Link>

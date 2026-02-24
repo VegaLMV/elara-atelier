@@ -9,12 +9,13 @@ interface Props {
     index: number;
     title: string;
     subtitle?: string;
+    description?: string | null;
     imageUrl?: string | null;
     products: Producto[];
     onOpenDrawer: () => void;
 }
 
-export default function LookbookItem({ index, title, subtitle, imageUrl, products, onOpenDrawer }: Props) {
+export default function LookbookItem({ index, title, subtitle, description, imageUrl, products, onOpenDrawer }: Props) {
     const layoutType = index % 3;
 
     // Mini-grid de productos para mostrar qué incluye el look
@@ -26,11 +27,11 @@ export default function LookbookItem({ index, title, subtitle, imageUrl, product
             {/* El scroll horizontal que causaba problemas de superposición */}
             <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-4 -mb-4">
                 {products.map(p => (
-                    <button 
-                        key={p.id} 
+                    <button
+                        key={p.id}
                         type="button"
                         onClick={onOpenDrawer}
-                        className="w-20 shrink-0 space-y-2 group cursor-pointer text-left focus:outline-none" 
+                        className="w-20 shrink-0 space-y-2 group cursor-pointer text-left focus:outline-none"
                     >
                         <div className="aspect-[3/4] relative bg-[#f0ebe6] rounded-sm overflow-hidden">
                             {p.imagenes[0] && (
@@ -57,17 +58,22 @@ export default function LookbookItem({ index, title, subtitle, imageUrl, product
                     )}
                 </div>
                 <div className="lg:col-span-5 flex flex-col justify-center space-y-10 lg:pr-10">
-                    <div className="space-y-4">
+                    <div className="space-y-4 md:space-y-6">
                         <span className="text-[10px] font-black uppercase tracking-[0.4em] text-[#864d2d]">{subtitle || "Edition 2024"}</span>
                         <h2 className="text-5xl md:text-6xl lg:text-7xl font-serif text-[#3f2f2f] leading-[1.1] tracking-tight">{title}</h2>
+                        {description && (
+                            <p className="text-[#3f2f2f]/60 font-light leading-relaxed text-sm md:text-base max-w-md">
+                                {description}
+                            </p>
+                        )}
                     </div>
 
                     <ProductMiniGrid />
 
                     {/* Botón Mejorado para Móvil */}
-                    <button 
+                    <button
                         type="button"
-                        onClick={onOpenDrawer} 
+                        onClick={onOpenDrawer}
                         className="relative z-10 w-full md:w-auto bg-[#3f2f2f] text-white px-8 py-4 text-[10px] font-black uppercase tracking-[0.3em] hover:bg-[#864d2d] active:bg-[#864d2d] active:scale-[0.98] transition-all flex items-center justify-center gap-3 touch-manipulation shadow-lg md:shadow-none"
                     >
                         Añadir Look Completo <Plus className="w-4 h-4" />
@@ -82,17 +88,22 @@ export default function LookbookItem({ index, title, subtitle, imageUrl, product
         return (
             <section className="px-6 grid flex-col-reverse lg:grid-cols-12 gap-12 lg:gap-20 items-center">
                 <div className="lg:col-span-5 flex flex-col justify-center space-y-10 lg:pl-10 order-2 lg:order-1">
-                    <div className="space-y-4">
+                    <div className="space-y-4 md:space-y-6">
                         <span className="text-[10px] font-black uppercase tracking-[0.4em] text-[#864d2d]">{subtitle || "Esencia Atemporal"}</span>
                         <h2 className="text-5xl md:text-6xl lg:text-7xl font-serif text-[#3f2f2f] leading-[1.1] tracking-tight">{title}</h2>
+                        {description && (
+                            <p className="text-[#3f2f2f]/60 font-light leading-relaxed text-sm md:text-base max-w-md">
+                                {description}
+                            </p>
+                        )}
                     </div>
 
                     <ProductMiniGrid />
 
                     {/* Botón Mejorado para Móvil */}
-                    <button 
+                    <button
                         type="button"
-                        onClick={onOpenDrawer} 
+                        onClick={onOpenDrawer}
                         className="relative z-10 w-full md:w-auto bg-[#3f2f2f] text-white px-8 py-4 text-[10px] font-black uppercase tracking-[0.3em] hover:bg-[#864d2d] active:bg-[#864d2d] active:scale-[0.98] transition-all flex items-center justify-center gap-3 touch-manipulation shadow-lg md:shadow-none"
                     >
                         Añadir Look Completo <Plus className="w-4 h-4" />
@@ -110,9 +121,14 @@ export default function LookbookItem({ index, title, subtitle, imageUrl, product
     // Layout 2: Banner Centralizado
     return (
         <section className="px-6 max-w-[1200px] mx-auto space-y-12">
-            <div className="text-center space-y-4 max-w-2xl mx-auto">
+            <div className="text-center space-y-4 md:space-y-6 max-w-2xl mx-auto">
                 <span className="text-[10px] font-black uppercase tracking-[0.4em] text-[#864d2d]">{subtitle || "Curaduría Premium"}</span>
                 <h2 className="text-5xl md:text-6xl lg:text-7xl font-serif text-[#3f2f2f] leading-[1.1] tracking-tight">{title}</h2>
+                {description && (
+                    <p className="text-[#3f2f2f]/60 font-light leading-relaxed text-sm md:text-base mt-4 italic">
+                        {description}
+                    </p>
+                )}
             </div>
 
             <div className="relative w-full aspect-[4/5] md:aspect-[16/9] bg-[#f0ebe6] rounded-sm overflow-hidden group">
@@ -127,9 +143,9 @@ export default function LookbookItem({ index, title, subtitle, imageUrl, product
                 </div>
                 <div className="w-full lg:w-1/3 flex lg:justify-end mt-4 lg:mt-0">
                     {/* Botón Mejorado para Móvil */}
-                    <button 
+                    <button
                         type="button"
-                        onClick={onOpenDrawer} 
+                        onClick={onOpenDrawer}
                         className="relative z-10 w-full md:w-auto bg-[#3f2f2f] text-white px-8 py-5 text-[10px] font-black uppercase tracking-[0.3em] hover:bg-[#864d2d] active:bg-[#864d2d] active:scale-[0.98] transition-all flex items-center justify-center gap-3 touch-manipulation shadow-lg md:shadow-none"
                     >
                         Añadir Look Completo <Plus className="w-4 h-4" />

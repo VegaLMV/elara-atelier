@@ -161,13 +161,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
             Auditoría detallada de movimientos de inventario. Controla entradas, salidas y ajustes.
           </p>
         </div>
-
-        <Link
-          href="/admin"
-          className="bg-white text-slate-700 border border-gray-200 rounded-xl px-5 py-2.5 text-sm font-bold hover:bg-slate-50 transition shadow-sm flex items-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" /> Volver al Panel
-        </Link>
       </div>
 
       {/* FILTROS */}
@@ -184,6 +177,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
                 <th className="px-6 py-4">Fecha / Hora</th>
                 <th className="px-6 py-4">Tipo Movimiento</th>
                 <th className="px-6 py-4">Producto / Variante</th>
+                <th className="px-6 py-4">SKU</th>
                 <th className="px-6 py-4 text-right">Cantidad</th>
                 <th className="px-6 py-4 text-right">Costo Unit.</th>
                 <th className="px-6 py-4">Nota / Referencia</th>
@@ -233,6 +227,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
                           </span>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 align-middle font-mono text-[10px] text-slate-500 font-bold">
+                      {m.variante.sku || "—"}
                     </td>
                     <td className={`px-6 py-4 align-middle text-right font-mono text-sm ${cambioClass}`}>
                       {cambioTxt}
@@ -298,7 +295,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
             Siguiente →
           </Link>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }

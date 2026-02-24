@@ -214,7 +214,9 @@ export function ExportButtons({
         listToExport.forEach((table, i) => {
             const cleanedData = table.data.map(row => row.map(cleanCellData));
             const ws = XLSX.utils.aoa_to_sheet([table.headers, ...cleanedData]);
-            XLSX.utils.book_append_sheet(wb, ws, table.title || `Datos ${i + 1}`);
+            // El nombre de la hoja no puede exceder los 31 caracteres
+            const sheetName = (table.title || `Datos ${i + 1}`).substring(0, 31);
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
         });
 
         XLSX.writeFile(wb, `${filename}.xlsx`);

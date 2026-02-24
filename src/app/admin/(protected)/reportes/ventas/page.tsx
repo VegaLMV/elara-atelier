@@ -146,92 +146,103 @@ function VentasReporteContent() {
     };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6 md:space-y-8">
             {/* Filtros y Personalización */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-gray-200 shadow-sm">
-                <DateRangePicker basePath="/admin/reportes/ventas" />
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-2xl md:rounded-3xl border border-gray-200 shadow-sm">
+                <div className="w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 hide-scrollbar">
+                    <DateRangePicker basePath="/admin/reportes/ventas" />
+                </div>
 
-                <div className="flex items-center gap-3">
-                    <ReportCustomizer
-                        columns={columns}
-                        onColumnsChange={setColumns}
-                        onNoteChange={setNote}
-                        currentNote={note}
-                    />
-                    <div className="w-px h-8 bg-gray-100 hidden md:block" />
-                    <ExportButtons
-                        title="Reporte de Ventas"
-                        headers={exportHeaders}
-                        data={exportData}
-                        filename={`ventas-${from || "todo"}-${to || "todo"}`}
-                        metadata={exportMetadata}
-                    />
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                    <div className="w-full sm:w-auto">
+                        <ReportCustomizer
+                            columns={columns}
+                            onColumnsChange={setColumns}
+                            onNoteChange={setNote}
+                            currentNote={note}
+                        />
+                    </div>
+                    <div className="w-px h-8 bg-gray-100 hidden sm:block" />
+                    <div className="w-full sm:w-auto">
+                        <ExportButtons
+                            title="Reporte de Ventas"
+                            headers={exportHeaders}
+                            data={exportData}
+                            filename={`ventas-${from || "todo"}-${to || "todo"}`}
+                            metadata={exportMetadata}
+                        />
+                    </div>
                 </div>
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
                 <StatCard
                     label="Ingresos Totales"
                     value={`S/ ${data.resumen.totalIngresos.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`}
-                    icon={<DollarSign className="w-6 h-6 text-emerald-600" />}
+                    icon={<DollarSign className="w-5 h-5 md:w-6 md:h-6 text-emerald-600" />}
                     color="bg-emerald-50"
                 />
                 <StatCard
                     label="Utilidad Bruta"
                     value={`S/ ${data.resumen.utilidadBruta.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`}
-                    icon={<PiggyBank className="w-6 h-6 text-emerald-700" />}
+                    icon={<PiggyBank className="w-5 h-5 md:w-6 md:h-6 text-emerald-700" />}
                     color="bg-emerald-100"
                 />
                 <StatCard
                     label="Margen de Ganancia"
                     value={`${data.resumen.margenPromedio.toFixed(2)}%`}
-                    icon={<Activity className="w-6 h-6 text-indigo-600" />}
+                    icon={<Activity className="w-5 h-5 md:w-6 md:h-6 text-indigo-600" />}
                     color="bg-indigo-50"
                 />
                 <StatCard
                     label="Ventas Realizadas"
                     value={`${data.resumen.cantidadVentas}`}
-                    icon={<ShoppingCart className="w-6 h-6 text-blue-600" />}
+                    icon={<ShoppingCart className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />}
                     color="bg-blue-50"
                 />
                 <StatCard
                     label="Ticket Promedio"
                     value={`S/ ${data.resumen.ticketPromedio.toFixed(2)}`}
-                    icon={<TrendingUp className="w-6 h-6 text-purple-600" />}
+                    icon={<TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-purple-600" />}
                     color="bg-purple-50"
                 />
                 <StatCard
                     label="Descuentos Otorgados"
                     value={`S/ ${data.resumen.totalDescuentos.toFixed(2)}`}
-                    icon={<Percent className="w-6 h-6 text-amber-600" />}
+                    icon={<Percent className="w-5 h-5 md:w-6 md:h-6 text-amber-600" />}
                     color="bg-amber-50"
                 />
             </div>
 
             {/* Gráficos */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 min-w-0">
                 {/* Ventas por Período */}
                 <ChartCard
                     title="Ventas por Período"
                     description="Evolución de ingresos en el tiempo"
-                    className="lg:col-span-2"
+                    className="lg:col-span-2 overflow-hidden"
                 >
-                    <div className="h-[300px]">
+                    <div className="h-[250px] md:h-[300px] w-full -ml-4 sm:ml-0">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={data.ventasPorPeriodo}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <LineChart data={data.ventasPorPeriodo} margin={{ left: 0, right: 10, top: 10, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                                 <XAxis
                                     dataKey="fecha"
-                                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                                    tick={{ fontSize: 10, fill: "#6b7280" }}
                                     tickFormatter={(v: string) => {
                                         const d = new Date(v);
                                         return `${d.getDate()}/${d.getMonth() + 1}`;
                                     }}
+                                    axisLine={false}
+                                    tickLine={false}
                                 />
                                 <YAxis
-                                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                                    tick={{ fontSize: 10, fill: "#6b7280" }}
                                     tickFormatter={(v: number) => `S/${v}`}
+                                    width={50}
+                                    axisLine={false}
+                                    tickLine={false}
                                 />
                                 <Tooltip
                                     formatter={(value: any) => [`S/ ${Number(value).toFixed(2)}`, "Ingresos"]}
@@ -251,8 +262,8 @@ function VentasReporteContent() {
                 </ChartCard>
 
                 {/* Ventas por Método de Pago */}
-                <ChartCard title="Métodos de Pago" description="Distribución por forma de pago">
-                    <div className="h-[280px]">
+                <ChartCard title="Métodos de Pago" description="Distribución por forma de pago" className="min-w-0">
+                    <div className="h-[250px] md:h-[280px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
@@ -261,10 +272,11 @@ function VentasReporteContent() {
                                     cy="50%"
                                     labelLine={false}
                                     label={(props: any) => `${props.name} ${(props.percent * 100).toFixed(0)}%`}
-                                    outerRadius={100}
+                                    outerRadius="80%"
                                     fill="#8884d8"
                                     dataKey="total"
                                     nameKey="metodo"
+                                    className="text-[10px] sm:text-xs"
                                 >
                                     {data.metodosPago.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -277,15 +289,15 @@ function VentasReporteContent() {
                 </ChartCard>
 
                 {/* Ventas por Canal */}
-                <ChartCard title="Canales de Venta" description="Origen de las ventas">
-                    <div className="h-[280px]">
+                <ChartCard title="Canales de Venta" description="Origen de las ventas" className="min-w-0">
+                    <div className="h-[250px] md:h-[280px] w-full -ml-4 sm:ml-0">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={data.canales} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                <XAxis type="number" tickFormatter={(v: number) => `S/${v}`} tick={{ fontSize: 11 }} />
-                                <YAxis type="category" dataKey="canal" tick={{ fontSize: 11 }} width={80} />
-                                <Tooltip formatter={(value: any) => `S/ ${Number(value).toFixed(2)}`} />
-                                <Bar dataKey="total" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                            <BarChart data={data.canales} layout="vertical" margin={{ left: 0, right: 20, top: 10, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+                                <XAxis type="number" tickFormatter={(v: number) => `S/${v}`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                                <YAxis type="category" dataKey="canal" tick={{ fontSize: 10 }} width={70} axisLine={false} tickLine={false} />
+                                <Tooltip formatter={(value: any) => `S/ ${Number(value).toFixed(2)}`} cursor={{fill: '#f3f4f6'}} />
+                                <Bar dataKey="total" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={30} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -294,36 +306,36 @@ function VentasReporteContent() {
 
             {/* Tabla de Productos Top */}
             <ChartCard title="Top 10 Productos Más Vendidos" description="Productos con mayor volumen de ventas">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 hide-scrollbar">
+                    <table className="w-full text-sm min-w-[600px]">
                         <thead className="text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100">
                             <tr>
-                                <th className="text-left py-3 px-2">#</th>
-                                <th className="text-left py-3 px-2">Producto</th>
-                                <th className="text-left py-3 px-2">Variante</th>
-                                <th className="text-right py-3 px-2">Cantidad</th>
-                                <th className="text-right py-3 px-2">Ingresos</th>
+                                <th className="text-left py-3 px-3 md:px-4">#</th>
+                                <th className="text-left py-3 px-3 md:px-4">Producto</th>
+                                <th className="text-left py-3 px-3 md:px-4">Variante</th>
+                                <th className="text-right py-3 px-3 md:px-4">Cantidad</th>
+                                <th className="text-right py-3 px-3 md:px-4">Ingresos</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {data.productosTop.map((p, i) => (
                                 <tr key={i} className="hover:bg-gray-50/50">
-                                    <td className="py-3 px-2 font-bold text-gray-400">{i + 1}</td>
-                                    <td className="py-3 px-2 font-bold text-gray-900">{p.producto}</td>
-                                    <td className="py-3 px-2">
+                                    <td className="py-3 px-3 md:px-4 font-bold text-gray-400 whitespace-nowrap">{i + 1}</td>
+                                    <td className="py-3 px-3 md:px-4 font-bold text-gray-900 whitespace-nowrap">{p.producto}</td>
+                                    <td className="py-3 px-3 md:px-4 whitespace-nowrap">
                                         <div className="flex items-center gap-2">
                                             <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">{p.talla}</span>
                                             <span className="flex items-center gap-1 text-xs text-gray-500">
                                                 <span
-                                                    className="w-3 h-3 rounded-full border border-gray-200 shadow-sm"
+                                                    className="w-3 h-3 rounded-full border border-gray-200 shadow-sm shrink-0"
                                                     style={getColorStyle(p.colorHex)}
                                                 />
                                                 {p.color}
                                             </span>
                                         </div>
                                     </td>
-                                    <td className="py-3 px-2 text-right font-mono font-bold text-gray-900">{p.cantidad}</td>
-                                    <td className="py-3 px-2 text-right font-mono font-bold text-emerald-600">
+                                    <td className="py-3 px-3 md:px-4 text-right font-mono font-bold text-gray-900 whitespace-nowrap">{p.cantidad}</td>
+                                    <td className="py-3 px-3 md:px-4 text-right font-mono font-bold text-emerald-600 whitespace-nowrap">
                                         S/ {p.ingresos.toFixed(2)}
                                     </td>
                                 </tr>
@@ -338,23 +350,23 @@ function VentasReporteContent() {
 
 export default function VentasReportePage() {
     return (
-        <div className="p-6 md:p-10 max-w-[1600px] mx-auto space-y-8 bg-gray-50/50 min-h-screen">
+        <div className="p-4 sm:p-6 md:p-10 max-w-[1600px] mx-auto space-y-6 md:space-y-8 bg-gray-50/50 min-h-screen">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-200 pb-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6 border-b border-gray-200 pb-6 md:pb-8">
                 <div>
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2.5 bg-emerald-500 text-white rounded-2xl shadow-xl shadow-emerald-500/20">
-                            <ShoppingCart className="w-6 h-6" />
+                        <div className="p-2 sm:p-2.5 bg-emerald-500 text-white rounded-xl sm:rounded-2xl shadow-xl shadow-emerald-500/20 shrink-0">
+                            <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
-                        <h1 className="text-4xl font-black text-gray-900 tracking-tight">Reporte de Ventas</h1>
+                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Reporte de Ventas</h1>
                     </div>
-                    <p className="text-gray-500 text-sm ml-1 max-w-md">
+                    <p className="text-gray-500 text-xs sm:text-sm ml-1 max-w-md">
                         Análisis detallado de ingresos, métodos de pago y productos más vendidos.
                     </p>
                 </div>
                 <Link
                     href="/admin/reportes"
-                    className="bg-white text-slate-700 border border-gray-200 rounded-xl px-5 py-2.5 text-sm font-bold hover:bg-slate-50 transition shadow-sm flex items-center gap-2"
+                    className="w-full md:w-auto justify-center bg-white text-slate-700 border border-gray-200 rounded-xl px-5 py-2.5 sm:py-3 md:py-2.5 text-sm font-bold hover:bg-slate-50 transition shadow-sm flex items-center gap-2"
                 >
                     <ArrowLeft className="w-4 h-4" /> Volver a Reportes
                 </Link>

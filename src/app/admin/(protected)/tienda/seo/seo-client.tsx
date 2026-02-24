@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Image as ImageIcon } from "lucide-react";
+import { UploaderImage } from "@/components/ui/uploader-image"; // ✅ Importación del componente
 
 type Settings = {
   id: string;
@@ -16,7 +17,7 @@ type Settings = {
 export default function SeoClient({ initial }: { initial: Settings }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{type:"ok"|"err"; text:string} | null>(null);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [s, setS] = useState<Settings>(initial);
 
   async function guardar() {
@@ -36,10 +37,10 @@ export default function SeoClient({ initial }: { initial: Settings }) {
       });
       const t = await r.text();
       if (!r.ok) throw new Error(t || "Error guardando SEO");
-      setMsg({type:"ok", text:"SEO guardado ✅"});
+      setMsg({ type: "ok", text: "SEO guardado ✅" });
       router.refresh();
-    } catch (e:any) {
-      setMsg({type:"err", text: e?.message ?? "Error"});
+    } catch (e: any) {
+      setMsg({ type: "err", text: e?.message ?? "Error" });
     } finally {
       setBusy(false);
     }
@@ -70,8 +71,8 @@ export default function SeoClient({ initial }: { initial: Settings }) {
 
       {msg && (
         <div className={`border rounded-2xl px-5 py-4 text-sm font-medium ${
-          msg.type==="ok" ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-          : "bg-red-50 border-red-200 text-red-800"
+          msg.type === "ok" ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+            : "bg-red-50 border-red-200 text-red-800"
         }`}>{msg.text}</div>
       )}
 
@@ -83,21 +84,32 @@ export default function SeoClient({ initial }: { initial: Settings }) {
           </div>
           <div className="p-6 space-y-4">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título</label>
-              <input className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                value={s.storeName} onChange={(e)=>setS(p=>({ ...p, storeName: e.target.value }))} />
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título de la Tienda</label>
+              <input 
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-slate-900 outline-none transition-all"
+                value={s.storeName} 
+                onChange={(e) => setS(p => ({ ...p, storeName: e.target.value }))} 
+              />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Tagline</label>
-              <input className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                value={s.tagline ?? ""} onChange={(e)=>setS(p=>({ ...p, tagline: e.target.value }))} />
+              <input 
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-slate-900 outline-none transition-all"
+                placeholder="Ej: Alta costura contemporánea"
+                value={s.tagline ?? ""} 
+                onChange={(e) => setS(p => ({ ...p, tagline: e.target.value }))} 
+              />
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Descripción</label>
-              <textarea className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium min-h-[140px]"
-                value={s.description ?? ""} onChange={(e)=>setS(p=>({ ...p, description: e.target.value }))} />
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Descripción (Meta Description)</label>
+              <textarea 
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium min-h-[140px] focus:ring-2 focus:ring-slate-900 outline-none transition-all"
+                placeholder="Escribe una descripción optimizada para buscadores..."
+                value={s.description ?? ""} 
+                onChange={(e) => setS(p => ({ ...p, description: e.target.value }))} 
+              />
             </div>
           </div>
         </div>
@@ -112,29 +124,20 @@ export default function SeoClient({ initial }: { initial: Settings }) {
               <h2 className="font-bold text-slate-900">Imagen de compartir</h2>
             </div>
           </div>
-          <div className="p-6 space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">OG Image URL</label>
-              <input className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium"
-                value={s.ogImageUrl ?? ""} onChange={(e)=>setS(p=>({ ...p, ogImageUrl: e.target.value }))} />
-            </div>
+          
+          <div className="p-6 space-y-6">
+            <UploaderImage 
+              modulo="seo" 
+              label="Banner de Redes Sociales (OG Image)"
+              url={s.ogImageUrl}
+              onUpload={(url) => setS(p => ({ ...p, ogImageUrl: url }))}
+            />
 
-            <div className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-50">
-              <div className="p-4 text-xs text-slate-500">Preview</div>
-              <div className="aspect-[1.91/1] bg-slate-100">
-                {s.ogImageUrl ? (
-                  <img src={s.ogImageUrl} alt="OG Preview" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-300 text-sm">
-                    Sin imagen
-                  </div>
-                )}
-              </div>
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                💡 <strong>Recomendación:</strong> Usa una imagen de <strong>1200x630px</strong> para que se vea perfecta al compartir el enlace en WhatsApp, Facebook o Instagram.
+              </p>
             </div>
-
-            <p className="text-xs text-slate-400">
-              Luego lo conectamos a un uploader como el de productos (Supabase).
-            </p>
           </div>
         </div>
       </div>

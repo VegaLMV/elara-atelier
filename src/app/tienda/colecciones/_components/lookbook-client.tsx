@@ -8,6 +8,7 @@ interface LookSection {
     id: string;
     title: string;
     subtitle?: string;
+    description?: string | null;
     imageUrl?: string | null;
     products: Producto[];
 }
@@ -48,6 +49,7 @@ export default function LookbookClient({ sections }: Props) {
                         index={idx}
                         title={section.title}
                         subtitle={section.subtitle}
+                        description={section.description}
                         imageUrl={section.imageUrl}
                         products={section.products}
                         onOpenDrawer={() => handleOpenLook(section)}

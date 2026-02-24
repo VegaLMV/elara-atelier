@@ -7,20 +7,28 @@ import { ArrowRight } from "lucide-react";
 interface Props {
     title: string;
     subtitle?: string;
+    description?: string | null;
     categorySlug?: string;
     ctaText?: string;
     ctaHref?: string;
     imageUrl?: string | null;
 }
 
-export default function CategorySpotlightSection({ title, subtitle, categorySlug, ctaText, ctaHref, imageUrl }: Props) {
+export default function CategorySpotlightSection({ 
+    title, 
+    subtitle, 
+    description, 
+    categorySlug, 
+    ctaText, 
+    ctaHref, 
+    imageUrl 
+}: Props) {
     const finalHref = ctaHref || (categorySlug ? `/tienda/catalogo?categoria=${categorySlug}` : "/tienda/catalogo");
 
     return (
         <section className="py-20 md:py-32 bg-[#fcfaf8] border-t border-[#e6dad1]/30">
             <div className="max-w-[1400px] mx-auto px-6 grid md:grid-cols-2 gap-12 md:gap-24 items-center">
                 
-                {/* Imagen Editorial */}
                 <div className="relative aspect-[4/5] w-full bg-[#f0ebe6] rounded-sm overflow-hidden group">
                     {imageUrl ? (
                         <Image 
@@ -37,7 +45,6 @@ export default function CategorySpotlightSection({ title, subtitle, categorySlug
                     )}
                 </div>
 
-                {/* Contenido (Textos) */}
                 <div className="space-y-8 md:pr-10">
                     <div className="space-y-4">
                         {subtitle && (
@@ -50,9 +57,15 @@ export default function CategorySpotlightSection({ title, subtitle, categorySlug
                         </h2>
                     </div>
 
-                    <p className="text-[#3f2f2f]/70 font-light leading-relaxed max-w-md text-sm md:text-base">
-                        Descubre una selección meticulosamente curada. Piezas diseñadas para realzar tu figura y acompañarte en tus momentos más memorables.
-                    </p>
+                    {description ? (
+                        <p className="text-[#3f2f2f]/70 font-light leading-relaxed max-w-md text-sm md:text-base">
+                            {description}
+                        </p>
+                    ) : (
+                        <p className="text-[#3f2f2f]/70 font-light leading-relaxed max-w-md text-sm md:text-base">
+                            Descubre una selección meticulosamente curada. Piezas diseñadas para realzar tu figura y acompañarte en tus momentos más memorables.
+                        </p>
+                    )}
                     
                     <div className="pt-4">
                         <Link 

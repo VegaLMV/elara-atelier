@@ -3,16 +3,20 @@
 import { useState } from "react";
 import { Image as ImageIcon, Loader2, Trash2 } from "lucide-react";
 
+type ModuloDestino = "categorias" | "campanas" | "identidad" | "seo" | "home-secciones";
+
 interface UploaderImageProps {
     url: string | null;
     onUpload: (url: string | null) => void;
     label?: string;
+    modulo: ModuloDestino;
 }
 
 export function UploaderImage({
     url,
     onUpload,
     label = "Imagen",
+    modulo,
 }: UploaderImageProps) {
     const [uploading, setUploading] = useState(false);
 
@@ -24,20 +28,24 @@ export function UploaderImage({
         try {
             const fd = new FormData();
             fd.append("file", file);
+            fd.append("modulo", modulo);
 
-            const res = await fetch("/api/admin/hero-banners/upload", {
+            const res = await fetch("/api/admin/upload", {
                 method: "POST",
                 body: fd,
             });
+
+            if (!res.ok) throw new Error("Error en el servidor");
+
             const data = await res.json();
             if (data.url) onUpload(data.url);
         } catch (err) {
             console.error("Upload error", err);
+            alert("No se pudo subir la imagen.");
         } finally {
             setUploading(false);
         }
     }
-
     return (
         <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">{label}</label>

@@ -12,7 +12,8 @@ import {
     Calendar,
     ShoppingCart,
     Filter,
-    DollarSign
+    DollarSign,
+    Truck
 } from "lucide-react";
 import Pagination from "@/components/ui/pagination";
 
@@ -125,7 +126,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
                         Registro de ingresos de stock. Gestiona proveedores y costos operativos.
                     </p>
                 </div>
-
                 <Link
                     href="/admin/compras/nueva"
                     className="bg-slate-900 text-white rounded-xl px-6 py-3 text-sm font-bold hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2"

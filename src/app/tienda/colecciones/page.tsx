@@ -44,7 +44,6 @@ export default async function LookbookPage() {
         },
         include: {
             imagenes: { orderBy: [{ esPortada: "desc" }, { orden: "asc" }] },
-            // 👇 Agregamos imagenesColor para cambiar la foto según el color
             imagenesColor: {
                 include: { color: true }
             },
@@ -55,7 +54,7 @@ export default async function LookbookPage() {
         }
     });
 
-    // 4. Formatear productos (Lógica CleanProduct con descuentos y colores)
+    // 4. Formatear productos
     const formatProduct = (p: any) => {
         const precioOriginal = Number(p.precio || 0);
         const inicioValido = !p.descuentoInicio || new Date(p.descuentoInicio) <= ahora;
@@ -72,7 +71,6 @@ export default async function LookbookPage() {
             precioOriginal,
             precioFinal,
             imagenes: p.imagenes.map((img: any) => img.url),
-            // 👇 Mapeamos las imágenes por color
             imagenesColor: p.imagenesColor ? p.imagenesColor.map((ic: any) => ({
                 colorNombre: ic.color.nombre,
                 url: ic.url
@@ -80,7 +78,6 @@ export default async function LookbookPage() {
             variantes: p.variantes.map((v: any) => ({
                 id: v.id,
                 talla: v.talla ? { nombre: v.talla.nombre } : null,
-                // 👇 Ahora sí extraemos el código HEX para pintar los círculos
                 color: v.color ? { nombre: v.color.nombre, hex: v.color.hex } : null,
                 stockActual: v.stockActual
             }))
@@ -102,6 +99,7 @@ export default async function LookbookPage() {
             id: s.id,
             title: content?.title || "Colección sin título",
             subtitle: content?.subtitle || "Atelier Curator",
+            description: s.descripcion || null,
             imageUrl: content?.imageUrl || null,
             products: sectionProducts
         };

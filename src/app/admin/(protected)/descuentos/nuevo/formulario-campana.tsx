@@ -226,6 +226,7 @@ export default function FormularioCampana({ initialData, categorias = [], produc
 
                   <div className="pt-2">
                      <UploaderImage
+                        modulo="campanas"
                         label="Imagen Publicitaria (Banner)"
                         url={imagenUrl}
                         onUpload={(url) => setImagenUrl(url)}

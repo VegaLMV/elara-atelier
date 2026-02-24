@@ -28,6 +28,7 @@ import { formatMoney } from "@/lib/precios";
 import PedidoFormModal from "./_components/pedido-form-modal";
 import PedidoDetailsDrawer from "./_components/pedido-details-drawer";
 import PrintOrdersModal from "./_components/print-orders-modal";
+import { OrdersDeadlineAlert } from "./_components/orders-deadline-alert";
 import Pagination from "@/components/ui/pagination";
 
 const dateFormatter = new Intl.DateTimeFormat('es-PE', {
@@ -145,6 +146,7 @@ export default function PedidosClient() {
 
     return (
         <div className="p-8 space-y-8 bg-slate-50/50 min-h-full max-w-7xl mx-auto">
+            <OrdersDeadlineAlert />
 
             {/* HEADER SECTION */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
