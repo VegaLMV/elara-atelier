@@ -128,7 +128,7 @@ export default function SeoClient({ initial }: { initial: Settings }) {
             <UploaderImage
               modulo="seo"
               label="Banner de Redes Sociales (OG Image)"
-              url={s.ogImageUrl}
+              url={s.ogImageUrl ?? null}
               onUpload={(url) => setS(p => ({ ...p, ogImageUrl: url }))}
             />
 
