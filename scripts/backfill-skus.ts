@@ -11,7 +11,7 @@ async function backfill() {
             sku: null,
         },
         orderBy: {
-            creadoEn: "asc",
+            id: "asc",
         },
     });
 
