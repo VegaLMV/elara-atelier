@@ -75,7 +75,16 @@ export default function ShopTheLookDrawer({ isOpen, onClose, lookTitle, producto
         }, 0);
     }, [productos, selecciones]);
 
+    const isLookAgotado = useMemo(() => {
+        return totalLook === 0;
+    }, [totalLook]);
+
     const handleAddFullLook = () => {
+        if (isLookAgotado) {
+             setError("Las opciones seleccionadas no se encuentran disponibles.");
+             return;
+        }
+
         let hayErrores = false;
 
         productos.forEach(p => {
@@ -91,7 +100,7 @@ export default function ShopTheLookDrawer({ isOpen, onClose, lookTitle, producto
         });
 
         if (hayErrores) {
-            setError("Por favor, selecciona talla y color para todas las prendas.");
+            setError("Por favor, selecciona talla y color para todas las prendas disponibles.");
             return;
         }
 
@@ -123,19 +132,20 @@ export default function ShopTheLookDrawer({ isOpen, onClose, lookTitle, producto
             <div
                 className={cn(
                     "fixed inset-0 bg-[#3f2f2f]/60 backdrop-blur-sm z-[100] transition-opacity duration-300",
-                    isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+                    isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
                 )}
                 onClick={onClose}
             />
 
+            {/* FIX CLAVE: Se maneja pointer-events-none estricto cuando está cerrado para no bloquear la pantalla */}
             <div
                 className={cn(
-                    "fixed inset-0 z-[110] flex items-center justify-center p-0 md:p-6 pointer-events-none transition-all duration-500",
-                    isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                    "fixed inset-0 z-[110] flex items-center justify-center p-0 md:p-6 transition-all duration-500",
+                    isOpen ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-95 pointer-events-none"
                 )}
             >
                 <div
-                    className="bg-[#fcfaf8] w-full h-full md:h-auto md:max-w-3xl md:max-h-[90vh] md:rounded-sm shadow-2xl flex flex-col pointer-events-auto overflow-hidden"
+                    className="bg-[#fcfaf8] w-full h-full md:h-auto md:max-w-3xl md:max-h-[90vh] md:rounded-sm shadow-2xl flex flex-col overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
@@ -167,15 +177,12 @@ export default function ShopTheLookDrawer({ isOpen, onClose, lookTitle, producto
 
                             return (
                                 <div key={producto.id} className="flex flex-row gap-4 md:gap-8 bg-white p-4 md:p-6 rounded-sm border border-[#e6dad1]/40 shadow-sm items-start">
-
-                                    {/* Imagen: Ahora mucho más pequeña en móvil */}
                                     <div className="w-20 md:w-40 shrink-0 aspect-[3/4] relative bg-[#f0ebe6] rounded-sm overflow-hidden transition-opacity duration-300">
                                         {activeImage && (
                                             <Image src={activeImage} alt={producto.nombre} fill className="object-cover" sizes="(max-width: 768px) 80px, 160px" />
                                         )}
                                     </div>
 
-                                    {/* Detalles del producto */}
                                     <div className="flex-1 flex flex-col min-w-0">
                                         <div className="mb-4">
                                             <h3 className="text-[11px] md:text-sm font-bold text-[#3f2f2f] uppercase tracking-widest leading-snug truncate">
@@ -199,7 +206,6 @@ export default function ShopTheLookDrawer({ isOpen, onClose, lookTitle, producto
                                             </div>
                                         ) : (
                                             <div className="space-y-4 md:space-y-6">
-                                                {/* Selector de Tallas */}
                                                 {tallasUnicas.length > 0 && (
                                                     <div className="space-y-2 md:space-y-3">
                                                         <span className="text-[9px] md:text-[10px] font-bold text-[#3f2f2f] uppercase tracking-[0.2em]">Talla</span>
@@ -225,7 +231,6 @@ export default function ShopTheLookDrawer({ isOpen, onClose, lookTitle, producto
                                                     </div>
                                                 )}
 
-                                                {/* Selector de Colores */}
                                                 {coloresDisponibles.length > 0 && (
                                                     <div className="space-y-2 md:space-y-3">
                                                         <div className="flex items-center gap-2 flex-wrap">
@@ -236,7 +241,6 @@ export default function ShopTheLookDrawer({ isOpen, onClose, lookTitle, producto
                                                             {coloresDisponibles.map(c => {
                                                                 if (!c) return null;
                                                                 const isSelected = sel.color === c.nombre;
-
                                                                 return (
                                                                     <button
                                                                         key={c.nombre}
@@ -276,7 +280,7 @@ export default function ShopTheLookDrawer({ isOpen, onClose, lookTitle, producto
                         <div className="flex items-center justify-between gap-4">
                             <div className="space-y-0.5 md:space-y-1">
                                 <span className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-[#3f2f2f]/50">Subtotal</span>
-                                <span className="hidden md:block text-[9px] text-[#3f2f2f]/40 uppercase tracking-widest">Impuestos incluidos</span>
+                                <span className="hidden md:block text-[9px] text-[#3f2f2f]/40 uppercase tracking-widest">Los costos de envio son adicionales</span>
                             </div>
                             <span className="block text-2xl md:text-4xl font-serif text-[#3f2f2f] tracking-tight leading-none">
                                 {formatMoney(totalLook)}
@@ -285,11 +289,15 @@ export default function ShopTheLookDrawer({ isOpen, onClose, lookTitle, producto
 
                         <button
                             onClick={handleAddFullLook}
-                            disabled={totalLook === 0}
-                            className="mt-4 md:mt-6 w-full bg-[#3f2f2f] text-white py-4 md:py-5 text-[10px] md:text-[11px] font-black uppercase tracking-[0.4em] hover:bg-[#864d2d] transition-all duration-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 rounded-sm shadow-xl shadow-[#3f2f2f]/10"
+                            className={cn(
+                                "mt-4 md:mt-6 w-full py-4 md:py-5 text-[10px] md:text-[11px] font-black uppercase tracking-[0.4em] transition-all duration-500 flex items-center justify-center gap-3 rounded-sm shadow-xl",
+                                isLookAgotado
+                                    ? "bg-gray-200 text-gray-500 cursor-not-allowed shadow-none"
+                                    : "bg-[#3f2f2f] text-white hover:bg-[#864d2d] active:scale-[0.98] shadow-[#3f2f2f]/10"
+                            )}
                         >
-                            Añadir Look a la bolsa
-                            <ShoppingBag className="w-3 h-3 md:w-4 md:h-4" />
+                            {isLookAgotado ? "No Disponible" : "Añadir Look a la bolsa"}
+                            {!isLookAgotado && <ShoppingBag className="w-3 h-3 md:w-4 md:h-4" />}
                         </button>
                     </div>
                 </div>
@@ -299,7 +307,6 @@ export default function ShopTheLookDrawer({ isOpen, onClose, lookTitle, producto
                 __html: `
                 .hide-scrollbar::-webkit-scrollbar { display: none; }
                 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-                /* Padding extra para dispositivos con Notch/Safe Area en la parte inferior */
                 .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
             `}} />
         </>

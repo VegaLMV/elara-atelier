@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import type { CSSProperties } from "react";
 import { prisma } from "@/lib/prisma";
 import { absolutizeUrl, baseUrl } from "@/lib/site";
@@ -17,8 +16,12 @@ import {
     Mail,
     MapPin,
     Link2,
-    ArrowRight
 } from "lucide-react";
+
+// Importamos el componente de animación
+import ScrollReveal from "@/components/ui/scroll-reveal";
+import SmartHeader from "@/components/layout/smart-header";
+import CartDrawer from "@/components/layout/cart-drawer";
 
 type StoreSettings = {
     storeName?: string | null;
@@ -81,10 +84,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
     return {
         metadataBase: new URL(baseUrl()),
-        title: {
-            default: `${storeName} | Catálogo`,
-            template: `%s | ${storeName}`,
-        },
+        title: `${storeName}`,
         description: desc,
         icons: {
             icon: favicon,
@@ -93,22 +93,19 @@ export async function generateMetadata(): Promise<Metadata> {
         openGraph: {
             type: "website",
             siteName: storeName,
-            title: `${storeName} | Catálogo`,
+            title: `${storeName}`,
             description: desc,
             url: "/tienda",
             images: [{ url: og, width: 1200, height: 630, alt: storeName }],
         },
         twitter: {
             card: "summary_large_image",
-            title: `${storeName} | Catálogo`,
+            title: `${storeName}`,
             description: desc,
             images: [og],
         },
     };
 }
-
-import SmartHeader from "@/components/layout/smart-header";
-import CartDrawer from "@/components/layout/cart-drawer";
 
 export default async function CatalogoLayout({ children }: { children: React.ReactNode }) {
     const [settings, navItems, social, categorias] = await Promise.all([
@@ -182,109 +179,118 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
                 {children}
             </main>
 
-            {/* FOOTER PREMIUM */}
-            <footer className="bg-[#3f2f2f] text-[#e6dad1] border-t border-[#e6dad1]/20" style={{ fontFamily: "var(--brand-font-body)" }}>
+            {/* FOOTER PREMIUM CON ANIMACIONES */}
+            <footer className="bg-[#3f2f2f] text-[#e6dad1] border-t border-[#e6dad1]/20 overflow-hidden" style={{ fontFamily: "var(--brand-font-body)" }}>
 
-                {/* 2. Main Footer Links */}
+                {/* Main Footer Links */}
                 <div className="max-w-[1600px] mx-auto px-6 py-20 grid grid-cols-1 md:grid-cols-12 gap-12 lg:gap-8">
                     
-                    {/* Brand Column */}
-                    <div className="md:col-span-12 lg:col-span-5 space-y-6 pr-0 lg:pr-12 text-center lg:text-left">
-                        <p className="text-4xl md:text-5xl lg:text-6xl font-serif italic text-white tracking-wide leading-none" style={{ fontFamily: "var(--brand-font-heading)" }}>
-                            {storeName}
-                        </p>
-                        {settings.tagline && <p className="text-xs text-[#864d2d] font-bold uppercase tracking-[0.3em]">{settings.tagline}</p>}
-                        {settings.description && (
-                            <p className="text-sm text-[#e6dad1]/60 leading-relaxed font-light max-w-md mx-auto lg:mx-0">
-                                {settings.description}
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Links Column */}
-                    <div className="md:col-span-4 lg:col-span-2">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white mb-8">Descubrir</p>
-                        <ul className="space-y-5">
-                            {footerLinks.map((l) => (
-                                <li key={l.id}>
-                                    <Link href={l.href} className="text-sm text-[#e6dad1]/60 hover:text-white hover:pl-2 transition-all duration-300 font-light relative w-fit">
-                                        {l.label}
-                                    </Link>
-                                </li>
-                            ))}
-                            {footerLinks.length === 0 && <li className="text-sm text-[#e6dad1]/40">Navegación en curso</li>}
-                        </ul>
-                    </div>
-
-                    {/* Contact Column */}
-                    <div className="md:col-span-4 lg:col-span-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white mb-8">Atención al Cliente</p>
-                        <ul className="space-y-5 font-light text-sm text-[#e6dad1]/60">
-                            {settings.contactEmail && (
-                                <li>
-                                    <a href={`mailto:${settings.contactEmail}`} className="hover:text-white transition-colors flex items-center gap-4">
-                                        <Mail className="w-4 h-4 text-[#864d2d]" /> {settings.contactEmail}
-                                    </a>
-                                </li>
-                            )}
-                            {(settings.phone || settings.whatsapp) && (
-                                <li>
-                                    <div className="flex items-center gap-4 hover:text-white transition-colors cursor-pointer">
-                                        <Phone className="w-4 h-4 text-[#864d2d]" />
-                                        <span>{settings.phone ?? settings.whatsapp}</span>
-                                    </div>
-                                </li>
-                            )}
-                            {settings.address && (
-                                <li className="flex items-start gap-4">
-                                    <MapPin className="w-4 h-4 text-[#864d2d] mt-1 shrink-0" />
-                                    <span className="leading-relaxed hover:text-white transition-colors">{settings.address}</span>
-                                </li>
-                            )}
-                            {!settings.contactEmail && !settings.phone && !settings.whatsapp && !settings.address && (
-                                <li>Contacto en actualización.</li>
-                            )}
-                        </ul>
-                    </div>
-
-                    {/* Social Column */}
-                    <div className="md:col-span-4 lg:col-span-2 lg:flex lg:justify-end">
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white mb-8 lg:text-right">Social</p>
-                            <div className="flex flex-wrap lg:flex-col gap-4 lg:items-end">
-                                {(social ?? []).map((s) => {
-                                    const Icon = iconForPlatform(s.platform);
-                                    return (
-                                        <a
-                                            key={s.id}
-                                            href={s.url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="group flex items-center gap-3 text-[#e6dad1]/60 hover:text-white transition-colors"
-                                            title={s.platform}
-                                        >
-                                            <span className="text-[11px] tracking-[0.2em] uppercase hidden lg:block group-hover:pr-1 transition-all">{s.platform}</span>
-                                            <div className="w-10 h-10 rounded-full border border-[#e6dad1]/20 flex items-center justify-center group-hover:border-[#864d2d] group-hover:bg-[#864d2d]/10 transition-all duration-300">
-                                                <Icon className="w-4 h-4" />
-                                            </div>
-                                        </a>
-                                    );
-                                })}
+                    {/* Brand Column - Entrada desde la izquierda */}
+                    <div className="md:col-span-12 lg:col-span-5 pr-0 lg:pr-12 text-center lg:text-left">
+                        <ScrollReveal direction="left" delay={0.1}>
+                            <div className="space-y-6">
+                                <p className="text-4xl md:text-5xl lg:text-6xl font-serif italic text-white tracking-wide leading-none" style={{ fontFamily: "var(--brand-font-heading)" }}>
+                                    {storeName}
+                                </p>
+                                {settings.tagline && <p className="text-xs text-[#864d2d] font-bold uppercase tracking-[0.3em]">{settings.tagline}</p>}
+                                {settings.description && (
+                                    <p className="text-sm text-[#e6dad1]/60 leading-relaxed font-light max-w-md mx-auto lg:mx-0">
+                                        {settings.description}
+                                    </p>
+                                )}
                             </div>
-                        </div>
+                        </ScrollReveal>
+                    </div>
+
+                    {/* Links Column - Cascada Up */}
+                    <div className="md:col-span-4 lg:col-span-2">
+                        <ScrollReveal direction="up" delay={0.2}>
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white mb-8">Descubrir</p>
+                            <ul className="space-y-5">
+                                {footerLinks.map((l) => (
+                                    <li key={l.id}>
+                                        <Link href={l.href} className="text-sm text-[#e6dad1]/60 hover:text-white hover:pl-2 transition-all duration-300 font-light relative w-fit">
+                                            {l.label}
+                                        </Link>
+                                    </li>
+                                ))}
+                                {footerLinks.length === 0 && <li className="text-sm text-[#e6dad1]/40">Navegación en curso</li>}
+                            </ul>
+                        </ScrollReveal>
+                    </div>
+
+                    {/* Contact Column - Cascada Up */}
+                    <div className="md:col-span-4 lg:col-span-3">
+                        <ScrollReveal direction="up" delay={0.3}>
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white mb-8">Atención al Cliente</p>
+                            <ul className="space-y-5 font-light text-sm text-[#e6dad1]/60">
+                                {settings.contactEmail && (
+                                    <li>
+                                        <a href={`mailto:${settings.contactEmail}`} className="hover:text-white transition-colors flex items-center gap-4">
+                                            <Mail className="w-4 h-4 text-[#864d2d]" /> {settings.contactEmail}
+                                        </a>
+                                    </li>
+                                )}
+                                {(settings.phone || settings.whatsapp) && (
+                                    <li>
+                                        <div className="flex items-center gap-4 hover:text-white transition-colors cursor-pointer">
+                                            <Phone className="w-4 h-4 text-[#864d2d]" />
+                                            <span>{settings.phone ?? settings.whatsapp}</span>
+                                        </div>
+                                    </li>
+                                )}
+                                {settings.address && (
+                                    <li className="flex items-start gap-4">
+                                        <MapPin className="w-4 h-4 text-[#864d2d] mt-1 shrink-0" />
+                                        <span className="leading-relaxed hover:text-white transition-colors">{settings.address}</span>
+                                    </li>
+                                )}
+                            </ul>
+                        </ScrollReveal>
+                    </div>
+
+                    {/* Social Column - Cascada Up */}
+                    <div className="md:col-span-4 lg:col-span-2 lg:flex lg:justify-end">
+                        <ScrollReveal direction="up" delay={0.4}>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white mb-8 lg:text-right">Social</p>
+                                <div className="flex flex-wrap lg:flex-col gap-4 lg:items-end">
+                                    {(social ?? []).map((s) => {
+                                        const Icon = iconForPlatform(s.platform);
+                                        return (
+                                            <a
+                                                key={s.id}
+                                                href={s.url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="group flex items-center gap-3 text-[#e6dad1]/60 hover:text-white transition-colors"
+                                                title={s.platform}
+                                            >
+                                                <span className="text-[11px] tracking-[0.2em] uppercase hidden lg:block group-hover:pr-1 transition-all">{s.platform}</span>
+                                                <div className="w-10 h-10 rounded-full border border-[#e6dad1]/20 flex items-center justify-center group-hover:border-[#864d2d] group-hover:bg-[#864d2d]/10 transition-all duration-300">
+                                                    <Icon className="w-4 h-4" />
+                                                </div>
+                                            </a>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </ScrollReveal>
                     </div>
                 </div>
 
-                {/* 3. Bottom Bar */}
+                {/* Bottom Bar - Simple Fade-in sin desplazamiento */}
                 <div className="border-t border-[#e6dad1]/10 bg-[#352727]">
-                    <div className="max-w-[1600px] mx-auto px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-4">
-                        <p className="text-[10px] text-[#e6dad1]/40 tracking-widest uppercase">
-                            © {new Date().getFullYear()} {storeName}. Todos los derechos reservados.
-                        </p>
-                        <div className="flex flex-wrap justify-center gap-6 text-[10px] text-[#e6dad1]/40 uppercase tracking-[0.2em] font-medium">
-                            <span className="text-[#864d2d]">Diseñado en Ica, Perú</span>
+                    <ScrollReveal direction="none" delay={0.5}>
+                        <div className="max-w-[1600px] mx-auto px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                            <p className="text-[10px] text-[#e6dad1]/40 tracking-widest uppercase">
+                                © {new Date().getFullYear()} {storeName}. Todos los derechos reservados.
+                            </p>
+                            <div className="flex flex-wrap justify-center gap-6 text-[10px] text-[#e6dad1]/40 uppercase tracking-[0.2em] font-medium">
+                                <span className="text-[#864d2d]">Diseñado en Ica, Perú</span>
+                            </div>
                         </div>
-                    </div>
+                    </ScrollReveal>
                 </div>
 
             </footer>

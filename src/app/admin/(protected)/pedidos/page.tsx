@@ -3,7 +3,7 @@ import PedidosClient from "./pedidos-client";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-    title: "Gestión de Pedidos | Admin Élara Atelier",
+    title: "Gestión de Pedidos | Admin",
     description: "Gestión de pedidos de WhatsApp antes de convertirlos en ventas."
 };
 

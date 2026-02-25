@@ -185,7 +185,7 @@ export default async function AdminHome() {
             </div>
 
             {/* 2. BENTO GRID - KPIs Principales (6 columnas) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
 
                 <StatCard
                     label="Ventas Hoy"
@@ -286,7 +286,7 @@ export default async function AdminHome() {
                             <QuickActionButton
                                 href="/admin/descuentos"
                                 icon={<TicketPercent className="w-6 h-6 text-purple-600" />}
-                                label="Ofertas"
+                                label="Campañas descuento"
                                 color="bg-purple-50 border-purple-100 hover:border-purple-300"
                             />
                             <QuickActionButton

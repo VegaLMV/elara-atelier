@@ -11,8 +11,10 @@ import LiveSearchInput from "./_components/live-search-input";
 import { ArrowLeft, Shirt } from "lucide-react";
 import { formatMoney, calcularPrecioFinal } from "@/lib/precios";
 import Pagination from "@/components/ui/pagination";
+import { Metadata } from "next";
 
-// Importamos las secciones editoriales
+// Importamos animaciones y secciones
+import ScrollReveal from "@/components/ui/scroll-reveal";
 import VideoBannerSection from "../_components/landing/video-banner-section";
 import CategorySpotlightSection from "../_components/landing/category-spotlight-section";
 import ShopTheLookSection from "../_components/landing/shop-the-look-section";
@@ -24,6 +26,11 @@ type SP = {
     min?: string;
     max?: string;
     page?: string;
+};
+
+export const metadata: Metadata = {
+    title: "Élara Atelier | Catálogo",
+    description: "Catálogo público de Elara Atelier. Moda y prendas por talla y color."
 };
 
 export default async function CatalogoGridPage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -38,28 +45,20 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
     const skip = (currentPage - 1) * ITEMS_PER_PAGE;
     const ahora = new Date();
 
-    // 1. FILTRAR SECCIONES EDITORIALES SEGÚN CATEGORÍA (REGLA ESTRICTA)
     const allSections = await getCachedHomeSections();
 
     const editoriales = allSections.filter(s => {
         if (!s.enabled) return false;
         if (!["VIDEO_BANNER", "CATEGORY_SPOTLIGHT", "SHOP_THE_LOOK"].includes(s.type)) return false;
-
         const content = s.content as any;
         const catSlugSeccion = (content?.categorySlug || "").trim();
-
-        // REGLA DE NEGOCIO (Merchandising):
-        if (!categoriaSlug) {
-            return catSlugSeccion === "";
-        }
+        if (!categoriaSlug) return catSlugSeccion === "";
         return catSlugSeccion === categoriaSlug;
     });
 
     const headerEditorials = editoriales.filter(s => s.type === "VIDEO_BANNER" || s.type === "CATEGORY_SPOTLIGHT");
     const footerEditorials = editoriales.filter(s => s.type === "SHOP_THE_LOOK");
 
-    // 2. BUSCAR LOS PRODUCTOS DEL SHOP THE LOOK
-    // Extraemos todos los IDs únicos para optimizar la consulta
     const allShopTheLookProductIds = Array.from(new Set(
         footerEditorials.flatMap(s => {
             const ids = (s.content as any)?.manualProductIds;
@@ -67,7 +66,6 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
         })
     ));
 
-    // Configuración compartida de selección para evitar inconsistencias
     const productSelect = {
         id: true, nombre: true, slug: true, precio: true,
         descuentoActivo: true, descuentoTipo: true, descuentoValor: true,
@@ -85,7 +83,6 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
         });
     }
 
-    // Formateador Helper robusto
     const formatProduct = (p: any) => {
         const precioOriginal = Number(p.precio || 0);
         const inicioValido = !p.descuentoInicio || new Date(p.descuentoInicio) <= ahora;
@@ -93,7 +90,6 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
         const tieneDescuento = p.descuentoActivo && inicioValido && finValido;
         const precioFinal = tieneDescuento ? calcularPrecioFinal(precioOriginal, p.descuentoTipo, Number(p.descuentoValor)) : precioOriginal;
         const stock = (p.variantes || []).reduce((acc: number, v: any) => acc + (v.stockActual || 0), 0);
-
         return {
             id: p.id, nombre: p.nombre, slug: p.slug, categoria: p.categoria?.nombre,
             imagenes: (p.imagenes || []).map((i: any) => i.url),
@@ -106,9 +102,7 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
 
     const cleanShopProducts = dbShopProducts.map(formatProduct);
 
-    // 3. CONSULTA PRINCIPAL DEL CATÁLOGO
     const where: Prisma.ProductoWhereInput = { estado: "ACTIVO" };
-
     if (q) {
         const palabras = q.split(/\s+/).filter(word => word.length > 1);
         if (palabras.length > 0) {
@@ -121,11 +115,7 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
             }));
         }
     }
-
-    if (categoriaSlug) {
-        where.categoria = { slug: categoriaSlug };
-    }
-
+    if (categoriaSlug) where.categoria = { slug: categoriaSlug };
     if (minPrice > 0 || maxPrice > 0) {
         where.precio = {};
         if (minPrice > 0) where.precio.gte = minPrice;
@@ -155,89 +145,93 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
     const categoriaActualNombre = categorias.find(c => c.slug === categoriaSlug)?.nombre;
 
     return (
-        <div className="bg-[#fcfaf8] min-h-screen">
-
-            {/* SECCIONES EDITORIALES SUPERIORES */}
+        <div className="bg-[#fcfaf8] min-h-screen scroll-smooth">
             {headerEditorials.map(s => {
                 const content = s.content as any;
-                if (s.type === "VIDEO_BANNER") {
-                    return <VideoBannerSection 
-                    key={s.id} 
-                    {...content} 
-                    description={s.descripcion || null}
-                    />;
-                }
-                if (s.type === "CATEGORY_SPOTLIGHT") {
-                    return <CategorySpotlightSection key={s.id} {...content} description={s.descripcion || null}/>;
-                }
+                if (s.type === "VIDEO_BANNER") return <VideoBannerSection key={s.id} {...content} description={s.descripcion || null} />;
+                if (s.type === "CATEGORY_SPOTLIGHT") return <CategorySpotlightSection key={s.id} {...content} description={s.descripcion || null} />;
                 return null;
             })}
 
-            <div className="max-w-[1500px] mx-auto px-6 py-8 md:py-12" id="catalogo-grid">
+            <div className="max-w-[1500px] mx-auto px-6 py-8 md:py-12 scroll-mt-24" id="catalogo-grid">
+                
                 <div className="mb-8">
-                    <Link href="/tienda" className="group inline-flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-[#3f2f2f]/60 hover:text-[#864d2d] transition-colors">
-                        <ArrowLeft className="w-4 h-4 mr-3 group-hover:-translate-x-1 transition-transform" /> Volver a Inicio
-                    </Link>
+                    <ScrollReveal direction="right" delay={0.1}>
+                        <Link href="/tienda" scroll={false} className="group inline-flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-[#3f2f2f]/60 hover:text-[#864d2d] transition-colors">
+                            <ArrowLeft className="w-4 h-4 mr-3 group-hover:-translate-x-1 transition-transform" /> Volver a Inicio
+                        </Link>
+                    </ScrollReveal>
                 </div>
 
+                {/* ESTRUCTURA PROTEGIDA: Flex directo sin envoltorios de animación */}
                 <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
-                    <div className="w-full lg:w-auto ">
+                    
+                    {/* SIDEBAR: El layout se mantiene intacto */}
+                    <div className="w-full lg:w-64 shrink-0">
                         <FilterSidebar categorias={categorias} />
                     </div>
 
+                    {/* MAIN: El layout se mantiene intacto */}
                     <main className="flex-1 space-y-10">
-                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-[#e6dad1]/50">
-                            <div className="space-y-2">
-                                <h1 className="text-3xl md:text-4xl font-serif text-[#3f2f2f] leading-tight tracking-tight">
-                                    {categoriaActualNombre || "Toda la Colección"}
-                                </h1>
-                                <div className="flex items-center gap-3">
-                                    <div className="w-6 h-[1px] bg-[#864d2d]/30" />
-                                    <p className="text-[#864d2d] text-[9px] font-black uppercase tracking-[0.3em]">
-                                        {totalProductos} {totalProductos === 1 ? 'Pieza' : 'Piezas'}
-                                    </p>
+                        <ScrollReveal direction="up" delay={0.1}>
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-[#e6dad1]/50">
+                                <div className="space-y-2">
+                                    <h1 className="text-3xl md:text-4xl font-serif text-[#3f2f2f] leading-tight tracking-tight">
+                                        {categoriaActualNombre || "Toda la Colección"}
+                                    </h1>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-6 h-[1px] bg-[#864d2d]/30" />
+                                        <p className="text-[#864d2d] text-[9px] font-black uppercase tracking-[0.3em]">
+                                            {totalProductos} {totalProductos === 1 ? 'Pieza' : 'Piezas'}
+                                        </p>
+                                    </div>
                                 </div>
+                                <LiveSearchInput initialQuery={q} />
                             </div>
-                            <LiveSearchInput initialQuery={q} />
-                        </div>
+                        </ScrollReveal>
 
                         {productos.length === 0 ? (
-                            <div className="py-24 text-center space-y-6 flex flex-col items-center animate-in fade-in zoom-in-95 duration-700">
-                                <div className="w-16 h-16 rounded-full bg-[#e6dad1]/30 flex items-center justify-center text-[#3f2f2f]/40 mb-2">
-                                    <Shirt className="w-6 h-6 stroke-[1.5]" />
-                                </div>
-                                <div className="space-y-3 max-w-md mx-auto">
+                            <ScrollReveal direction="up" delay={0.2}>
+                                <div className="py-24 text-center space-y-6 flex flex-col items-center">
+                                    <div className="w-16 h-16 rounded-full bg-[#e6dad1]/30 flex items-center justify-center text-[#3f2f2f]/40 mb-2">
+                                        <Shirt className="w-6 h-6 stroke-[1.5]" />
+                                    </div>
                                     <h3 className="text-2xl font-serif text-[#3f2f2f] italic">Nuestra curaduría está vacía</h3>
-                                    <p className="text-[#3f2f2f]/60 font-light text-sm leading-relaxed">
-                                        No pudimos encontrar piezas que coincidan con tu búsqueda. Intenta suavizar los filtros.
+                                    <p className="text-[#3f2f2f]/60 font-light text-sm max-w-xs mx-auto">
+                                        No pudimos encontrar piezas que coincidan con tu búsqueda.
                                     </p>
+                                    <div className="pt-4">
+                                        <Link href="/tienda/catalogo#catalogo-grid" className="inline-block bg-[#3f2f2f] text-white px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#864d2d] transition-all">
+                                            Restaurar Colección
+                                        </Link>
+                                    </div>
                                 </div>
-                                <div className="pt-4">
-                                    <Link href="/tienda/catalogo" className="inline-block bg-transparent border border-[#3f2f2f] text-[#3f2f2f] px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#3f2f2f] hover:text-white transition-all duration-500">
-                                        Restaurar Colección
-                                    </Link>
-                                </div>
-                            </div>
+                            </ScrollReveal>
                         ) : (
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-12">
                                 {productos.map((p, idx) => (
-                                    <div key={p.id} className="animate-in fade-in slide-in-from-bottom-8 duration-[1000ms] ease-out" style={{ animationDelay: `${idx * 100}ms` }}>
+                                    <ScrollReveal 
+                                        key={p.id} 
+                                        direction="up" 
+                                        delay={0.1 + (idx % 4) * 0.05}
+                                    >
                                         <ProductoCard producto={p} />
-                                    </div>
+                                    </ScrollReveal>
                                 ))}
                             </div>
                         )}
 
                         {totalPages > 1 && (
-                            <div className="flex justify-center pt-12 border-t border-[#e6dad1]/30 mt-12">
-                                <Pagination totalPages={totalPages} />
-                            </div>
+                            <ScrollReveal direction="up" delay={0.1}>
+                                <div className="flex justify-center pt-12 border-t border-[#e6dad1]/30 mt-12">
+                                    <Pagination totalPages={totalPages} />
+                                </div>
+                            </ScrollReveal>
                         )}
                     </main>
                 </div>
             </div>
 
-            {/* SECCIONES EDITORIALES INFERIORES */}
             {footerEditorials.map(s => {
                 const content = s.content as any;
                 const specificProductIds = Array.isArray(content?.manualProductIds) ? content.manualProductIds : [];
@@ -259,7 +253,6 @@ export default async function CatalogoGridPage({ searchParams }: { searchParams:
                 }
                 return null;
             })}
-
         </div>
     );
 }

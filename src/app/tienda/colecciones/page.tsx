@@ -4,7 +4,7 @@ import { calcularPrecioFinal } from "@/lib/precios";
 import LookbookClient from "./_components/lookbook-client";
 
 export const metadata = {
-    title: "Lookbook | Élara Atelier",
+    title: "Élara Atelier | Lookbook",
     description: "Colecciones exclusivas y curadurías de alta costura contemporánea.",
 };
 

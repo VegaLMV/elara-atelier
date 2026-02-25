@@ -4,7 +4,7 @@ import type { Decimal } from "@prisma/client/runtime/library";
 export interface ItemConPrecio {
     precio: number | Decimal;
     descuentoActivo: boolean;
-    descuentoTipo: string | null; // "PORCENTAJE" | "MONTO"
+    descuentoTipo: string | null;
     descuentoValor: number | Decimal | null;
     descuentoInicio?: Date | null | string;
     descuentoFin?: Date | null | string;

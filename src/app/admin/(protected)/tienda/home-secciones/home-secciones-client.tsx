@@ -20,7 +20,8 @@ import {
     Type,
     Link as LinkIcon,
     Image as ImageIcon,
-    ShoppingBag
+    ShoppingBag,
+    Tag
 } from "lucide-react";
 import { UploaderImage } from "@/components/ui/uploader-image";
 import { formatMoney } from "@/lib/precios";
@@ -58,7 +59,6 @@ const LABEL: Record<TipoSeccionHome, string> = {
     SHOP_THE_LOOK: "Shop The Look",
 };
 
-// 👇 EL ORDEN MAESTRO: Forzamos la estructura lógica de la tienda 👇
 const TYPE_ORDER: TipoSeccionHome[] = [
     "HERO",
     "CATEGORY_SPOTLIGHT",
@@ -68,11 +68,10 @@ const TYPE_ORDER: TipoSeccionHome[] = [
     "SHOP_THE_LOOK"
 ];
 
-// Agrupa y recalcula el orden global respetando los grupos
 function normalizeOrders(sections: HomeSection[]) {
     let newOrder = 0;
     const result: HomeSection[] = [];
-    
+
     TYPE_ORDER.forEach(type => {
         const ofType = sections.filter(s => s.type === type).sort((a, b) => a.order - b.order);
         ofType.forEach(s => {
@@ -309,7 +308,7 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                 const copy = [...prev];
                 const s1Index = copy.findIndex(s => s.id === ofType[idx].id);
                 const s2Index = copy.findIndex(s => s.id === ofType[idx - 1].id);
-                // Intercambiamos el orden para que la recarga lo ordene bien
+                // Intercambiamos el orden
                 const temp = copy[s1Index].order;
                 copy[s1Index].order = copy[s2Index].order;
                 copy[s2Index].order = temp;
@@ -324,7 +323,7 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                 copy[s2Index].order = temp;
                 return normalizeOrders(copy);
             }
-            return prev; // Si ya está arriba del todo o abajo del todo, no hace nada
+            return prev;
         });
     }, []);
 
@@ -357,9 +356,9 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
             manualProductIds: []
         };
         if (type === "PROMO_CAMPAIGN") base.content = { selectedCampaignId: null, title: "", subtitle: "" };
-        if (type === "VIDEO_BANNER") base.content = { title: "Nueva Colección", subtitle: "Editorial", ctaText: "Descubrir", ctaHref: "/tienda/catalogo", videoUrl: "", overlayOpacity: 0.3 };
+        if (type === "VIDEO_BANNER") base.content = { title: "Nueva Colección", subtitle: "Editorial", ctaText: "Descubrir", ctaHref: "/tienda/catalogo", videoUrl: "", overlayOpacity: 0.3, categorySlug: "" }; // NUEVO categorySlug
         if (type === "CATEGORY_SPOTLIGHT") base.content = { title: "Vestidos de Noche", subtitle: "Elegancia Atemporal", categorySlug: "", ctaText: "Ver Colección", ctaHref: "/tienda/catalogo", imageUrl: null };
-        if (type === "SHOP_THE_LOOK") base.content = { title: "Get The Look", subtitle: "Inspiración", categorySlug: "", imageUrl: null, manualProductIds: [] };
+        if (type === "SHOP_THE_LOOK") base.content = { title: "Get The Look", subtitle: "Inspiración", categorySlug: "", imageUrl: null, manualProductIds: [] }; // NUEVO categorySlug
 
         setSections((prev) => normalizeOrders([...prev, base]));
         setSelectedId(id);
@@ -406,11 +405,35 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
         }
     }
 
-    // Helpers UI para el Editor
     const renderSectionHeader = (icon: any, title: string) => (
         <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-200/60">
             {icon}
             <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500">{title}</h3>
+        </div>
+    );
+
+    // ============================================================
+    // COMPONENTE REUTILIZABLE: Selector de Categoría
+    // ============================================================
+    const CategorySelector = () => (
+        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            {renderSectionHeader(<Tag className="w-4 h-4 text-slate-400" />, "Merchandising Dinámico")}
+            <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-600 ml-1">Regla de Visibilidad (Catálogo)</label>
+                <p className="text-[10px] text-slate-400 ml-1 mb-2">Si dejas esto en "Home General", se mostrará en el inicio. Si eliges una categoría, esta sección "viajará" y solo se mostrará cuando el cliente navegue dentro de esa categoría específica en el catálogo.</p>
+                <select
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold focus:border-slate-900 outline-none bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+                    value={selected.content?.categorySlug ?? ""}
+                    onChange={(e) => updateSelectedContent({ categorySlug: e.target.value })}
+                >
+                    <option value="">Mostrar en el Home General</option>
+                    {categorias.map(cat => (
+                        <option key={cat.id} value={cat.slug}>
+                            Mostrar solo en: {cat.nombre}
+                        </option>
+                    ))}
+                </select>
+            </div>
         </div>
     );
 
@@ -525,8 +548,14 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                                                             <p className="font-bold text-sm text-slate-900 truncate leading-tight">
                                                                 {sec.content?.title || "Sin título configurado"}
                                                             </p>
-                                                            <p className="text-xs text-slate-500 truncate mt-0.5">
-                                                                {sec.content?.subtitle || "Sin subtítulo"}
+                                                            <p className="text-xs text-slate-500 truncate mt-0.5 flex flex-col gap-1">
+                                                                <span>{sec.content?.subtitle || "Sin subtítulo"}</span>
+                                                                {/* Indicador visual de que pertenece a una categoría */}
+                                                                {sec.content?.categorySlug && (
+                                                                     <span className="text-[9px] bg-indigo-50 text-indigo-600 font-bold px-1.5 py-0.5 rounded w-fit">
+                                                                         En Catálogo
+                                                                     </span>
+                                                                )}
                                                             </p>
                                                         </div>
 
@@ -542,7 +571,7 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                                                                 {sec.enabled ? <ToggleRight className="w-6 h-6 text-emerald-500" /> : <ToggleLeft className="w-6 h-6 text-slate-300" />}
                                                             </button>
 
-                                                            {/* Flechas Inteligentes (Solo aparecen si se pueden usar) */}
+                                                            {/* Flechas Inteligentes */}
                                                             {items.length > 1 && (
                                                                 <div className="flex items-center bg-white rounded-lg border border-slate-200 shadow-sm">
                                                                     <button
@@ -627,6 +656,11 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
 
                             {/* Editor Content Area */}
                             <div className="p-4 md:p-8 space-y-6 md:space-y-8 bg-slate-50/30">
+
+                                {/* SIEMPRE RENDERIZAR CATEGORY SELECTOR PARA ESTOS TRES TIPOS */}
+                                {["CATEGORY_SPOTLIGHT", "VIDEO_BANNER", "SHOP_THE_LOOK"].includes(selected.type) && (
+                                    <CategorySelector />
+                                )}
 
                                 {/* === HERO === */}
                                 {selected.type === "HERO" && (
@@ -955,22 +989,6 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                                                         onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
                                                     />
                                                 </div>
-                                            </div>
-
-                                            <div className="space-y-2 pt-4 border-t border-slate-100">
-                                                <label className="text-xs font-bold text-slate-600 ml-1">Vincular a Categoría Real (Base de Datos)</label>
-                                                <select
-                                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold focus:border-slate-900 outline-none bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
-                                                    value={selected.content?.categorySlug ?? ""}
-                                                    onChange={(e) => updateSelectedContent({ categorySlug: e.target.value })}
-                                                >
-                                                    <option value="">-- Redirigir al Catálogo General --</option>
-                                                    {categorias.map(cat => (
-                                                        <option key={cat.id} value={cat.slug}>
-                                                            {cat.nombre}
-                                                        </option>
-                                                    ))}
-                                                </select>
                                             </div>
                                         </div>
 

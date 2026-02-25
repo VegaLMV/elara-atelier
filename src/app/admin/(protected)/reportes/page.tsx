@@ -145,7 +145,7 @@ export default async function ReportesPage() {
                     <ScrollText className="w-4 h-4" />
                     Resumen Últimos 30 Días
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 md:gap-6">
                     <StatCard
                         label="Ingresos Totales"
                         value={`S/ ${totalVentas.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`}

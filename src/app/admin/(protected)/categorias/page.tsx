@@ -7,6 +7,11 @@ import { sesionAdmin } from "@/lib/sesion";
 import CategoriasClient from "./categorias-client";
 import { FolderTree } from "lucide-react"; // Opcional: Icono decorativo si deseas usarlo en el header
 
+export const metadata = {
+    title: "Categorías | Admin",
+    description: "Gestión de categorías de productos."
+};
+
 export default async function Page() {
   const sesion = await sesionAdmin();
   if (!sesion) redirect("/admin/login");
