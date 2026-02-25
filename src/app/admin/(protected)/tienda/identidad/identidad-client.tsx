@@ -9,24 +9,24 @@ import { UploaderImage } from "@/components/ui/uploader-image";
 type Settings = {
     id: string;
     storeName: string;
-    tagline?: string | null;
-    description?: string | null;
+    tagline: string | null;
+    description: string | null;
 
-    logoUrl?: string | null;
-    faviconUrl?: string | null;
-    ogImageUrl?: string | null;
+    logoUrl: string | null;
+    faviconUrl: string | null;
+    ogImageUrl: string | null;
 
-    primaryColor?: string | null;
-    accentColor?: string | null;
-    backgroundColor?: string | null;
+    primaryColor: string | null;
+    accentColor: string | null;
+    backgroundColor: string | null;
 
-    fontHeading?: string | null;
-    fontBody?: string | null;
+    fontHeading: string | null;
+    fontBody: string | null;
 
-    contactEmail?: string | null;
-    phone?: string | null;
-    whatsapp?: string | null;
-    address?: string | null;
+    contactEmail: string | null;
+    phone: string | null;
+    whatsapp: string | null;
+    address: string | null;
 
     currency: string;
     locale: string;
@@ -133,8 +133,8 @@ export default function IdentidadClient({ initial }: { initial: Settings }) {
             {msg && (
                 <div
                     className={`border rounded-2xl px-5 py-4 text-sm font-medium ${msg.type === "ok"
-                            ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                            : "bg-red-50 border-red-200 text-red-800"
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                        : "bg-red-50 border-red-200 text-red-800"
                         }`}
                 >
                     {msg.text}

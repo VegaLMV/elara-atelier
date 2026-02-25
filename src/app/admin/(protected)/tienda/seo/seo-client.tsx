@@ -9,9 +9,9 @@ import { UploaderImage } from "@/components/ui/uploader-image"; // ✅ Importaci
 type Settings = {
   id: string;
   storeName: string;
-  tagline?: string | null;
-  description?: string | null;
-  ogImageUrl?: string | null;
+  tagline: string | null;
+  description: string | null;
+  ogImageUrl: string | null;
 };
 
 export default function SeoClient({ initial }: { initial: Settings }) {
@@ -71,7 +71,7 @@ export default function SeoClient({ initial }: { initial: Settings }) {
 
       {msg && (
         <div className={`border rounded-2xl px-5 py-4 text-sm font-medium ${msg.type === "ok" ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-            : "bg-red-50 border-red-200 text-red-800"
+          : "bg-red-50 border-red-200 text-red-800"
           }`}>{msg.text}</div>
       )}
 
@@ -128,7 +128,7 @@ export default function SeoClient({ initial }: { initial: Settings }) {
             <UploaderImage
               modulo="seo"
               label="Banner de Redes Sociales (OG Image)"
-              url={s.ogImageUrl ?? null}
+              url={s.ogImageUrl}
               onUpload={(url) => setS(p => ({ ...p, ogImageUrl: url }))}
             />
 
