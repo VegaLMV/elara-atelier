@@ -125,7 +125,7 @@ export default function SmartHeader({
                                                         <Link
                                                             key={cat.id}
                                                             href={`/tienda/catalogo?categoria=${cat.slug}`}
-                                                            prefetch={false} 
+                                                            prefetch={false}
                                                             className="text-sm font-serif text-[#3f2f2f]/80 hover:text-[#864d2d] hover:italic transition-all"
                                                         >
                                                             {cat.nombre}
@@ -134,7 +134,7 @@ export default function SmartHeader({
                                                     <div className="pt-3 mt-2 border-t border-[#e6dad1]/30">
                                                         <Link
                                                             href="/tienda/catalogo"
-                                                            prefetch={false} 
+                                                            prefetch={false}
                                                             className="text-[10px] font-black uppercase tracking-[0.2em] text-[#3f2f2f] hover:text-[#864d2d] transition-colors flex items-center gap-2"
                                                         >
                                                             Ver todo <ArrowRight className="w-3 h-3" />
@@ -150,7 +150,7 @@ export default function SmartHeader({
                                     <Link
                                         key={item.id}
                                         href={item.href}
-                                        prefetch={false} 
+                                        prefetch={false}
                                         className="text-[10px] font-black uppercase tracking-[0.2em] text-[#3f2f2f]/60 hover:text-[#3f2f2f] transition-colors py-2 relative group"
                                     >
                                         {item.label}
@@ -205,11 +205,11 @@ export default function SmartHeader({
 
             {isMenuOpen && (
                 <div className="fixed inset-0 z-[100] flex lg:hidden">
-                    <div 
-                        className="absolute inset-0 bg-[#3f2f2f]/60 backdrop-blur-md animate-in fade-in duration-300" 
-                        onClick={() => setIsMenuOpen(false)} 
+                    <div
+                        className="absolute inset-0 bg-[#3f2f2f]/60 backdrop-blur-md animate-in fade-in duration-300"
+                        onClick={() => setIsMenuOpen(false)}
                     />
-                    
+
                     <div className="relative w-[85vw] max-w-sm bg-[#fcfaf8] h-full shadow-2xl animate-in slide-in-from-left duration-500 flex flex-col">
                         <div className="p-6 border-b border-[#e6dad1]/50 flex justify-between items-center bg-white">
                             <span className="text-xl font-serif text-[#3f2f2f] italic">{settings.storeName}</span>
@@ -223,7 +223,7 @@ export default function SmartHeader({
                                 <Link
                                     key={item.id}
                                     href={item.href}
-                                    prefetch={false} 
+                                    prefetch={false}
                                     onClick={() => setIsMenuOpen(false)}
                                     className="text-2xl font-serif text-[#3f2f2f] hover:text-[#864d2d] transition-colors"
                                 >
@@ -240,7 +240,7 @@ export default function SmartHeader({
                                         <Link
                                             key={cat.id}
                                             href={`/tienda/catalogo?categoria=${cat.slug}`}
-                                            prefetch={false} 
+                                            prefetch={false}
                                             onClick={() => setIsMenuOpen(false)}
                                             className="text-lg font-light text-[#3f2f2f]/80 hover:text-[#864d2d] hover:italic transition-all flex items-center gap-3"
                                         >
@@ -248,7 +248,7 @@ export default function SmartHeader({
                                             {cat.nombre}
                                         </Link>
                                     ))}
-                                    
+
                                     <Link
                                         href={`/tienda/catalogo`}
                                         prefetch={false}

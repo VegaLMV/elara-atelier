@@ -11,9 +11,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   });
 
   return [
-    { url: `${base}/catalogo`, lastModified: new Date() },
+    { url: `${base}/tienda`, lastModified: new Date() },
     ...productos.map((p) => ({
-      url: `${base}/catalogo/${p.slug}`,
+      url: `${base}/tienda/${p.slug}`,
       lastModified: p.actualizadoEn,
     })),
   ];

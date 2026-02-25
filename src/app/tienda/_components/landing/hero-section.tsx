@@ -91,9 +91,8 @@ export default function HeroCarousel({
         {slides.map((s, i) => (
           <div
             key={s.id}
-            className={`absolute inset-0 transition-opacity duration-[1.5s] ease-in-out ${
-              i === idx ? "opacity-100 z-10" : "opacity-0 z-0"
-            }`}
+            className={`absolute inset-0 transition-opacity duration-[1.5s] ease-in-out ${i === idx ? "opacity-100 z-10" : "opacity-0 z-0"
+              }`}
           >
             {/* Imagen con zoom sutil cinematográfico */}
             <Image
@@ -102,12 +101,11 @@ export default function HeroCarousel({
               fill
               priority={i === idx}
               quality={90}
-              className={`object-cover transition-transform duration-[10s] ease-out ${
-                i === idx ? "scale-105" : "scale-100"
-              }`}
+              className={`object-cover transition-transform duration-[10s] ease-out ${i === idx ? "scale-105" : "scale-100"
+                }`}
               sizes="100vw"
             />
-            
+
             {/* Degradado Editorial: Transparente arriba, suavemente oscuro abajo-izquierda */}
             <div className="absolute inset-0 bg-gradient-to-t from-[#1a1515]/80 via-[#1a1515]/20 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-r from-[#1a1515]/60 via-transparent to-transparent opacity-80" />
@@ -127,7 +125,7 @@ export default function HeroCarousel({
 
           return (
             <div key={s.id + "-content"} className="animate-in fade-in slide-in-from-bottom-8 duration-[1.5s] ease-out pointer-events-auto">
-              
+
               {/* Etiqueta superior sutil */}
               <div className="flex items-center gap-3 mb-4 md:mb-6">
                 <div className="w-8 h-[1px] bg-white/60" />
@@ -162,7 +160,7 @@ export default function HeroCarousel({
       {/* 3. CONTROLES MINIMALISTAS (Inferior Derecho) */}
       {total > 1 && (
         <div className="absolute bottom-12 right-6 md:bottom-20 md:right-16 z-30 flex flex-col items-end gap-6">
-          
+
           {/* Navegación (Líneas en lugar de puntos gruesos) */}
           <div className="flex items-center gap-2">
             {slides.map((s, i) => (
@@ -170,9 +168,8 @@ export default function HeroCarousel({
                 key={s.id + "-dot"}
                 type="button"
                 onClick={() => go(i)}
-                className={`h-[2px] transition-all duration-500 ${
-                  i === idx ? "w-10 bg-white" : "w-4 bg-white/30 hover:bg-white/60"
-                }`}
+                className={`h-[2px] transition-all duration-500 ${i === idx ? "w-10 bg-white" : "w-4 bg-white/30 hover:bg-white/60"
+                  }`}
                 aria-label={`Ir al banner ${i + 1}`}
               />
             ))}
@@ -196,7 +193,7 @@ export default function HeroCarousel({
               <ArrowRight className="w-4 h-4 md:w-5 md:h-5 stroke-[1.5]" />
             </button>
           </div>
-          
+
         </div>
       )}
     </section>
