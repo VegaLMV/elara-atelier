@@ -70,10 +70,9 @@ export default function SeoClient({ initial }: { initial: Settings }) {
       </div>
 
       {msg && (
-        <div className={`border rounded-2xl px-5 py-4 text-sm font-medium ${
-          msg.type === "ok" ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+        <div className={`border rounded-2xl px-5 py-4 text-sm font-medium ${msg.type === "ok" ? "bg-emerald-50 border-emerald-200 text-emerald-800"
             : "bg-red-50 border-red-200 text-red-800"
-        }`}>{msg.text}</div>
+          }`}>{msg.text}</div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -85,30 +84,30 @@ export default function SeoClient({ initial }: { initial: Settings }) {
           <div className="p-6 space-y-4">
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Título de la Tienda</label>
-              <input 
+              <input
                 className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-slate-900 outline-none transition-all"
-                value={s.storeName} 
-                onChange={(e) => setS(p => ({ ...p, storeName: e.target.value }))} 
+                value={s.storeName}
+                onChange={(e) => setS(p => ({ ...p, storeName: e.target.value }))}
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Tagline</label>
-              <input 
+              <input
                 className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-slate-900 outline-none transition-all"
                 placeholder="Ej: Alta costura contemporánea"
-                value={s.tagline ?? ""} 
-                onChange={(e) => setS(p => ({ ...p, tagline: e.target.value }))} 
+                value={s.tagline ?? ""}
+                onChange={(e) => setS(p => ({ ...p, tagline: e.target.value }))}
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Descripción (Meta Description)</label>
-              <textarea 
+              <textarea
                 className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium min-h-[140px] focus:ring-2 focus:ring-slate-900 outline-none transition-all"
                 placeholder="Escribe una descripción optimizada para buscadores..."
-                value={s.description ?? ""} 
-                onChange={(e) => setS(p => ({ ...p, description: e.target.value }))} 
+                value={s.description ?? ""}
+                onChange={(e) => setS(p => ({ ...p, description: e.target.value }))}
               />
             </div>
           </div>
@@ -124,12 +123,12 @@ export default function SeoClient({ initial }: { initial: Settings }) {
               <h2 className="font-bold text-slate-900">Imagen de compartir</h2>
             </div>
           </div>
-          
+
           <div className="p-6 space-y-6">
-            <UploaderImage 
-              modulo="seo" 
+            <UploaderImage
+              modulo="seo"
               label="Banner de Redes Sociales (OG Image)"
-              url={s.ogImageUrl}
+              url={s.ogImageUrl ?? null}
               onUpload={(url) => setS(p => ({ ...p, ogImageUrl: url }))}
             />
 
