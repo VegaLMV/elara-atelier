@@ -38,13 +38,11 @@ export default function ClienteSelector({ onSelect, initialClientes = [], select
 
     useEffect(() => {
         if (selectedId) {
-            // Buscar en la lista actual o traer de la API
             const found = clientes.find(c => c.id === selectedId);
             if (found) {
                 setSelected(found);
                 onSelect(found);
             } else {
-                // Si no está en la lista inicial, lo buscamos específicamente
                 fetch(`/api/admin/clientes/${selectedId}`)
                     .then(res => {
                         if (!res.ok) return null;

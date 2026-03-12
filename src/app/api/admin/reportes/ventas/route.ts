@@ -148,7 +148,6 @@ export async function GET(request: NextRequest) {
 
         // NUEVO: Cálculos Financieros Reales (COGS Histórico + Gastos Empaque)
         const [movimientosVenta, empaquesVenta] = await Promise.all([
-            // Costo real del inventario vendido (basado en el costo congelado al momento de la venta)
             prisma.movimientoInventario.findMany({
                 where: {
                     venta: {
@@ -159,7 +158,6 @@ export async function GET(request: NextRequest) {
                 },
                 select: { costoUnitario: true, cambioCantidad: true },
             }),
-            // Gastos de empaque asociados
             prisma.usoEmpaque.aggregate({
                 where: {
                     venta: {

@@ -29,7 +29,7 @@ export default function PrintOrdersModal({ isOpen, onClose, pedidos }: Props) {
                 // --- DESIGN MATCHING EXPORT-BUTTONS.TSX ---
 
                 // 1. Branding / Logo
-                doc.setFillColor(15, 23, 42); // Slate 900
+                doc.setFillColor(15, 23, 42);
                 doc.rect(0, 0, pageWidth, 40, "F");
                 doc.setTextColor(255);
                 doc.setFontSize(24);
@@ -50,9 +50,9 @@ export default function PrintOrdersModal({ isOpen, onClose, pedidos }: Props) {
                         if (!acc[key]) {
                             acc[key] = {
                                 producto: it.variante.producto.nombre,
-                                variante: it.variante.producto.nombre, // Para sorting/display
+                                variante: it.variante.producto.nombre, 
                                 detalle: `${it.variante.color.nombre} / ${it.variante.talla.nombre}`,
-                                colorHex: it.variante.color?.hex || '#000000', // Fallback to black if no hex
+                                colorHex: it.variante.color?.hex || '#ffffffff',
                                 imagen: it.variante.producto.imagenes?.[0]?.url,
                                 cantidad: 0
                             };
@@ -63,10 +63,10 @@ export default function PrintOrdersModal({ isOpen, onClose, pedidos }: Props) {
                 }, {});
 
                 const bodyData = Object.values(consolidatedItems).map((it: any) => [
-                    it.imagen || '',        // Col 0: Imagen
-                    it.producto,            // Col 1: Producto
-                    (it.colorHex || '#000000') + '|' + it.detalle, // Col 2: Color/Variante (Encoded for custom draw)
-                    it.cantidad             // Col 3: Cantidad
+                    it.imagen || '',
+                    it.producto,
+                    (it.colorHex || '#000000') + '|' + it.detalle,
+                    it.cantidad
                 ]);
 
                 autoTable(doc, {
@@ -95,13 +95,6 @@ export default function PrintOrdersModal({ isOpen, onClose, pedidos }: Props) {
                             const cx = data.cell.x + 4;
                             const cy = data.cell.y + (data.cell.height / 2);
 
-                            // Draw Text manually to avoid overlapping or just let it print?
-                            // autoTable prints text by default. We just want to add the circle.
-                            // But we need to shift text? data.cell.text contains the cleaned text? No, we need to clean it first in didParseCell maybe?
-
-                            // Let's just draw the circle to the left of text.
-                            // Actually better to use didParseCell to clean text and didDrawCell for graphics.
-
                             if (hex && hex.startsWith('#')) {
                                 doc.setFillColor(hex);
                                 doc.setDrawColor(200);
@@ -110,17 +103,15 @@ export default function PrintOrdersModal({ isOpen, onClose, pedidos }: Props) {
                         }
                     },
                     didParseCell: (data) => {
-                        // Clean text for Image column
                         if (data.column.index === 0 && data.section === 'body') {
                             data.cell.text = [''];
                             data.cell.styles.minCellHeight = 20;
                         }
-                        // Clean text for Variant column
                         if (data.column.index === 2 && data.section === 'body' && typeof data.cell.raw === 'string') {
                             const parts = data.cell.raw.split('|');
                             if (parts.length > 1) {
-                                data.cell.text = [parts[1]]; // Show only text
-                                data.cell.styles.cellPadding = { top: 3, bottom: 3, left: 10, right: 3 }; // Indent for circle
+                                data.cell.text = [parts[1]];
+                                data.cell.styles.cellPadding = { top: 3, bottom: 3, left: 10, right: 3 };
                             }
                         }
                     }
@@ -129,14 +120,9 @@ export default function PrintOrdersModal({ isOpen, onClose, pedidos }: Props) {
                 doc.save(`alistamiento-${new Date().toISOString().split('T')[0]}.pdf`);
 
             } else {
-                // --- SHIPPING LABELS (8 per page: 2 cols x 4 rows) ---
-                // A4 Height: 297mm. Width: 210mm.
-                // 4 rows -> ~74mm height. 
-                // 2 cols -> ~105mm width.
-                // Margins: 5mm.
                 const cardsPerPage = 8;
-                const cardWidth = 95; // Slightly less than 105 to allow gaps
-                const cardHeight = 65; // Fits 4 comfortably (65*4 = 260 < 297)
+                const cardWidth = 95;
+                const cardHeight = 65;
                 const marginX = 10;
                 const marginY = 15;
                 const gapX = 5;
@@ -171,14 +157,13 @@ export default function PrintOrdersModal({ isOpen, onClose, pedidos }: Props) {
                     doc.setTextColor(0);
                     doc.setFont("helvetica", "bold");
                     const name = ped.clienteNombre || ped.cliente?.nombre || "Cliente";
-                    doc.text(name.substring(0, 25), x + 4, y + 13); // Truncate if too long
+                    doc.text(name.substring(0, 25), x + 4, y + 13);
 
                     doc.setFontSize(8);
                     doc.setFont("helvetica", "normal");
                     doc.setTextColor(80);
                     doc.text(`DNI: ${ped.cliente?.dni || '--'} / Tel: ${ped.cliente?.telefono || '--'}`, x + 4, y + 17);
 
-                    // Location
                     doc.setFontSize(6);
                     doc.setTextColor(100);
                     doc.text("DIRECCIÓN", x + 4, y + 24);
@@ -187,7 +172,6 @@ export default function PrintOrdersModal({ isOpen, onClose, pedidos }: Props) {
                     doc.setTextColor(0);
                     const address = ped.direccion || "";
                     const location = `${ped.distrito || ''}, ${ped.provincia || ''}`;
-                    // Split address if long
                     const splitAddr = doc.splitTextToSize(address, cardWidth - 8);
                     doc.text(splitAddr, x + 4, y + 28);
                     doc.text(location, x + 4, y + 28 + (splitAddr.length * 4));
@@ -199,8 +183,6 @@ export default function PrintOrdersModal({ isOpen, onClose, pedidos }: Props) {
                         doc.text(`Ref: ${ped.referencia.substring(0, 40)}`, x + 4, refY);
                     }
 
-                    // Content (Right/Bottom side)
-                    // Let's put content at the bottom area separated by line
                     const contentY = y + 45;
                     doc.setDrawColor(240);
                     doc.line(x + 2, contentY, x + cardWidth - 2, contentY);
@@ -210,7 +192,7 @@ export default function PrintOrdersModal({ isOpen, onClose, pedidos }: Props) {
                     doc.text("CONTENIDO", x + 4, contentY + 3);
 
                     let itemY = contentY + 7;
-                    ped.items.slice(0, 3).forEach((it: any) => { // Max 3 items visible
+                    ped.items.slice(0, 3).forEach((it: any) => {
                         doc.setFontSize(7);
                         doc.setTextColor(0);
                         doc.setFont("helvetica", "bold");

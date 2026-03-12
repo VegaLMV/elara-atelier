@@ -29,7 +29,6 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     
-    // Validar duplicados si tiene DNI
     if (body.dni) {
         const existe = await prisma.cliente.findUnique({ where: { dni: body.dni } });
         if (existe) return NextResponse.json({ error: "El DNI ya está registrado" }, { status: 400 });

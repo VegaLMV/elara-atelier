@@ -19,7 +19,6 @@ export default async function NuevaVentaPage() {
 
   // Carga paralela de datos maestros
   const [productosDb, clientesDb, empaquesDb, categoriasDb] = await Promise.all([
-    // 1. Productos (Solo activos y con stock en alguna variante)
     prisma.producto.findMany({
       where: {
         estado: "ACTIVO",
@@ -30,7 +29,6 @@ export default async function NuevaVentaPage() {
         nombre: true,
         precio: true,
         categoriaId: true,
-        // Datos de descuento vigentes
         descuentoActivo: true,
         descuentoTipo: true,
         descuentoValor: true,
@@ -55,19 +53,16 @@ export default async function NuevaVentaPage() {
       orderBy: { nombre: "asc" }
     }),
 
-    // 2. Clientes (Para buscador rápido)
     prisma.cliente.findMany({
       orderBy: { nombre: "asc" },
       select: { id: true, nombre: true, dni: true, email: true }
     }),
 
-    // 3. Empaques (Insumos)
     prisma.tipoEmpaque.findMany({
       where: { activo: true, stock: { gt: 0 } },
       select: { id: true, nombre: true, stock: true, costoUnitario: true, imagenUrl: true }
     }),
 
-    // 4. Categorías (Para filtros)
     prisma.categoria.findMany({
       orderBy: { nombre: "asc" },
       select: { id: true, nombre: true }

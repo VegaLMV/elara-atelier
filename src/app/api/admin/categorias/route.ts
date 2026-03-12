@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
-import { slugify } from "@/lib/slugify"; // Asegúrate de tener esta utilidad, o usa una simple abajo
+import { slugify } from "@/lib/slugify";
 
 export async function POST(request: Request) {
   const admin = await sesionAdmin();

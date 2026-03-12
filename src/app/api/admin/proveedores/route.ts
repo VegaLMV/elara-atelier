@@ -10,7 +10,7 @@ export async function GET() {
 
     const proveedores = await prisma.proveedor.findMany({
       where: {
-        activo: true, // Filtro de Soft Delete
+        activo: true,
       },
       orderBy: {
         creadoEn: "desc",
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         provincia,
         distrito,
         direccion,
-        activo: true // Aseguramos que se cree como activo
+        activo: true
       },
     });
 

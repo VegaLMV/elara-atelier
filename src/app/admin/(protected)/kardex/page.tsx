@@ -16,7 +16,6 @@ import {
   AlertCircle
 } from "lucide-react";
 
-// Tipos permitidos para el filtro
 type TipoKardex = "TODOS" | "COMPRA" | "VENTA" | "AJUSTE" | "DEVOLUCION";
 
 type SP = {
@@ -27,7 +26,6 @@ type SP = {
   page?: string; // "1", "2"...
 };
 
-// Helper para formatear moneda
 function soles(v: any) {
   const n = Number(v?.toString?.() ?? v);
   if (Number.isNaN(n)) return `S/ ${String(v)}`;
@@ -131,7 +129,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     },
     orderBy: { creadoEn: "desc" },
     skip,
-    take: take + 1, // Traemos 1 extra para saber si hay "Siguiente"
+    take: take + 1,
   });
 
   const hasNext = list.length > take;

@@ -98,8 +98,7 @@ export default function ColoresClient({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // 🔎 Filtros (Sincronizados con URL)
-  // Estado local para input inmediato, effect para URL
+  // Filtros (Sincronizados con URL)
   const [buscar, setBuscar] = useState(initialFilters.q);
   const [filtroEstado, setFiltroEstado] = useState(initialFilters.estado);
 
@@ -144,11 +143,10 @@ export default function ColoresClient({
   const [previewColor, setPreviewColor] = useState<{ nombre: string; hex: string | null; activo: boolean } | null>(null);
   const [zoomImg, setZoomImg] = useState(false);
 
-  // 📸 Imagen de Referencia
+  // Imagen de Referencia
   const [imgRef, setImgRef] = useState<string | null>(null);
   const [esSoportado, setEsSoportado] = useState(false);
 
-  // Verificar soporte de EyeDropper al montar
   useEffect(() => {
     if (typeof window !== "undefined" && (window as any).EyeDropper) {
       setEsSoportado(true);
@@ -174,7 +172,6 @@ export default function ColoresClient({
       const result = await eyeDropper.open();
       setHex(normalizarHex(result.sRGBHex));
     } catch (e) {
-      // Usuario canceló o error
     }
   };
 
@@ -185,7 +182,6 @@ export default function ColoresClient({
     [nombre, hexNorm]
   );
 
-  // Use initialRows directly as they are now paginated/filtered from server
   const rowsFiltradas = initialRows;
 
   const showToast = (msg: string, type: "success" | "error" | "warning" = "success") => {
@@ -220,7 +216,6 @@ export default function ColoresClient({
 
   async function actualizar(id: string, patch: { nombre: string; hex: string | null }) {
     const nombreTrim = patch.nombre.trim();
-    // No normalizamos agresivamente si hay comas, permitimos la estructura manual
     const rawHex = patch.hex ?? "";
 
     if (!nombreTrim) { showToast("Nombre inválido", "error"); return; }

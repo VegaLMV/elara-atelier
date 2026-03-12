@@ -8,7 +8,7 @@ import Link from "next/link";
 import ClientesClient from "./clientes-client";
 
 type Props = {
-    initialData?: any; // Si existe, estamos en modo EDICIÓN
+    initialData?: any;
     onSuccess?: (data: any) => void;
     isModal?: boolean;
 };
@@ -24,7 +24,6 @@ export default function ClienteForm({ initialData, onSuccess, isModal }: Props) 
     const router = useRouter();
     const [loading, setLoading] = useState(false);
 
-    // Estado único para el formulario
     const [form, setForm] = useState({
         nombre: initialData?.nombre || "",
         dni: initialData?.dni || "",
@@ -44,7 +43,6 @@ export default function ClienteForm({ initialData, onSuccess, isModal }: Props) 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Validaciones básicas
         if (!form.nombre.trim()) {
             toast.error("Campo obligatorio", { description: "El nombre del cliente es requerido." });
             return;
@@ -52,7 +50,6 @@ export default function ClienteForm({ initialData, onSuccess, isModal }: Props) 
 
         setLoading(true);
 
-        // Determinar si es Crear (POST) o Editar (PUT)
         const url = initialData ? `/api/admin/clientes/${initialData.id}` : "/api/admin/clientes";
         const method = initialData ? "PUT" : "POST";
 

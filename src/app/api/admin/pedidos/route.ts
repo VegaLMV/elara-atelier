@@ -13,7 +13,7 @@ export async function GET(req: Request) {
         const { searchParams } = new URL(req.url);
         const estado = searchParams.get("estado") as any;
         const page = parseInt(searchParams.get("page") || "1");
-        const limit = parseInt(searchParams.get("limit") || "25"); // Default 25 items per page
+        const limit = parseInt(searchParams.get("limit") || "25");
 
         const skip = (page - 1) * limit;
 
@@ -76,11 +76,11 @@ export async function POST(req: Request) {
             provincia,
             departamento,
             referencia,
-            items, // Array: { varianteId, cantidad, precioUnitario }
+            items,
             notas,
             whatsappMessage,
             costoEnvio = 0,
-            empaques = [] // Array: { tipoEmpaqueId, cantidad }
+            empaques = []
         } = body;
 
         if (!clienteId) {
@@ -202,8 +202,8 @@ export async function POST(req: Request) {
                 }
             });
         }, {
-            maxWait: 5000, // default: 2000
-            timeout: 20000 // default: 5000
+            maxWait: 5000, 
+            timeout: 20000
         });
 
         return NextResponse.json(result);

@@ -13,7 +13,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const { id: productoId } = await ctx.params;
   if (!productoId) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
 
-  // Última compra con proveedor para cualquier variante de ese producto
   const last = await prisma.itemCompra.findFirst({
     where: {
       variante: { productoId },

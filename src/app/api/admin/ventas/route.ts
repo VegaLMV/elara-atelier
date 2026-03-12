@@ -11,140 +11,106 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { clienteId, metodoPago, items, empaques } = body;
 
-        // --- 1. Validaciones Iniciales ---
         if (!items || !Array.isArray(items) || items.length === 0) {
             return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
         }
 
-        // --- 2. Validar Stock PRODUCTOS ---
+        // 1. Validar Stock PRODUCTOS (Cargando relaciones correctamente)
         const variantesIds = items.map((i: any) => i.varianteId);
         const variantesDb = await prisma.variante.findMany({
             where: { id: { in: variantesIds } },
-            select: { id: true, stockActual: true, producto: { select: { nombre: true } }, talla: true, color: true }
+            include: { 
+                producto: { select: { nombre: true } }, 
+                talla: true, 
+                color: true 
+            }
         });
 
         for (const item of items) {
             const dbVar = variantesDb.find(v => v.id === item.varianteId);
-            if (!dbVar) return NextResponse.json({ error: `Variante no encontrada (ID: ${item.varianteId})` }, { status: 400 });
+            if (!dbVar) return NextResponse.json({ error: `Variante no encontrada` }, { status: 400 });
 
             if (dbVar.stockActual < item.cantidad) {
                 return NextResponse.json({
-                    error: `Stock insuficiente para "${dbVar.producto.nombre}" (${dbVar.talla.nombre}/${dbVar.color.nombre}). Solicitado: ${item.cantidad}, Disponible: ${dbVar.stockActual}`
+                    error: `Stock insuficiente para "${dbVar.producto.nombre}" (${dbVar.talla.nombre}/${dbVar.color.nombre}). Disponible: ${dbVar.stockActual}`
                 }, { status: 409 });
             }
         }
 
-        // --- 3. Validar Stock EMPAQUES ---
-        if (empaques && Array.isArray(empaques) && empaques.length > 0) {
-            const empaqueIds = empaques.map((e: any) => e.tipoEmpaqueId);
-            const empaquesDb = await prisma.tipoEmpaque.findMany({
-                where: { id: { in: empaqueIds } },
-                select: { id: true, stock: true, nombre: true, costoUnitario: true }
-            });
-
-            for (const emp of empaques) {
-                const dbEmp = empaquesDb.find(e => e.id === emp.tipoEmpaqueId);
-                if (!dbEmp) return NextResponse.json({ error: `Empaque no encontrado` }, { status: 400 });
-
-                if (dbEmp.stock < emp.cantidad) {
-                    return NextResponse.json({
-                        error: `Sin stock de empaque "${dbEmp.nombre}". Disponible: ${dbEmp.stock}`
-                    }, { status: 409 });
-                }
-            }
-        }
-
-        // --- 4. Cálculos Financieros (Precisión Decimal) ---
+        // 2. Cálculos Financieros usando la precisión de Prisma.Decimal
         let subtotalVenta = new Prisma.Decimal(0);
         let descuentoTotalVenta = new Prisma.Decimal(0);
         let totalVenta = new Prisma.Decimal(0);
 
         const itemsProcesados = items.map((item: any) => {
-            const precioUnit = new Prisma.Decimal(item.precioUnitario || 0);
-            const cantidad = new Prisma.Decimal(item.cantidad || 0);
-            const descuentoUnit = new Prisma.Decimal(item.descuentoAplicado || 0);
+            const pUnit = new Prisma.Decimal(item.precioUnitario);
+            const cant = new Prisma.Decimal(item.cantidad);
+            const descUnit = new Prisma.Decimal(item.descuentoAplicado || 0);
 
-            // Cálculos por línea: (PrecioUnit - DescuentoUnit)
-            const precioFinalUnit = precioUnit.minus(descuentoUnit);
+            const pFinalUnit = pUnit.minus(descUnit);
+            const subtotalLinea = pFinalUnit.mul(cant);
 
-            // Subtotal línea (lo que paga el cliente)
-            const subtotalLinea = precioFinalUnit.mul(cantidad);
-
-            // Acumuladores generales
-            const montoBaseLinea = precioUnit.mul(cantidad);
-            const montoDescuentoLinea = descuentoUnit.mul(cantidad);
-
-            subtotalVenta = subtotalVenta.plus(montoBaseLinea);
-            descuentoTotalVenta = descuentoTotalVenta.plus(montoDescuentoLinea);
+            subtotalVenta = subtotalVenta.plus(pUnit.mul(cant));
+            descuentoTotalVenta = descuentoTotalVenta.plus(descUnit.mul(cant));
             totalVenta = totalVenta.plus(subtotalLinea);
 
             return {
                 varianteId: item.varianteId,
-                cantidad: Number(cantidad), // Para stock y kardex (Int)
-                precioUnitario: precioUnit,
-                precioFinal: precioFinalUnit,
+                cantidad: Number(item.cantidad),
+                precioUnitario: pUnit,
+                precioFinal: pFinalUnit,
                 subtotal: subtotalLinea,
-                tieneDescuento: descuentoUnit.greaterThan(0),
-                descuentoMonto: descuentoUnit,
-                descuentoRazon: item.descuentoRazon || (descuentoUnit.greaterThan(0) ? "Oferta POS" : null)
+                tieneDescuento: descUnit.gt(0),
+                descuentoMonto: descUnit,
+                descuentoRazon: item.descuentoRazon || null
             };
         });
 
-        // --- 5. TRANSACCIÓN ATÓMICA ---
+        // 3. Transacción Atómica
         const ventaCreada = await prisma.$transaction(async (tx) => {
+            
+            // ==========================================
+            // SOLUCIÓN: ESTRUCTURACIÓN SEGURA PARA PRISMA
+            // ==========================================
+            const dataVenta: any = {
+                metodoPago: metodoPago || "EFECTIVO",
+                subtotal: subtotalVenta,
+                descuentoTotal: descuentoTotalVenta,
+                total: totalVenta,
+                items: {
+                    create: itemsProcesados.map(i => ({
+                        varianteId: i.varianteId,
+                        cantidad: i.cantidad,
+                        precioUnitario: i.precioUnitario,
+                        precioFinal: i.precioFinal,
+                        subtotal: i.subtotal,
+                        tieneDescuento: i.tieneDescuento,
+                        descuentoMonto: i.descuentoMonto,
+                        descuentoRazon: i.descuentoRazon
+                    }))
+                }
+            };
+
+            // VINCULACIÓN ESTRICTA DEL CLIENTE
+            if (clienteId && clienteId.trim() !== "") {
+                dataVenta.cliente = { connect: { id: clienteId } };
+                dataVenta.clienteNombre = null; 
+            } else {
+                dataVenta.clienteNombre = "Público General";
+            }
 
             // A. Crear Venta
             const venta = await tx.venta.create({
-                data: {
-                    clienteId: clienteId || null,
-                    clienteNombre: !clienteId ? "Público General" : null,
-                    metodoPago: metodoPago || "EFECTIVO",
-                    subtotal: subtotalVenta,
-                    descuentoTotal: descuentoTotalVenta,
-                    total: totalVenta,
-                    items: {
-                        create: itemsProcesados.map(i => ({
-                            varianteId: i.varianteId,
-                            cantidad: i.cantidad,
-                            precioUnitario: i.precioUnitario,
-                            precioFinal: i.precioFinal,
-                            subtotal: i.subtotal,
-                            tieneDescuento: i.tieneDescuento,
-                            descuentoMonto: i.descuentoMonto,
-                            descuentoRazon: i.descuentoRazon
-                        }))
-                    }
-                }
+                data: dataVenta
             });
 
-            // B. Registrar Empaques
-            if (empaques && empaques.length > 0) {
-                for (const emp of empaques) {
-                    const dataEmp = await tx.tipoEmpaque.findUnique({ where: { id: emp.tipoEmpaqueId } });
-                    const costoUnit = new Prisma.Decimal(dataEmp?.costoUnitario || 0);
-                    const cant = new Prisma.Decimal(emp.cantidad);
-
-                    await tx.usoEmpaque.create({
-                        data: {
-                            ventaId: venta.id,
-                            tipoEmpaqueId: emp.tipoEmpaqueId,
-                            cantidad: Number(cant),
-                            costoTotal: costoUnit.mul(cant)
-                        }
-                    });
-                    await tx.tipoEmpaque.update({
-                        where: { id: emp.tipoEmpaqueId },
-                        data: { stock: { decrement: Number(cant) } }
-                    });
-                }
-            }
-
-            // C. Kardex & Stock Productos
+            // B. Kardex y Stock de Productos
             for (const item of itemsProcesados) {
                 await tx.variante.update({
                     where: { id: item.varianteId },
                     data: { stockActual: { decrement: item.cantidad } }
                 });
+
                 await tx.movimientoInventario.create({
                     data: {
                         varianteId: item.varianteId,
@@ -157,13 +123,35 @@ export async function POST(request: Request) {
                 });
             }
 
+            // C. Manejo de Empaques (Si existen)
+            if (empaques && empaques.length > 0) {
+                for (const emp of empaques) {
+                    const dbEmp = await tx.tipoEmpaque.findUnique({ where: { id: emp.tipoEmpaqueId } });
+                    if (dbEmp) {
+                        const costoTotal = new Prisma.Decimal(dbEmp.costoUnitario).mul(emp.cantidad);
+                        await tx.usoEmpaque.create({
+                            data: {
+                                ventaId: venta.id,
+                                tipoEmpaqueId: emp.tipoEmpaqueId,
+                                cantidad: emp.cantidad,
+                                costoTotal: costoTotal
+                            }
+                        });
+                        await tx.tipoEmpaque.update({
+                            where: { id: emp.tipoEmpaqueId },
+                            data: { stock: { decrement: emp.cantidad } }
+                        });
+                    }
+                }
+            }
+
             return venta;
         });
 
         return NextResponse.json({ success: true, codigo: ventaCreada.codigo, id: ventaCreada.id });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error en POST Ventas:", error);
-        return NextResponse.json({ error: "Error interno al procesar la venta" }, { status: 500 });
+        return NextResponse.json({ error: error.message || "Error interno" }, { status: 500 });
     }
 }

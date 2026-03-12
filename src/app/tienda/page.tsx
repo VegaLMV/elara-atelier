@@ -4,7 +4,6 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { getCachedHomeSections, getCachedCategoriasVisibles } from "@/lib/cache";
 
-// Landing Components
 import HeroSection from "./_components/landing/hero-section";
 import CategoriesSection from "./_components/landing/categories-section";
 import ProductDualSection from "./_components/landing/product-dual-section";
@@ -41,7 +40,7 @@ function mapProduct(p: any, ahora: Date): CleanProduct {
     imagenes: p.imagenes.map((i: any) => i.url),
     precioOriginal: Number(p.precio),
     precioFinal: Number(p.precio),
-    tieneDescuento: false, // Se recalcula en el componente si hay campaña
+    tieneDescuento: false,
     porcentaje: null,
     esNuevo: p.nuevoHasta ? new Date(p.nuevoHasta) >= ahora : false,
     destacado: p.destacado,
@@ -189,9 +188,9 @@ export default async function TiendaPage() {
         return (
           <ScrollReveal key={`promo-${section.id}`}>
             <PromoCampaignSection
-              title={content?.title}
-              subtitle={content?.subtitle}
               campaign={{
+                title: content?.title,
+                subtitle: content?.subtitle,
                 nombre: campana.nombre,
                 descripcion: campana.descripcion,
                 imagenUrl: campana.imagenUrl,

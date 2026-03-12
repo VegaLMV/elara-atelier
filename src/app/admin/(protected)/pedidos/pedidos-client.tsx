@@ -74,7 +74,7 @@ export default function PedidosClient() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedPedidoId, setSelectedPedidoId] = useState<string | null>(null);
     const [preselectedClienteId, setPreselectedClienteId] = useState<string | null>(null);
-    const [editData, setEditData] = useState<any>(null); // NEW
+    const [editData, setEditData] = useState<any>(null);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [showPrintModal, setShowPrintModal] = useState(false);
 
@@ -89,7 +89,6 @@ export default function PedidosClient() {
         if (isNew) {
             setPreselectedClienteId(cid);
             setIsFormOpen(true);
-            // Limpiar params para que no se re-abra al refrescar
             const newParams = new URLSearchParams(searchParams.toString());
             newParams.delete("new");
             newParams.delete("clienteId");
@@ -112,7 +111,7 @@ export default function PedidosClient() {
                 setPedidos(data.data);
                 setTotalPages(data.metadata.totalPages);
             } else {
-                setPedidos([]); // Fallback
+                setPedidos([]);
             }
         } catch (error) {
             toast.error("Error al cargar pedidos");
@@ -345,8 +344,8 @@ export default function PedidosClient() {
                 onUpdate={fetchPedidos}
                 onEdit={(pedido) => {
                     setEditData(pedido);
-                    setSelectedPedidoId(null); // Close drawer
-                    setIsFormOpen(true); // Open modal
+                    setSelectedPedidoId(null);
+                    setIsFormOpen(true);
                 }}
             />
 

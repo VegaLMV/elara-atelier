@@ -45,7 +45,6 @@ export default function CategoriasClient({ initialRows }: { initialRows: Categor
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // NUEVO: Estado para manejar la confirmación de borrado de imágenes individualmente
   const [imgToDelete, setImgToDelete] = useState<string | null>(null);
 
   async function crear(e: React.FormEvent) {
@@ -92,7 +91,7 @@ export default function CategoriasClient({ initialRows }: { initialRows: Categor
     await fetch(`/api/admin/categorias/${categoriaId}/imagenes/${imagenId}`, {
       method: "DELETE",
     });
-    setImgToDelete(null); // Limpiar estado tras borrar
+    setImgToDelete(null);
     router.refresh();
   }
 
@@ -360,7 +359,6 @@ export default function CategoriasClient({ initialRows }: { initialRows: Categor
   );
 }
 
-// Pequeño componente adicional para el icono de advertencia
 function AlertTriangle({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>

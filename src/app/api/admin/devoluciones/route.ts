@@ -80,8 +80,6 @@ export async function POST(req: Request) {
       }
     }
 
-
-
     // --- INICIO DE TRANSACCIÓN ---
     const resultado = await prisma.$transaction(async (tx) => {
 
@@ -122,7 +120,7 @@ export async function POST(req: Request) {
             varianteId: item.varianteId,
             tipo: "DEVOLUCION",
             cambioCantidad: cantidadCambio,
-            costoUnitario: new Prisma.Decimal(0), // Valor contable (ajustable según política)
+            costoUnitario: new Prisma.Decimal(0),
             nota: `Devolución #${nuevaDevolucion.id.slice(-5)}: ${motivo}`
           }
         });
@@ -132,10 +130,8 @@ export async function POST(req: Request) {
       let idVentaCambio = null;
 
       if (tipo === "CLIENTE" && accion === "CAMBIO" && itemsNuevos && itemsNuevos.length > 0) {
-        // Calcular totales de la nueva venta
         let totalNuevo = new Prisma.Decimal(0);
 
-        // Obtenemos precios actuales de los nuevos productos
         const variantesNuevasIds = itemsNuevos.map((i: any) => i.varianteId);
         const variantesDb = await tx.variante.findMany({
           where: { id: { in: variantesNuevasIds } },
@@ -144,18 +140,19 @@ export async function POST(req: Request) {
 
         const itemsVenta = [];
 
-        for (const itemNuevo of itemsNuevos) {
+  for (const itemNuevo of itemsNuevos) {
           const dbVar = variantesDb.find(v => v.id === itemNuevo.varianteId);
           if (!dbVar) throw new Error(`Variante ${itemNuevo.varianteId} no encontrada`);
 
-          // Validar Stock
           if (dbVar.stockActual < itemNuevo.cantidad) {
             throw new Error(`Sin stock suficiente para ${dbVar.producto.nombre}`);
           }
 
-          const precioUnit = dbVar.producto.precio; // Precio base (sin descuento complejo por ahora, o pasar desde front)
-          // NOTA: Para MVP tomamos precio base. En producción ideal pasar precio calculado.
-          const subtotal = new Prisma.Decimal(precioUnit).mul(itemNuevo.cantidad);
+          const precioUnit = itemNuevo.precioAlternativo !== undefined && itemNuevo.precioAlternativo !== null
+                              ? new Prisma.Decimal(itemNuevo.precioAlternativo) 
+                              : dbVar.producto.precio;
+          
+          const subtotal = precioUnit.mul(itemNuevo.cantidad);
 
           totalNuevo = totalNuevo.plus(subtotal);
 
@@ -171,7 +168,7 @@ export async function POST(req: Request) {
               varianteId: itemNuevo.varianteId,
               tipo: "VENTA",
               cambioCantidad: -itemNuevo.cantidad,
-              costoUnitario: precioUnit, // Aprox
+              costoUnitario: precioUnit,
               nota: `Cambio por Devolución #${nuevaDevolucion.id.slice(-5)}`
             }
           });
@@ -192,7 +189,7 @@ export async function POST(req: Request) {
           data: {
             clienteId: clienteId || null,
             clienteNombre: "Cambio / Devolución",
-            metodoPago: metodoPagoDiferencia || "EFECTIVO", // Si hay diferencia positiva, el cliente paga
+            metodoPago: metodoPagoDiferencia || "EFECTIVO",
             subtotal: totalNuevo,
             total: totalNuevo,
             notas: `Generada automáticamente por Cambio de Dev. ${nuevaDevolucion.id}`,
@@ -213,13 +210,34 @@ export async function POST(req: Request) {
         }
       }
 
-      // 5. Lógica Financiera: Saldo a Favor (Solo si NO hubo cambio directo o fue explícito)
-      // Si fue CAMBIO, la lógica financiera ya se manejó arriba con la diferencia
-      if (tipo === "CLIENTE" && accion === "SALDO_A_FAVOR" && clienteId) {
-        await tx.cliente.update({
-          where: { id: clienteId },
-          data: { saldoAFavor: { increment: new Prisma.Decimal(montoTotal || 0) } },
-        });
+     // 5. Lógica Financiera: Saldo a Favor o Reembolso
+      if (tipo === "CLIENTE") {
+        if (accion === "SALDO_A_FAVOR" && clienteId) {
+          // Aumenta el saldo a favor del cliente
+          await tx.cliente.update({
+            where: { id: clienteId },
+            data: { saldoAFavor: { increment: new Prisma.Decimal(montoTotal || 0) } },
+          });
+        } 
+        else if (accion === "REEMBOLSO") {
+          // Si devuelve el dinero, restamos del total de la venta original
+          const ventaOriginal = await tx.venta.findUnique({ where: { id: referenciaId } });
+          
+          if (ventaOriginal) {
+             const nuevoTotal = ventaOriginal.total.minus(new Prisma.Decimal(montoTotal || 0));
+             
+             // Si el nuevo total es 0 o menor, asumimos que la venta se anuló por completo
+             const estadoVenta = nuevoTotal.lte(0) ? "ANULADO" : "COMPLETADO";
+
+             await tx.venta.update({
+               where: { id: referenciaId },
+               data: { 
+                  total: Math.max(0, Number(nuevoTotal)),
+                  estado: estadoVenta
+               }
+             });
+          }
+        }
       }
 
       return nuevaDevolucion;
@@ -235,6 +253,7 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error("Error en Devolución:", error);
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+    // IMPORTANTE: Devolver el error real para que el frontend lo muestre
+    return NextResponse.json({ error: error.message || "Error interno del servidor" }, { status: 500 });
   }
 }

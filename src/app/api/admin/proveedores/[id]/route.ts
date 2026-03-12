@@ -23,7 +23,7 @@ export async function PATCH(
       provincia, 
       distrito, 
       direccion,
-      activo // Permitimos actualizar el estado si fuera necesario
+      activo
     } = body;
 
     const proveedor = await prisma.proveedor.update({
@@ -60,7 +60,6 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // En lugar de borrar, marcamos como inactivo
     await prisma.proveedor.update({
       where: { id },
       data: {

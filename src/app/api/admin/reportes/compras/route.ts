@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
             _count: true,
         });
 
-        // Obtener totales de items por compra
         const compras = await prisma.compra.findMany({
             where: {
                 fechaCompra: { gte: from, lte: to },
@@ -53,7 +52,6 @@ export async function GET(request: NextRequest) {
             },
         });
 
-        // Agrupar por proveedor
         const proveedorTotales: Record<string, { nombre: string; total: number; compras: number }> = {};
         compras.forEach((c) => {
             const provId = c.proveedorId || "sin-proveedor";
@@ -127,7 +125,7 @@ export async function GET(request: NextRequest) {
                 },
             },
             orderBy: { compra: { fechaCompra: "desc" } },
-            take: 100, // Aumentado para mejor búsqueda
+            take: 100,
         });
 
         const historialCostos = itemsRecientes.map((item) => ({

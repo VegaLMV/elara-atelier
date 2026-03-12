@@ -15,7 +15,7 @@ export async function PATCH(
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const { id } = await ctx.params; // ✅ Next 16: params es Promise
+  const { id } = await ctx.params; 
   if (!id) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
@@ -25,7 +25,6 @@ export async function PATCH(
     return NextResponse.json({ error: "Body inválido" }, { status: 400 });
   }
 
-  // ✅ NUEVO: tipoMovimiento (por defecto AJUSTE)
   const tipoMovimiento: Tipo =
     body?.tipoMovimiento === "DEVOLUCION" ? "DEVOLUCION" : "AJUSTE";
 
@@ -38,7 +37,6 @@ export async function PATCH(
   }
 
   // ✅ Reglas sugeridas:
-  // - DEVOLUCION debe RESTAR stock (cambioCantidad negativo)
   if (tipoMovimiento === "DEVOLUCION" && cambioCantidad > 0) {
     return NextResponse.json(
       { error: "En DEVOLUCION, cambioCantidad debe ser negativo (ej: -1, -2)" },
@@ -67,7 +65,7 @@ export async function PATCH(
       await tx.movimientoInventario.create({
         data: {
           varianteId: id,
-          tipo: tipoMovimiento, // ✅ AJUSTE o DEVOLUCION
+          tipo: tipoMovimiento,
           cambioCantidad,
           nota,
         },

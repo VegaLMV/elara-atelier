@@ -25,7 +25,6 @@ async function subirArchivoProductoColor(opts: {
     (mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg");
 
   const nombreArchivo = `${crypto.randomUUID()}.${ext}`;
-  // ✅ guardamos en subcarpeta /colores/{colorId}/
   const ruta = `${productoId}/colores/${colorId}/${nombreArchivo}`;
 
   const supabase = supabaseAdmin();
@@ -104,7 +103,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return NextResponse.json({ error: `Máximo ${maxMB}MB` }, { status: 400 });
     }
 
-    // opcional: valida que el color exista
     const existeColor = await prisma.color.findUnique({ where: { id: colorId }, select: { id: true } });
     if (!existeColor) return NextResponse.json({ error: "Color no existe" }, { status: 400 });
 

@@ -47,8 +47,6 @@ export default function QuickCreatePedido({ isOpen, onClose, onSuccess }: Props)
                 toast.error(data.error);
             } else {
                 setParsedData(data);
-                // Default shipping logic simulation
-                // In a real app, we'd check the customer's previous sales
                 setCostoEnvio(0);
                 setIsFirstOrder(true);
             }

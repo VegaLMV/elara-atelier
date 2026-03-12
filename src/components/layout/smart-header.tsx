@@ -182,7 +182,6 @@ export default function SmartHeader({
                     </div>
 
                     <div className="flex items-center justify-end gap-2 md:gap-6">
-                        {/* 🔥 PREFETCH APAGADO EN EL BUSCADOR MÓVIL */}
                         <Link href="/tienda/catalogo" prefetch={false} className="p-2 text-[#3f2f2f] hover:text-[#864d2d] transition-colors hidden sm:block">
                             <Search className="w-5 h-5 stroke-[1.5]" />
                         </Link>

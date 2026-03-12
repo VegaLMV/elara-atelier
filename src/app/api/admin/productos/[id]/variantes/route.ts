@@ -67,7 +67,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     }))
   );
 
-  // Generar SKUs para todas las combinaciones
   const nextSkus = await generateNextSkus(combinations.length);
 
   const data = combinations.map((combo, idx) => ({

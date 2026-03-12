@@ -358,7 +358,7 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
     showToast("Producto guardado correctamente");
   }
 
-  // ✅ Función para eliminar descuento
+  // Función para eliminar descuento
   async function eliminarDescuento(id: string) {
     if (!confirm("¿Deseas cancelar o eliminar este descuento?")) return;
     try {
@@ -480,7 +480,6 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
     !descuentoVigente || d.id !== descuentoVigente.id
   );
 
-  // ✅ ESCENARIO A: GENERACIÓN DE ETIQUETAS PDF MEJORADO (SEGÚN STOCK FÍSICO)
   const generarEtiquetasPDF = () => {
     if (!variantes || variantes.length === 0) {
       return showToast("No hay variantes creadas para imprimir.", "error");
@@ -498,22 +497,20 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
     const margenY = 15;
     const columnas = 3;
     const filasPorPagina = 7;
-    const gap = 5; // Espacio entre etiquetas
+    const gap = 5;
 
     // Cálculo de tamaño de etiqueta
     const anchoEtiqueta = (210 - (margenX * 2) - (gap * (columnas - 1))) / columnas;
-    const altoEtiqueta = 35; // 3.5 cm de alto
+    const altoEtiqueta = 35;
 
     let colActual = 0;
     let filaActual = 0;
 
     // Recorrer variantes y generar etiquetas según el stock
     variantes.forEach((variante) => {
-      // Imprimir tantas etiquetas como stock haya (mínimo 1 por seguridad/modelo)
       const cantidadAImprimir = variante.stockActual > 0 ? variante.stockActual : 1;
 
       for (let i = 0; i < cantidadAImprimir; i++) {
-        // Control de saltos de página
         if (filaActual >= filasPorPagina) {
           doc.addPage();
           filaActual = 0;
@@ -524,18 +521,16 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
         const posX = margenX + (colActual * (anchoEtiqueta + gap));
         const posY = margenY + (filaActual * (altoEtiqueta + gap));
 
-        // Dibujar el marco de la etiqueta (borde gris claro)
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.3);
         doc.roundedRect(posX, posY, anchoEtiqueta, altoEtiqueta, 2, 2, "S");
 
-        // TEXTOS DE LA ETIQUETA (Centrados)
         const centroX = posX + (anchoEtiqueta / 2);
 
         // 1. Marca
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
-        doc.setTextColor(30, 41, 59); // slate-800
+        doc.setTextColor(30, 41, 59);
         doc.text("ÉLARA ATELIER", centroX, posY + 6, { align: "center" });
 
         // Línea separadora
@@ -545,30 +540,29 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
         // 2. Producto
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7);
-        doc.setTextColor(71, 85, 105); // slate-600
+        doc.setTextColor(71, 85, 105);
         const nombreCorto = nombre.length > 25 ? nombre.substring(0, 22) + "..." : nombre;
         doc.text(nombreCorto.toUpperCase(), centroX, posY + 13, { align: "center" });
 
         // 3. Variante (Talla y Color)
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
-        doc.setTextColor(0, 0, 0); // black
+        doc.setTextColor(0, 0, 0);
         doc.text(`${variante.talla} | ${variante.color}`, centroX, posY + 19, { align: "center" });
 
         // 4. SKU (Identificador único corto)
         doc.setFont("courier", "bold");
         doc.setFontSize(8);
-        doc.setTextColor(15, 23, 42); // slate-900
+        doc.setTextColor(15, 23, 42);
         const skuLabel = variante.sku || variante.id.slice(-8).toUpperCase();
         doc.text(`SKU: ${skuLabel}`, centroX, posY + 25, { align: "center" });
 
         // 5. Precio
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
-        doc.setTextColor(15, 23, 42); // slate-900
+        doc.setTextColor(15, 23, 42);
         doc.text(`S/ ${Number(precio).toFixed(2)}`, centroX, posY + 31, { align: "center" });
 
-        // Avanzar a la siguiente celda
         colActual++;
         if (colActual >= columnas) {
           colActual = 0;
@@ -585,7 +579,7 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
 
   return (
     <div className="p-4 md:p-6 space-y-6 md:space-y-8 max-w-7xl mx-auto relative pb-24 md:pb-6">
-      {/* ✅ TOAST NOTIFICATION */}
+      {/* TOAST NOTIFICATION */}
       {toast && (
         <div className={`fixed bottom-20 md:bottom-5 right-4 md:right-5 px-4 md:px-6 py-3 rounded-lg shadow-2xl text-white font-medium text-xs md:text-sm animate-in slide-in-from-bottom-5 fade-in duration-300 z-[9999] flex items-center gap-2 ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-900'}`}>
           <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
@@ -1095,7 +1089,6 @@ export default function ProductoEditor({ initialData }: { initialData: Data }) {
 // COMPONENTES AUXILIARES
 // ============================================================================
 
-// Pequeño helper visual para la tabla
 const ChevronRight = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6" /></svg>
 );
@@ -1148,7 +1141,6 @@ function FilaVarianteAgrupada({ row, onAjustar, onCambiarActiva, onPreviewColor 
   );
 }
 
-// ✅ SOLO MUESTRA HISTORIAL
 function HistorialDescuentos({ historial, onEliminar }: { historial: DescuentoItem[], onEliminar: (id: string) => void }) {
 
   const listaOrdenada = [...historial].sort((a, b) => {
@@ -1199,7 +1191,6 @@ function HistorialDescuentos({ historial, onEliminar }: { historial: DescuentoIt
           const isFuture = now < start && desc.estado !== 'CANCELADO';
           const isCancelled = desc.estado === 'CANCELADO';
 
-          // Estilo condicional
           let borderClass = 'border-gray-200';
           let bgClass = 'bg-white';
 

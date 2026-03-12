@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No hay productos seleccionados para esta campaña" }, { status: 400 });
     }
 
-    // --- 4. 🛡️ DETECCIÓN DE CONFLICTOS ---
+    // --- 4. DETECCIÓN DE CONFLICTOS ---
     const conflictos = await prisma.descuentoProducto.findFirst({
       where: {
         productoId: { in: idsObjetivo },

@@ -10,10 +10,8 @@ export default async function Page() {
     const admin = await sesionAdmin();
     if (!admin) redirect("/admin/login");
 
-    // 1. Obtenemos las secciones
     let sections = await prisma.homeSection.findMany({ orderBy: { order: "asc" } });
 
-    // 2. Obtenemos TODAS las categorías disponibles en la tienda
     const categorias = await prisma.categoria.findMany({
         select: { id: true, nombre: true, slug: true },
         orderBy: { nombre: "asc" }
@@ -80,6 +78,5 @@ export default async function Page() {
         sections = await prisma.homeSection.findMany({ orderBy: { order: "asc" } });
     }
 
-    // Pasamos tanto las secciones como las categorías al cliente
     return <HomeSeccionesClient initial={sections as any} categorias={categorias} />;
 }

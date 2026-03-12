@@ -13,7 +13,7 @@ function esHex(v: string | null) {
   return parts.every(part => hexRegex.test(part));
 }
 
-// PUT: Para editar Nombre y Hex (Edición completa)
+// PUT: Para editar Nombre y Hex
 export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const sesion = await obtenerSesion();
   if (!sesion || sesion.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -27,7 +27,6 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
   const nombre = String(body?.nombre ?? "").trim();
   const hex = body?.hex === null || body?.hex === undefined ? null : String(body.hex).trim();
 
-  // Validaciones estrictas para edición de datos
   if (!nombre) return NextResponse.json({ error: "Falta nombre" }, { status: 400 });
   if (!esHex(hex)) return NextResponse.json({ error: "HEX inválido (usa #RRGGBB)" }, { status: 400 });
 
@@ -46,7 +45,6 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
   }
 }
 
-// ✅ NUEVO MÉTODO PATCH: Para cambiar estado (Activo/Inactivo)
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const sesion = await obtenerSesion();
   if (!sesion || sesion.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -54,7 +52,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const body = await req.json().catch(() => null);
 
-  // Validamos que venga el campo 'activo' y sea booleano
   if (!body || typeof body.activo !== "boolean") {
     return NextResponse.json({ error: "Se requiere campo 'activo' (boolean)" }, { status: 400 });
   }
@@ -83,7 +80,6 @@ export async function DELETE(_: Request, ctx: { params: Promise<{ id: string }> 
     await prisma.color.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    // P2003: Error de restricción de clave foránea (Tiene variantes o imágenes)
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2003") {
       return NextResponse.json({ error: "No se puede eliminar: El color está en uso. Archívalo en su lugar." }, { status: 409 });
     }

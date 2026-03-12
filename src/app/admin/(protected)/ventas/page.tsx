@@ -25,7 +25,6 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
   const ITEMS_PER_PAGE = 25;
   const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
-  // Obtener ventas paginadas y total
   const [totalVentas, ventas] = await prisma.$transaction([
     prisma.venta.count(),
     prisma.venta.findMany({
@@ -40,7 +39,6 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
 
   const totalPages = Math.ceil(totalVentas / ITEMS_PER_PAGE);
 
-  // Métricas rápidas del listado actual
   const totalIngresos = ventas.reduce((acc, v) => acc + Number(v.total), 0);
   const ticketPromedio = ventas.length > 0 ? totalIngresos / ventas.length : 0;
 

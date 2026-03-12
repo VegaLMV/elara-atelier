@@ -3,15 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { Loader2, Menu, X } from "lucide-react"; // Importamos iconos para mejor UX
+import { Loader2, Menu, X } from "lucide-react";
 
 export default function AdminTopbar() {
     const router = useRouter();
-    const pathname = usePathname(); // 1. Obtenemos la ruta actual
+    const pathname = usePathname(); 
     const [cargando, setCargando] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-    // 2. ✅ EFECTO: Cuando el pathname cambie (navegación), cerramos el menú
     useEffect(() => {
         setMobileMenuOpen(false);
     }, [pathname]);
@@ -130,7 +129,7 @@ export default function AdminTopbar() {
     );
 }
 
-// --- SUBCOMPONENTES (Se mantienen igual) ---
+// --- SUBCOMPONENTES  ---
 
 function DropdownMenu({ title, children }: { title: string, children: React.ReactNode }) {
     const [isOpen, setIsOpen] = useState(false);

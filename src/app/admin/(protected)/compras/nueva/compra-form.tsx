@@ -14,9 +14,9 @@ import {
     Truck,
     Box,
     Check,
-    ShoppingCart // <--- FALTABA ESTE IMPORT
+    ShoppingCart
 } from "lucide-react";
-import { toast } from "sonner"; // Aseguramos usar sonner para notificaciones
+import { toast } from "sonner";
 
 // --- TIPOS ---
 type Proveedor = {
@@ -81,7 +81,6 @@ type ItemCarrito = {
     productoEstado?: string;
 };
 
-// Helpers
 function soles(v: any) {
     const n = Number(v?.toString?.() ?? v);
     if (Number.isNaN(n)) return `S/ ${String(v)}`;

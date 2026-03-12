@@ -56,10 +56,9 @@ export default async function ClientesPage({ searchParams }: Props) {
             where,
             include: {
                 _count: { select: { ventas: true } },
-                // Traemos las últimas ventas para calcular métricas rápidas
                 ventas: {
                     orderBy: { fechaVenta: 'desc' },
-                    select: { fechaVenta: true, total: true } // Solo lo necesario
+                    select: { fechaVenta: true, total: true }
                 }
             },
             orderBy: { nombre: "asc" },
@@ -130,7 +129,7 @@ export default async function ClientesPage({ searchParams }: Props) {
                     {clientes.map(c => {
                         // Cálculos en tiempo de render (LTV)
                         const totalGastado = c.ventas.reduce((acc, v) => acc + Number(v.total), 0);
-                        const ultimaVenta = c.ventas[0]; // Ya ordenado por fecha desc
+                        const ultimaVenta = c.ventas[0];
 
                         return (
                             <div key={c.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col group">

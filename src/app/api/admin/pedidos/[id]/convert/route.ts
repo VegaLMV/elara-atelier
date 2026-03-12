@@ -14,7 +14,6 @@ export async function POST(
         const body = await req.json();
         const { metodoPago, notasVenta } = body;
 
-        // 1. Obtener los datos del pedido
         const pedido = await prisma.pedido.findUnique({
             where: { id },
             include: { items: true }
@@ -28,9 +27,7 @@ export async function POST(
             return NextResponse.json({ error: "No se puede convertir un pedido cancelado" }, { status: 400 });
         }
 
-        // Usar una transacción para asegurar consistencia
         const ventaResult = await prisma.$transaction(async (tx) => {
-            // 2. Crear la Venta
             const venta = await tx.venta.create({
                 data: {
                     clienteId: pedido.clienteId,
@@ -54,27 +51,19 @@ export async function POST(
                 }
             });
 
-            // 3. NO Actualizar Stock de nuevo (ya se bloqueó al crear el Pedido)
-            // Solo registrar el movimiento de inventario oficial como "VENTA"
-            // y podríamos considerar el Pedido como la fuente de ese stock.
             for (const item of pedido.items) {
-                // Registrar movimiento de inventario de tipo VENTA
-                // Pero como ya restamos stock en el Pedido (tipo AJUSTE), 
-                // aquí solo vinculamos la Venta al historial de variantes si es necesario, 
-                // pero NO restamos de nuevo.
 
                 await tx.movimientoInventario.create({
                     data: {
                         varianteId: item.varianteId,
                         tipo: "VENTA",
-                        cambioCantidad: 0, // El cambio real ya lo hizo el Pedido (-cantidad)
+                        cambioCantidad: 0,
                         ventaId: venta.id,
                         nota: `Pedido ${pedido.codigo} oficializado como Venta`
                     }
                 });
             }
 
-            // 4. Actualizar estado del Pedido
             await tx.pedido.update({
                 where: { id: pedido.id },
                 data: {
@@ -89,7 +78,6 @@ export async function POST(
 
     } catch (error) {
         console.error("Error converting pedido to venta:", error);
-        // Verificar si el error es de stock de Prisma (si pusieras un check de >=0)
         return NextResponse.json({ error: "Error en la transacción de conversión" }, { status: 500 });
     }
 }

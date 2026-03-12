@@ -8,14 +8,14 @@ import { Prisma } from "@prisma/client";
 // Tipado actualizado para aceptar items híbridos
 type BodyCompra = {
   proveedorId?: string | null;
-  fechaCompra?: string; // ISO
+  fechaCompra?: string;
   costoEnvio?: string | number | null;
   otrosCostos?: string | number | null;
   notas?: string | null;
   estado?: "BORRADOR" | "ORDENADO" | "RECIBIDO" | "CANCELADO";
   items: Array<{
-    id: string; // Puede ser ID de Variante o de Empaque
-    tipo: "PRODUCTO" | "EMPAQUE"; // Nuevo campo discriminador
+    id: string;
+    tipo: "PRODUCTO" | "EMPAQUE";
     cantidad: number;
     costoUnitario: string | number;
   }>;
@@ -43,8 +43,8 @@ export async function GET(req: Request) {
       proveedor: true,
       items: {
         include: {
-          variante: { include: { producto: true, talla: true, color: true } }, // Incluimos detalles de ropa
-          tipoEmpaque: true // Incluimos detalles de empaque
+          variante: { include: { producto: true, talla: true, color: true } },
+          tipoEmpaque: true
         }
       },
     },
@@ -73,7 +73,6 @@ export async function POST(req: Request) {
   for (const it of items) {
     if (!it?.id) return NextResponse.json({ error: "Falta ID del ítem" }, { status: 400 });
     if (!it?.tipo || (it.tipo !== "PRODUCTO" && it.tipo !== "EMPAQUE")) {
-      // Si viene del código antiguo sin 'tipo', asumimos PRODUCTO por compatibilidad
       if (!it.tipo) it.tipo = "PRODUCTO";
       else return NextResponse.json({ error: "Tipo de ítem inválido" }, { status: 400 });
     }
@@ -81,7 +80,6 @@ export async function POST(req: Request) {
     if (!Number.isFinite(Number(it.cantidad)) || Number(it.cantidad) <= 0) {
       return NextResponse.json({ error: "Cantidad inválida" }, { status: 400 });
     }
-    // Permitimos 0 si es un regalo, pero debe ser número
     if (it.costoUnitario === undefined || it.costoUnitario === null || isNaN(Number(it.costoUnitario))) {
       return NextResponse.json({ error: "Costo unitario inválido" }, { status: 400 });
     }
@@ -113,14 +111,11 @@ export async function POST(req: Request) {
       });
 
       // 2. Crear Ítems
-      // Preparamos los datos con Decimal para bulk insert (createMany si soportado, o loop)
-      // Prisma createMany soporta Decimal si el input type lo permite.
-
       const itemsData = items.map((it) => ({
         compraId: compra.id,
         varianteId: it.tipo === "PRODUCTO" ? it.id : null,
         tipoEmpaqueId: it.tipo === "EMPAQUE" ? it.id : null,
-        cantidad: Number(it.cantidad), // Cantidad suele ser Int/Float
+        cantidad: Number(it.cantidad),
         costoUnitario: new Prisma.Decimal(String(it.costoUnitario)),
       }));
 

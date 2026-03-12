@@ -3,15 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  Calendar,
-  Tag,
-  Clock,
-  Ban,
-  Pencil,
-  MoreHorizontal,
-  X
-} from "lucide-react";
+import { Calendar, Tag, Clock, Ban, Pencil, MoreHorizontal, X } from "lucide-react";
 
 interface ProductoMini {
   id: string;
@@ -60,14 +52,18 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
   };
 
   const formatFecha = (dateStr: string | Date) => {
-    // Forzamos la visualización en la zona horaria de Perú (America/Lima)
-    // para que sea consistente sin importar dónde esté el navegador del admin.
-    return new Intl.DateTimeFormat('es-PE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      timeZone: 'America/Lima'
-    }).format(new Date(dateStr));
+    const d = new Date(dateStr);
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'America/Lima',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+    });
+    
+    const parts = formatter.formatToParts(d);
+    const day = parts.find(p => p.type === 'day')?.value;
+    const month = parts.find(p => p.type === 'month')?.value;
+    const year = parts.find(p => p.type === 'year')?.value;
+
+    return `${day}/${month}/${year}`;
   };
 
   return (
@@ -76,20 +72,19 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
         {campañas.map((c) => (
           <div
             key={c.id}
-            className={`bg-white rounded-2xl p-4 md:p-6 border transition-all hover:shadow-md relative ${c.estadoCalculado === 'ACTIVO' ? 'border-green-200' :
-              c.estadoCalculado === 'CANCELADO' ? 'border-red-100 opacity-80' :
-                'border-gray-200'
-              }`}
+            className={`bg-white rounded-2xl p-4 md:p-6 border transition-all hover:shadow-md relative ${
+              c.estadoCalculado === 'ACTIVO' ? 'border-green-200' :
+              c.estadoCalculado === 'CANCELADO' ? 'border-red-100 opacity-80' : 'border-gray-200'
+            }`}
           >
             <div className="flex flex-col space-y-4">
-              {/* Header Tarjeta */}
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${c.estadoCalculado === 'ACTIVO' ? 'bg-green-100 text-green-700' :
-                      c.estadoCalculado === 'PROGRAMADO' ? 'bg-blue-100 text-blue-700' :
-                        'bg-gray-100 text-gray-500'
-                      }`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                      c.estadoCalculado === 'ACTIVO' ? 'bg-green-100 text-green-700' :
+                      c.estadoCalculado === 'PROGRAMADO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
                       {c.estadoCalculado}
                     </span>
                     <span className="text-[10px] md:text-xs font-mono font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-600">
@@ -100,7 +95,6 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
                   {c.descripcion && <p className="text-xs md:text-sm text-gray-500 mt-1 line-clamp-1">{c.descripcion}</p>}
                 </div>
 
-                {/* Menú Acciones */}
                 <div className="relative shrink-0">
                   <button onClick={() => setMenuAbierto(menuAbierto === c.id ? null : c.id)} className="p-2 hover:bg-gray-100 rounded-full transition-colors active:scale-95">
                     <MoreHorizontal className="h-5 w-5 text-gray-400" />
@@ -130,7 +124,6 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
                 </div>
               </div>
 
-              {/* Fechas y Productos */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
                 <div className="flex items-center gap-4 text-xs md:text-sm text-gray-600 bg-gray-50 sm:bg-transparent p-2 sm:p-0 rounded-lg">
                   <div className="flex items-center gap-1.5">
@@ -170,7 +163,6 @@ export default function ListaCampanas({ campañas }: { campañas: Campana[] }) {
         ))}
       </div>
 
-      {/* MODAL DETALLES */}
       {campanaSeleccionada && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-200">

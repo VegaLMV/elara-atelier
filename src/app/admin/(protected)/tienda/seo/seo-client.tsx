@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Image as ImageIcon } from "lucide-react";
-import { UploaderImage } from "@/components/ui/uploader-image"; // ✅ Importación del componente
+import { UploaderImage } from "@/components/ui/uploader-image";
 
 type Settings = {
   id: string;

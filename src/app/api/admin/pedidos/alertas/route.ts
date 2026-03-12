@@ -11,13 +11,12 @@ export async function GET() {
     try {
         const hoy = new Date();
         const limiteUrgencia = new Date(hoy);
-        limiteUrgencia.setDate(hoy.getDate() - 3); // 3 días
+        limiteUrgencia.setDate(hoy.getDate() - 3);
 
         const limiteCritico = new Date(hoy);
-        limiteCritico.setDate(hoy.getDate() - 4); // 4 días
+        limiteCritico.setDate(hoy.getDate() - 4);
 
         const [urgentes, criticos] = await Promise.all([
-            // Próximos (Exactamente 3 días)
             prisma.pedido.findMany({
                 where: {
                     estado: "PENDIENTE",

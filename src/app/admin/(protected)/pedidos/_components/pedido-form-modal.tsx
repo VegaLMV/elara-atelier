@@ -24,7 +24,7 @@ interface Props {
     onClose: () => void;
     onSuccess: () => void;
     initialClienteId?: string | null;
-    initialData?: any; // Para modo edición
+    initialData?: any;
 }
 
 export default function PedidoFormModal({ isOpen, onClose, onSuccess, initialClienteId, initialData }: Props) {
@@ -51,8 +51,7 @@ export default function PedidoFormModal({ isOpen, onClose, onSuccess, initialCli
         if (isOpen) {
             fetchMasterData();
             if (initialData) {
-                // Cargar datos existentes
-                setTab("MANUAL"); // Forzar manual en edición
+                setTab("MANUAL");
                 setCliente(initialData.cliente);
                 setItems(initialData.items.map((i: any) => ({
                     varianteId: i.varianteId,
@@ -61,7 +60,7 @@ export default function PedidoFormModal({ isOpen, onClose, onSuccess, initialCli
                     titulo: i.variante?.producto?.nombre || "Producto",
                     detalle: `${i.variante?.color?.nombre} / ${i.variante?.talla?.nombre}`,
                     imagen: i.variante?.producto?.imagenes?.[0]?.url,
-                    stockMax: 999 // En edición, asumimos que se puede mantener lo que ya tiene, la API valida
+                    stockMax: 999 
                 })));
                 setEmpaquesSel(initialData.empaques?.map((e: any) => ({
                     tipoEmpaqueId: e.tipoEmpaqueId,
@@ -78,7 +77,6 @@ export default function PedidoFormModal({ isOpen, onClose, onSuccess, initialCli
                 setNotas(initialData.notas || "");
             }
         } else {
-            // Limpieza al cerrar modal
             setCliente(null);
             setItems([]);
             setEmpaquesSel([]);
@@ -242,10 +240,6 @@ export default function PedidoFormModal({ isOpen, onClose, onSuccess, initialCli
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md sm:p-4 md:p-6 overflow-hidden">
-            {/* MODAL CONTAINER: 
-              - Móvil: 100% width/height, bordes rectos (pantalla completa).
-              - Desktop: Max 5xl, altura máxima 90vh, bordes redondeados.
-            */}
             <div className="bg-white w-full h-full sm:h-[95vh] lg:h-[90vh] sm:max-w-5xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
 
                 {/* HEADER (Fijo arriba) */}
@@ -263,11 +257,7 @@ export default function PedidoFormModal({ isOpen, onClose, onSuccess, initialCli
                         <X className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600" />
                     </button>
                 </div>
-
-                {/* BODY WRAPPER:
-                  - Móvil: Permite scroll general hacia abajo (`overflow-y-auto`).
-                  - Desktop: Oculta el scroll general (`lg:overflow-hidden`) para que cada columna haga scroll por su cuenta.
-                */}
+                
                 <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden bg-white">
                     
                     {/* COL IZQ: DATOS Y PRODUCTOS */}

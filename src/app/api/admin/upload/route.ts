@@ -14,7 +14,7 @@ export async function POST(req: Request) {
 
         const form = await req.formData();
         const file = form.get("file") as File;
-        const modulo = form.get("modulo") as string; // Recibimos el módulo
+        const modulo = form.get("modulo") as string;
 
         if (!file || !modulo) {
             return NextResponse.json({ error: "Faltan datos (archivo o módulo)" }, { status: 400 });
@@ -24,11 +24,10 @@ export async function POST(req: Request) {
         const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
         const nombreArchivo = `${crypto.randomUUID()}.${ext}`;
         
-        // ✅ DISTRIBUCIÓN CORRECTA: Se guarda en la carpeta del módulo
-        // Ejemplo: categorias/uuid.jpg o seo/uuid.jpg
+        // DISTRIBUCIÓN CORRECTA: Se guarda en la carpeta del módulo
         const ruta = `${modulo}/${nombreArchivo}`;
 
-        // 3. Subir a Storage usando tu lib
+        // 3. Subir a Storage
         const supabase = supabaseAdmin();
         const bucket = bucketProductos();
         const buffer = Buffer.from(await file.arrayBuffer());

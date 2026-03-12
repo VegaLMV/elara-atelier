@@ -65,7 +65,7 @@ export async function PATCH(
         const {
             clienteId,
             direccion, distrito, provincia, departamento, referencia,
-            items, // Nuevos items
+            items,
             empaques,
             costoEnvio,
             notas
@@ -165,7 +165,7 @@ export async function PATCH(
                         }))
                     },
                     empaques: {
-                        create: empaquesToCreate // Usar array pre-calculado
+                        create: empaquesToCreate
                     }
                 }
             });

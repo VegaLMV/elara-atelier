@@ -67,7 +67,6 @@ export default function FooterClient({
     setBusy(true);
     setMsg(null);
     try {
-      // Guardar footer links (NavigationItem location=FOOTER) por endpoint de navegacion
       const navPayload = {
         items: links.map(l => ({
           id: l.id.startsWith("temp_") ? undefined : l.id,
@@ -88,7 +87,6 @@ export default function FooterClient({
       const t1 = await r1.text();
       if (!r1.ok) throw new Error(t1 || "Error guardando footer links");
 
-      // Guardar social por endpoint social
       const socPayload = {
         links: social.map(s => ({
           id: s.id.startsWith("temp_") ? undefined : s.id,

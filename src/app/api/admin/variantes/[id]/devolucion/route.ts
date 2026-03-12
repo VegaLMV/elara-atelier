@@ -26,7 +26,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ? body.nota.trim()
       : null;
 
-  const cambioCantidad = -Math.abs(cantidad); // ✅ SIEMPRE NEGATIVO
+  const cambioCantidad = -Math.abs(cantidad);
 
   try {
     const result = await prisma.$transaction(async (tx) => {

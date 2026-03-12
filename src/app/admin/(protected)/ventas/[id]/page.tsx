@@ -2,15 +2,15 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
 import { redirect, notFound } from "next/navigation";
-import { ArrowLeft, Printer, ShoppingBag, Package, User, CreditCard, Calendar, RotateCcw } from "lucide-react";
+import { ArrowLeft, ShoppingBag, Package, User, CreditCard, Calendar, RotateCcw } from "lucide-react";
+import PrintButton from "./_components/print-button";
 
 export const dynamic = "force-dynamic";
 
-type PageProps = {
+interface PageProps {
     params: Promise<{ id: string }>;
-};
+}
 
-// Helper de moneda
 const formatMoney = (amount: number) =>
     new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount);
 
@@ -18,7 +18,6 @@ function getColorStyle(hex: string | null) {
     if (!hex) return { backgroundColor: '#fff' };
     const codes = hex.split(",").map(c => c.trim()).filter(Boolean);
     if (codes.length <= 1) return { backgroundColor: codes[0] || '#fff' };
-
     const percentage = 100 / codes.length;
     const stops = codes.map((c, i) => `${c} ${i * percentage}% ${(i + 1) * percentage}%`).join(", ");
     return { background: `linear-gradient(135deg, ${stops})` };
@@ -30,28 +29,22 @@ export default async function DetalleVentaPage({ params }: PageProps) {
 
     const { id } = await params;
 
-    // 1. Consulta Completa (Incluyendo Imágenes y Empaques)
-    const venta = await prisma.venta.findUnique({
+    const ventaDb = await prisma.venta.findUnique({
         where: { id },
         include: {
             cliente: true,
-            // Incluimos empaques (NUEVO)
             empaques: {
-                include: {
-                    tipoEmpaque: true
-                }
+                include: { tipoEmpaque: true }
             },
             items: {
                 include: {
                     variante: {
                         include: {
                             producto: {
-                                select: {
-                                    nombre: true,
+                                include: {
                                     imagenes: {
                                         take: 1,
-                                        orderBy: { esPortada: 'desc' }, // Priorizamos portada
-                                        select: { url: true }
+                                        orderBy: { esPortada: 'desc' }
                                     }
                                 }
                             },
@@ -64,38 +57,71 @@ export default async function DetalleVentaPage({ params }: PageProps) {
         }
     });
 
-    if (!venta) notFound();
+    if (!ventaDb) notFound();
 
-    // Cálculos de totales visuales
-    const totalEmpaques = venta.empaques.reduce((acc, e) => acc + Number(e.costoTotal), 0);
-    const totalProductos = Number(venta.subtotal); // Asumiendo que subtotal guarda la suma de items
+    // ==========================================
+    // SOLUCIÓN: LIMPIAR DECIMALES PARA EL CLIENTE Y TOTALES
+    // Convertimos explícitamente los Prisma.Decimal a Number
+    // ==========================================
+    const ventaLimpia = {
+        ...ventaDb,
+        subtotal: Number(ventaDb.subtotal),
+        descuentoTotal: Number(ventaDb.descuentoTotal),
+        total: Number(ventaDb.total),
+        
+        cliente: ventaDb.cliente ? {
+            ...ventaDb.cliente,
+            saldoAFavor: Number(ventaDb.cliente.saldoAFavor)
+        } : null,
+
+        empaques: ventaDb.empaques.map(emp => ({
+            ...emp,
+            costoTotal: Number(emp.costoTotal),
+            tipoEmpaque: {
+                ...emp.tipoEmpaque,
+                costoUnitario: Number(emp.tipoEmpaque.costoUnitario)
+            }
+        })),
+        items: ventaDb.items.map(item => ({
+            ...item,
+            precioUnitario: Number(item.precioUnitario),
+            precioFinal: Number(item.precioFinal),
+            subtotal: Number(item.subtotal),
+            descuentoMonto: Number(item.descuentoMonto),
+            variante: {
+                ...item.variante,
+                producto: {
+                    ...item.variante.producto,
+                    precio: Number(item.variante.producto.precio),
+                    descuentoValor: item.variante.producto.descuentoValor ? Number(item.variante.producto.descuentoValor) : null,
+                }
+            }
+        }))
+    };
+
+    const totalEmpaques = ventaLimpia.empaques.reduce((acc, e) => acc + e.costoTotal, 0);
+    const totalProductos = ventaLimpia.subtotal;
 
     return (
         <div className="p-6 md:p-8 max-w-4xl mx-auto bg-gray-50/50 min-h-screen">
-
+            
             {/* Header de Navegación */}
             <div className="mb-6 flex items-center justify-between no-print gap-4">
                 <div className="flex items-center gap-3">
                     <Link href="/admin/ventas" className="flex items-center text-sm font-bold text-gray-500 hover:text-slate-900 transition-colors bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm">
-                        <ArrowLeft className="w-4 h-4 mr-2" /> Volver al historial
+                        <ArrowLeft className="w-4 h-4 mr-2" /> Volver
                     </Link>
                     <Link
-                        href={`/admin/devoluciones/nueva?refId=${venta.id}&tipo=CLIENTE`}
+                        href={`/admin/devoluciones/nueva?refId=${ventaLimpia.id}&tipo=CLIENTE`}
                         className="flex items-center text-sm font-bold text-orange-600 hover:text-orange-700 transition-colors bg-orange-50 px-4 py-2 rounded-xl border border-orange-200 shadow-sm"
                     >
                         <RotateCcw className="w-4 h-4 mr-2" /> Registrar Devolución
                     </Link>
-
                 </div>
-                <button
-                    type="button"
-                    onClick={() => typeof window !== 'undefined' && window.print()}
-                    className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-md active:scale-95"
-                >
-                    <Printer className="w-4 h-4" /> Imprimir Comprobante
-                </button>
+                
+                {/* Botón de impresión (Client Component) - AHORA RECIBE EL OBJETO LIMPIO AL 100% */}
+                <PrintButton venta={ventaLimpia} />
             </div>
-
 
             {/* TICKET / FACTURA */}
             <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden print:shadow-none print:border-0 print:rounded-none">
@@ -110,25 +136,22 @@ export default async function DetalleVentaPage({ params }: PageProps) {
                                 </div>
                                 Comprobante de Venta
                             </h1>
-                            <p className="text-slate-400 text-sm mt-2 font-mono print:text-gray-600">ID: #{venta.codigo.toUpperCase()}</p>
+                            <p className="text-slate-400 text-sm mt-2 font-mono print:text-gray-600">ID: #{ventaLimpia.codigo.toUpperCase()}</p>
                         </div>
                         <div className="text-right">
                             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha de Emisión</p>
-                            <p className="text-lg font-bold flex items-center justify-end gap-2">
+                            <p className="text-lg font-bold flex items-center justify-end gap-2 text-white print:text-black">
                                 <Calendar className="w-4 h-4 text-slate-500" />
-                                {new Date(venta.fechaVenta).toLocaleDateString('es-PE', {
+                                {new Date(ventaLimpia.fechaVenta).toLocaleDateString('es-PE', {
                                     year: 'numeric', month: 'long', day: 'numeric',
                                     hour: '2-digit', minute: '2-digit'
                                 })}
                             </p>
                         </div>
                     </div>
-                    {/* Decoración fondo */}
-                    <div className="absolute -right-10 -bottom-20 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none print:hidden"></div>
                 </div>
 
                 <div className="p-8 print:p-4">
-
                     {/* Info Cliente & Pago */}
                     <div className="grid grid-cols-2 gap-12 mb-10 pb-8 border-b border-gray-100 print:mb-6 print:pb-6">
                         <div>
@@ -136,24 +159,23 @@ export default async function DetalleVentaPage({ params }: PageProps) {
                                 <User className="w-3.5 h-3.5" /> Datos del Cliente
                             </p>
                             <p className="text-xl font-bold text-gray-900 mb-1">
-                                {venta.cliente?.nombre || venta.clienteNombre || "Público General"}
+                                {ventaLimpia.cliente?.nombre || ventaLimpia.clienteNombre || "Público General"}
                             </p>
-                            {venta.cliente?.dni && (
+                            {ventaLimpia.cliente?.dni && (
                                 <p className="text-sm text-gray-500 font-mono bg-gray-50 px-2 py-1 rounded inline-block border border-gray-100">
-                                    DNI/RUC: {venta.cliente.dni}
+                                    DNI/RUC: {ventaLimpia.cliente.dni}
                                 </p>
                             )}
-                            {venta.cliente?.email && <p className="text-sm text-gray-500 mt-1">{venta.cliente.email}</p>}
                         </div>
                         <div className="text-right">
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center justify-end gap-2">
                                 <CreditCard className="w-3.5 h-3.5" /> Método de Pago
                             </p>
                             <span className="inline-block px-4 py-1.5 bg-blue-50 text-blue-700 rounded-lg font-bold text-sm border border-blue-100 print:bg-transparent print:p-0 print:text-black">
-                                {venta.metodoPago}
+                                {ventaLimpia.metodoPago}
                             </span>
-                            <p className={`text-sm mt-3 font-bold ${venta.estado === 'ANULADO' ? 'text-red-600' : 'text-emerald-600'}`}>
-                                {venta.estado === 'COMPLETADO' ? '● Pagado' : '● Anulado'}
+                            <p className={`text-sm mt-3 font-bold ${ventaLimpia.estado === 'ANULADO' ? 'text-red-600' : 'text-emerald-600'}`}>
+                                {ventaLimpia.estado === 'COMPLETADO' ? '● Pagado' : '● Anulado'}
                             </p>
                         </div>
                     </div>
@@ -161,14 +183,13 @@ export default async function DetalleVentaPage({ params }: PageProps) {
                     {/* --- LISTA DE PRODUCTOS --- */}
                     <div className="space-y-6 mb-8">
                         <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2">
-                            Productos Adquiridos ({venta.items.length})
+                            Productos Adquiridos ({ventaLimpia.items.length})
                         </h3>
 
                         <div className="space-y-4">
-                            {venta.items.map((item) => (
+                            {ventaLimpia.items.map((item) => (
                                 <div key={item.id} className="flex justify-between items-center group">
                                     <div className="flex items-center gap-4">
-                                        {/* Imagen del Producto */}
                                         <div className="w-12 h-12 bg-gray-100 rounded-lg border border-gray-200 overflow-hidden relative shadow-sm print:hidden">
                                             {item.variante.producto.imagenes?.[0]?.url ? (
                                                 // eslint-disable-next-line @next/next/no-img-element
@@ -178,7 +199,7 @@ export default async function DetalleVentaPage({ params }: PageProps) {
                                                     alt={item.variante.producto.nombre}
                                                 />
                                             ) : (
-                                                <div className="flex items-center justify-center h-full text-gray-300 text-[9px]">IMG</div>
+                                                <div className="flex items-center justify-center h-full text-gray-300 text-[9px]">SIN FOTO</div>
                                             )}
                                         </div>
 
@@ -190,16 +211,12 @@ export default async function DetalleVentaPage({ params }: PageProps) {
                                                 <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200">
                                                     {item.variante.talla.nombre}
                                                 </span>
-                                                {/* Burbuja de Color */}
                                                 <div className="flex items-center gap-1 text-[10px] text-gray-500 font-medium">
                                                     <span
                                                         className="w-3 h-3 rounded-full border border-gray-300 shadow-sm"
                                                         style={getColorStyle(item.variante.color.hex)}
                                                     />
                                                     {item.variante.color.nombre}
-                                                </div>
-                                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">
-                                                    SKU: <span className="text-indigo-600 font-bold">{item.variante.sku || "—"}</span>
                                                 </div>
                                             </div>
                                             {item.tieneDescuento && (
@@ -212,15 +229,11 @@ export default async function DetalleVentaPage({ params }: PageProps) {
 
                                     <div className="text-right">
                                         <div className="flex flex-col items-end">
-                                            <span className="font-bold text-gray-900">{formatMoney(Number(item.subtotal))}</span>
+                                            {/* Como ya convertimos a número, no necesitamos Number() aquí */}
+                                            <span className="font-bold text-gray-900">{formatMoney(item.subtotal)}</span>
                                             <span className="text-xs text-gray-400">
-                                                {item.cantidad} x {formatMoney(Number(item.precioFinal))}
+                                                {item.cantidad} x {formatMoney(item.precioFinal)}
                                             </span>
-                                            {item.tieneDescuento && (
-                                                <span className="text-[10px] text-gray-400 line-through">
-                                                    {formatMoney(Number(item.precioUnitario) * item.cantidad)}
-                                                </span>
-                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -228,15 +241,15 @@ export default async function DetalleVentaPage({ params }: PageProps) {
                         </div>
                     </div>
 
-                    {/* --- LISTA DE EMPAQUES (NUEVO) --- */}
-                    {venta.empaques.length > 0 && (
+                    {/* --- LISTA DE EMPAQUES --- */}
+                    {ventaLimpia.empaques.length > 0 && (
                         <div className="space-y-6 mb-8 pt-6 border-t border-gray-50">
                             <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2 flex items-center gap-2">
                                 <Package className="w-3.5 h-3.5 text-orange-500" /> Empaques & Adicionales
                             </h3>
 
                             <div className="space-y-3">
-                                {venta.empaques.map((emp) => (
+                                {ventaLimpia.empaques.map((emp) => (
                                     <div key={emp.id} className="flex justify-between items-center text-sm">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 bg-orange-50 rounded flex items-center justify-center text-orange-400 print:hidden">
@@ -248,7 +261,7 @@ export default async function DetalleVentaPage({ params }: PageProps) {
                                             </div>
                                         </div>
                                         <span className="font-medium text-gray-600">
-                                            {formatMoney(Number(emp.costoTotal))}
+                                            {formatMoney(emp.costoTotal)}
                                         </span>
                                     </div>
                                 ))}
@@ -269,10 +282,10 @@ export default async function DetalleVentaPage({ params }: PageProps) {
                                     <span className="font-medium">{formatMoney(totalEmpaques)}</span>
                                 </div>
                             )}
-                            {Number(venta.descuentoTotal) > 0 && (
+                            {ventaLimpia.descuentoTotal > 0 && (
                                 <div className="flex justify-between text-sm text-red-600 font-medium">
                                     <span>Descuento Total</span>
-                                    <span>- {formatMoney(Number(venta.descuentoTotal))}</span>
+                                    <span>- {formatMoney(ventaLimpia.descuentoTotal)}</span>
                                 </div>
                             )}
 
@@ -280,15 +293,15 @@ export default async function DetalleVentaPage({ params }: PageProps) {
 
                             <div className="flex justify-between items-end">
                                 <span className="text-lg font-black text-gray-900 uppercase">Total a Pagar</span>
-                                <span className="text-3xl font-black text-slate-900">{formatMoney(Number(venta.total))}</span>
+                                <span className="text-3xl font-black text-slate-900">{formatMoney(ventaLimpia.total)}</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Notas del Vendedor */}
-                    {venta.notas && (
+                    {ventaLimpia.notas && (
                         <div className="mt-6 p-4 bg-yellow-50 border border-yellow-100 rounded-xl text-sm text-yellow-800 print:border print:bg-white">
-                            <strong>Notas:</strong> {venta.notas}
+                            <strong>Notas:</strong> {ventaLimpia.notas}
                         </div>
                     )}
                 </div>

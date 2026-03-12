@@ -16,7 +16,6 @@ import DevolucionForm from "./devolucion-form";
  * el componente cliente.
  */
 export default async function NuevaDevolucionPage() {
-   // 1. Verificación de Seguridad (Solo ADMIN puede gestionar stock/dinero de retorno)
    const sesion = await sesionAdmin();
    if (!sesion) {
       redirect("/admin/login");

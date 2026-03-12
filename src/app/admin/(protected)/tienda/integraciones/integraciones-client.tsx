@@ -27,7 +27,6 @@ export default function IntegracionesClient({ initial }: { initial: Settings }) 
         credentials: "include",
         body: JSON.stringify({
           whatsapp: s.whatsapp,
-          // phone también es actualizado para que el footer y otros usos del nro. queden sincronizados
           phone: s.whatsapp,
           contactEmail: s.contactEmail,
         }),

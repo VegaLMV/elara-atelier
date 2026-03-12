@@ -34,8 +34,7 @@ export function PurchaseActions({ compraId, pdfData }: { compraId: string; pdfDa
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.getWidth();
 
-        // 1. Cabecera (Logo / Branding) - Estilo Slate-900
-        doc.setFillColor(15, 23, 42); // slate-900
+        doc.setFillColor(15, 23, 42); 
         doc.rect(0, 0, pageWidth, 40, 'F');
 
         doc.setTextColor(255);
@@ -47,7 +46,6 @@ export function PurchaseActions({ compraId, pdfData }: { compraId: string; pdfDa
         doc.setFont("helvetica", "normal");
         doc.text("ORDEN DE COMPRA / INGRESO DE MERCADERÍA", 14, 32);
 
-        // 2. Información General
         doc.setFontSize(10);
         doc.setTextColor(30, 41, 59); // slate-800
         doc.setFont("helvetica", "bold");
@@ -60,7 +58,6 @@ export function PurchaseActions({ compraId, pdfData }: { compraId: string; pdfDa
         doc.setFont("helvetica", "normal");
         doc.text(`${pdfData.fecha}`, 48, 61);
 
-        // 3. Datos del Proveedor
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("DATOS DEL PROVEEDOR", 110, 55);
@@ -78,7 +75,6 @@ export function PurchaseActions({ compraId, pdfData }: { compraId: string; pdfDa
             doc.text(dirStr, 110, 82, { maxWidth: 85 });
         }
 
-        // 4. Tabla de Ítems
         const tableBody = pdfData.items.map(it => [
             it.nombre,
             it.cantidad.toString(),
@@ -97,10 +93,8 @@ export function PurchaseActions({ compraId, pdfData }: { compraId: string; pdfDa
             margin: { left: 14, right: 14 }
         });
 
-        // @ts-ignore
         const finalY = (doc as any).lastAutoTable.finalY || 90;
 
-        // 5. Resumen Financiero
         const startX = 135;
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
@@ -128,7 +122,6 @@ export function PurchaseActions({ compraId, pdfData }: { compraId: string; pdfDa
         doc.text(`TOTAL PAGADO:`, startX, finalY + 38);
         doc.text(`S/ ${pdfData.total.toFixed(2)}`, 195, finalY + 38, { align: 'right' });
 
-        // 6. Descargar
         doc.save(`OC_${pdfData.id}.pdf`);
     };
 

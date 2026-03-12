@@ -14,7 +14,6 @@ export async function POST(
         const { url } = await request.json();
         if (!url) return new NextResponse("URL requerida", { status: 400 });
 
-        // Obtener el máximo orden actual
         const maxOrden = await prisma.imagenCategoria.findFirst({
             where: { categoriaId },
             orderBy: { orden: "desc" },

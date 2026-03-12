@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { formatMoney, calcularPrecioProducto } from "@/lib/precios";
 import {
   Search,
   RotateCcw,
@@ -19,13 +20,12 @@ import {
   ArrowDownCircle,
   ArrowUpCircle
 } from "lucide-react";
-import { formatMoney } from "@/lib/precios";
 
 // --- TIPOS ---
 type ItemReferencia = {
   varianteId: string;
   nombre: string;
-  detalle: string; // Talla / Color
+  detalle: string;
   cantidadOriginal: number;
   cantidadADevolver: number;
   precioUnitario: number;
@@ -34,7 +34,7 @@ type ItemReferencia = {
 };
 
 type ItemIntercambio = {
-  id: string; // varianteId
+  id: string;
   nombre: string;
   detalle: string;
   precio: number;
@@ -91,16 +91,21 @@ export default function DevolucionForm() {
           if (!res.ok) throw new Error(data.error || "No se encontró la referencia");
 
           setReferencia(data);
-          const itemsMapeados = data.items?.map((it: any) => ({
-            varianteId: it.varianteId,
-            nombre: it.variante.producto.nombre,
-            detalle: `${it.variante.talla.nombre} / ${it.variante.color.nombre}`,
-            cantidadOriginal: it.cantidad,
-            cantidadADevolver: 0,
-            precioUnitario: Number(tipoUrl === "PROVEEDOR" ? it.costoUnitario : (it.precioFinal || it.costoUnitario)),
-            imagen: it.variante.producto.imagenes[0]?.url || null,
-            hex: it.variante.color.hex
-          })) || [];
+          const itemsMapeados = data.items?.map((it: any) => {
+           const precioReal = tipoUrl === "PROVEEDOR" ? it.costoUnitario : (it.precioFinal || it.costoUnitario);
+            const precioLimpio = Math.round(Number(precioReal) * 100) / 100;
+
+            return {
+              varianteId: it.varianteId,
+              nombre: it.variante.producto.nombre,
+              detalle: `${it.variante.talla.nombre} / ${it.variante.color.nombre}`,
+              cantidadOriginal: it.cantidad,
+              cantidadADevolver: 0,
+              precioUnitario: precioLimpio, 
+              imagen: it.variante.producto.imagenes[0]?.url || null,
+              hex: it.variante.color.hex
+            };
+          }) || [];
           setItems(itemsMapeados);
           toast.success(`Referencia de ${tipoUrl || "CLIENTE"} cargada automáticamente`);
         } catch (error: any) {
@@ -127,16 +132,21 @@ export default function DevolucionForm() {
       if (!res.ok) throw new Error(data.error || "No se encontró la referencia");
 
       setReferencia(data);
-      const itemsMapeados = data.items?.map((it: any) => ({
-        varianteId: it.varianteId,
-        nombre: it.variante.producto.nombre,
-        detalle: `${it.variante.talla.nombre} / ${it.variante.color.nombre}`,
-        cantidadOriginal: it.cantidad,
-        cantidadADevolver: 0,
-        precioUnitario: Number(tipo === "PROVEEDOR" ? it.costoUnitario : (it.precioFinal || it.costoUnitario)),
-        imagen: it.variante.producto.imagenes[0]?.url || null,
-        hex: it.variante.color.hex
-      })) || [];
+      const itemsMapeados = data.items?.map((it: any) => {
+        const precioReal = tipo === "PROVEEDOR" ? it.costoUnitario : (it.precioFinal || it.costoUnitario);
+        const precioLimpio = Math.round(Number(precioReal) * 100) / 100;
+
+        return {
+          varianteId: it.varianteId,
+          nombre: it.variante.producto.nombre,
+          detalle: `${it.variante.talla.nombre} / ${it.variante.color.nombre}`,
+          cantidadOriginal: it.cantidad,
+          cantidadADevolver: 0,
+          precioUnitario: precioLimpio,
+          imagen: it.variante.producto.imagenes[0]?.url || null,
+          hex: it.variante.color.hex
+        };
+      }) || [];
       setItems(itemsMapeados);
       toast.success("Referencia encontrada");
     } catch (error: any) {
@@ -162,22 +172,53 @@ export default function DevolucionForm() {
   };
 
   const montoTotalDevolucion = useMemo(() => {
-    return items.reduce((acc, it) => acc + (it.cantidadADevolver * it.precioUnitario), 0);
+    const sum = items.reduce((acc, it) => acc + (it.cantidadADevolver * it.precioUnitario), 0);
+    return Math.round(sum * 100) / 100;
   }, [items]);
 
   const montoTotalNuevos = useMemo(() => {
-    return itemsNuevos.reduce((acc, it) => acc + (it.cantidad * it.precio), 0);
+    const sum = itemsNuevos.reduce((acc, it) => acc + (it.cantidad * it.precio), 0);
+    return Math.round(sum * 100) / 100;
   }, [itemsNuevos]);
 
-  const diferencia = montoTotalNuevos - montoTotalDevolucion;
-
+  const diferencia = Math.round((montoTotalNuevos - montoTotalDevolucion) * 100) / 100;
+  
   // --- ENVÍO FINAL ---
   const buscarProductos = async (q: string) => {
-    if (!q) return;
-    const res = await fetch(`/api/admin/productos`);
-    const data = await res.json();
-    const filtrados = data.filter((p: any) => p.nombre.toLowerCase().includes(q.toLowerCase()));
-    setResultadosProd(filtrados.slice(0, 5));
+    if (!q.trim()) {
+        setResultadosProd([]);
+        return;
+    }
+    try {
+        const res = await fetch(`/api/admin/productos/buscar?q=${encodeURIComponent(q)}`);
+        if (!res.ok) throw new Error("Error de red");
+        
+        const data = await res.json();
+        
+        const filtrados = data
+            .filter((p: any) => p.variantes && p.variantes.length > 0)
+            .map((p: any) => {
+                
+                const calculoOficial = calcularPrecioProducto({
+                    precio: Number(p.precio),
+                    descuentoActivo: p.descuentoActivo,
+                    descuentoTipo: p.descuentoTipo,
+                    descuentoValor: p.descuentoValor ? Number(p.descuentoValor) : null,
+                    descuentoInicio: p.descuentoInicio,
+                    descuentoFin: p.descuentoFin
+                });
+                
+                return {
+                    ...p,
+                    precioFinal: calculoOficial.precioFinal, 
+                    precioOriginal: Number(p.precio)
+                };
+            });
+        
+        setResultadosProd(filtrados);
+    } catch (error) {
+        console.error("Error buscando productos:", error);
+    }
   };
 
   const agregarNuevo = (prod: any, variante: any) => {
@@ -186,19 +227,18 @@ export default function DevolucionForm() {
       setItemsNuevos(prev => prev.map(i => i.id === variante.id ? { ...i, cantidad: i.cantidad + 1 } : i));
     } else {
       
-      // LÓGICA INTELIGENTE DE COSTOS PARA PROVEEDORES
+      // LÓGICA INTELIGENTE DE COSTOS PARA PROVEEDORES Y CLIENTES
       let precioSugerido = 0;
       
       if (tipo === "PROVEEDOR") {
-        // Buscamos si este producto exacto estaba en la compra que estamos devolviendo
         const itemOriginal = items.find(it => it.varianteId === variante.id);
         if (itemOriginal) {
-           precioSugerido = itemOriginal.precioUnitario; // Jala el costo real de tu compra
+           precioSugerido = itemOriginal.precioUnitario;
         } else {
-           precioSugerido = 0; // Si es un producto nuevo, lo dejamos en 0 para que digites el costo manual
+           precioSugerido = 0;
         }
       } else {
-        precioSugerido = Number(prod.precio); // Si es cliente, jalamos el precio de venta normal
+        precioSugerido = prod.precioFinal !== undefined ? prod.precioFinal : Number(prod.precio);
       }
 
       setItemsNuevos(prev => [...prev, {
@@ -216,42 +256,56 @@ export default function DevolucionForm() {
 
   const procesarDevolucion = async () => {
     const itemsFiltrados = items.filter(it => it.cantidadADevolver > 0);
-    if (itemsFiltrados.length === 0) return toast.error("Selecciona al menos un producto para devolver");
-    if (!motivo.trim()) return toast.error("Ingresa el motivo de la devolución");
+    
+    if (itemsFiltrados.length === 0) {
+        toast.error("Selecciona al menos un producto para devolver");
+        return;
+    }
+    
+    if (!motivo.trim()) {
+        toast.error("Ingresa el motivo de la devolución");
+        return;
+    }
 
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/devoluciones", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = {
           tipo,
           accion,
           referenciaId: referencia.id,
-          clienteId: referencia.clienteId,
-          items: itemsFiltrados.map(it => ({ varianteId: it.varianteId, cantidad: it.cantidadADevolver })),
-          motivo,
-          montoTotal: montoTotalDevolucion,
-          // Mandamos el precio editado/jalado al backend
+          clienteId: referencia.clienteId || null,
+          items: itemsFiltrados.map(it => ({ 
+              varianteId: it.varianteId, 
+              cantidad: Number(it.cantidadADevolver) 
+          })),
+          motivo: motivo.trim(),
+          montoTotal: Number(montoTotalDevolucion),
           itemsNuevos: accion === "CAMBIO" ? itemsNuevos.map(i => ({ 
               varianteId: i.id, 
-              cantidad: i.cantidad,
-              precioAlternativo: i.precio 
+              cantidad: Number(i.cantidad),
+              precioAlternativo: Number(i.precio) 
           })) : [],
           metodoPagoDiferencia: "EFECTIVO"
-        })
+      };
+
+      const res = await fetch("/api/admin/devoluciones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const dataError = await res.json();
-        throw new Error(dataError.error || "Error en el servidor");
+        throw new Error(data.error || "Error en el servidor");
       }
 
       toast.success("Proceso completado exitosamente");
       router.push("/admin/devoluciones");
       router.refresh();
     } catch (error: any) {
-      toast.error(error.message || "Ocurrió un error inesperado");
+      console.error("Error capturado:", error);
+      toast.error(error.message || "Ocurrió un error inesperado. Revisa la consola.");
     } finally {
       setLoading(false);
     }
@@ -453,14 +507,20 @@ export default function DevolucionForm() {
                       <div className="flex-1">
                         <div className="flex justify-between items-start mb-2">
                           <p className="font-bold text-gray-900 text-sm leading-tight max-w-[200px]">{prod.nombre}</p>
-                          <p className="font-black text-indigo-600 text-sm whitespace-nowrap ml-2">
-                              {tipo === 'CLIENTE' ? formatMoney(prod.precio) : 'Costo Asignable'}
-                          </p>
+                            <div className="text-right ml-2">
+                              <p className="font-black text-indigo-600 text-sm whitespace-nowrap">
+                                {tipo === 'CLIENTE' ? formatMoney(prod.precioFinal) : 'Costo Asignable'}
+                                </p>
+                                {tipo === 'CLIENTE' && prod.descuentoActivo && (
+                                <p className="text-[10px] text-red-400 line-through">
+                                  {formatMoney(prod.precioOriginal)}
+                                </p>
+                              )}
+                          </div>
                         </div>
 
                         <div className="flex flex-wrap gap-2">
                           {prod.variantes?.map((v: any) => {
-                            // Si es proveedor NO bloqueamos stock (porque recibimos), si es cliente SÍ.
                             const sinStock = tipo === 'CLIENTE' ? (v.stockActual <= 0) : false;
                             return (
                               <button
@@ -515,7 +575,7 @@ export default function DevolucionForm() {
                                 onChange={(e) => actualizarPrecioNuevo(it.id, Number(e.target.value))}
                                 className={`w-20 text-sm font-mono font-black border-b-2 outline-none p-1 text-right transition-colors ${tipo === 'PROVEEDOR' ? 'border-orange-300 focus:border-orange-500 text-orange-700 bg-orange-50 rounded' : 'border-transparent focus:border-indigo-300 bg-transparent'}`}
                                 title={tipo === 'PROVEEDOR' ? "Editar costo del material a recibir" : "Precio del producto"}
-                                disabled={tipo === 'CLIENTE'} // El precio retail no debería editarse aquí
+                                disabled={tipo === 'CLIENTE'}
                             />
                         </div>
                         
@@ -589,13 +649,21 @@ export default function DevolucionForm() {
                       </span>
                       <p className="text-3xl font-black text-white">{formatMoney(diferencia)}</p>
                     </>
-                  ) : (
+                  ) : diferencia < 0 ? (
                     <>
                       <span className={`text-xs flex items-center gap-1 ${tipo === 'CLIENTE' ? 'text-orange-400' : 'text-emerald-400'}`}>
                           <ArrowDownCircle className="w-3 h-3" /> 
                           {tipo === 'CLIENTE' ? 'A favor del Cliente' : 'A favor nuestro (Proveedor)'}
                       </span>
                       <p className="text-3xl font-black text-white">{formatMoney(Math.abs(diferencia))}</p>
+                    </>
+                  ) : (
+                    <>
+                      <span className={`text-xs flex items-center gap-1 text-gray-400`}>
+                          <CheckCircle2 className="w-3 h-3" /> 
+                          Intercambio Exacto
+                      </span>
+                      <p className="text-3xl font-black text-white">{formatMoney(0)}</p>
                     </>
                   )}
                 </div>

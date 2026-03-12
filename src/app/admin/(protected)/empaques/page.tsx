@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
 import EmpaquesClient from "./empaques-client";
-import { Package } from "lucide-react"; // Icono decorativo
-
+import { Package } from "lucide-react";
 
 type SP = {
   q?: string;

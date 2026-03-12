@@ -8,7 +8,6 @@ export default function BuscadorProveedores() {
   const pathname = usePathname();
   const { replace } = useRouter();
 
-  // Función que actualiza la URL
   const handleSearch = (term: string) => {
     const params = new URLSearchParams(searchParams);
     
@@ -18,7 +17,6 @@ export default function BuscadorProveedores() {
       params.delete("q");
     }
     
-    // replace actualiza la URL sin recargar la página
     replace(`${pathname}?${params.toString()}`);
   };
 

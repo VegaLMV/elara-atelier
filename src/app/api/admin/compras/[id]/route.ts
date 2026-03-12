@@ -35,7 +35,7 @@ export async function GET(
           // Opción A: Es Producto (Ropa)
           variante: {
             include: {
-              producto: { include: { imagenes: true, imagenesColor: true } }, // Incluimos imágenes para el detalle visual
+              producto: { include: { imagenes: true, imagenesColor: true } },
               talla: true,
               color: true
             }
@@ -114,7 +114,7 @@ export async function PATCH(
               varianteId: it.varianteId,
               tipo: "COMPRA",
               cambioCantidad: it.cantidad,
-              costoUnitario: new Prisma.Decimal(it.costoUnitario.toString()), // Asegurar formato Decimal
+              costoUnitario: new Prisma.Decimal(it.costoUnitario.toString()),
               compraId: compra.id,
               nota: compra.notas ? `Ingreso Compra: ${compra.notas}` : "Ingreso por Compra",
             },
@@ -252,7 +252,7 @@ export async function PUT(
 
       return compraActualizada;
     }, {
-      timeout: 30000 // 30 segundos para evitar errores por operaciones pesadas
+      timeout: 30000
     });
 
     return NextResponse.json(result);

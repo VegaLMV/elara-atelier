@@ -38,7 +38,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 interface Props {
-  initialData?: any; // Si existe, modo edición
+  initialData?: any;
 }
 
 /**

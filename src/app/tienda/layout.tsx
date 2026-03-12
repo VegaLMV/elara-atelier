@@ -18,8 +18,8 @@ import {
     Link2,
 } from "lucide-react";
 
-// Importamos el componente de animación
 import ScrollReveal from "@/components/ui/scroll-reveal";
+import InitialPreloader from "@/components/ui/initial-preloader";
 import SmartHeader from "@/components/layout/smart-header";
 import CartDrawer from "@/components/layout/cart-drawer";
 
@@ -107,7 +107,7 @@ export async function generateMetadata(): Promise<Metadata> {
     };
 }
 
-export default async function CatalogoLayout({ children }: { children: React.ReactNode }) {
+export default async function TiendaLayout({ children }: { children: React.ReactNode }) {
     const [settings, navItems, social, categorias] = await Promise.all([
         getSettings(),
         prisma.navigationItem?.findMany?.({
@@ -157,6 +157,9 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
         >
             {fontsUrl && <link rel="stylesheet" href={fontsUrl} />}
 
+            {/* PRESENTACIÓN INICIAL TIPO SPLASH SCREEN */}
+            <InitialPreloader />
+
             <SmartHeader
                 settings={{
                     storeName,
@@ -168,9 +171,9 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
 
             <CartDrawer />
 
-            {/* MAIN */}
+            {/* MAIN CONTAINER */}
             <main
-                className="pt-[112px]"
+                className="flex-grow pt-[112px]"
                 style={{
                     backgroundColor: "var(--brand-bg)",
                     fontFamily: "var(--brand-font-body)"
@@ -181,11 +184,9 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
 
             {/* FOOTER PREMIUM CON ANIMACIONES */}
             <footer className="bg-[#3f2f2f] text-[#e6dad1] border-t border-[#e6dad1]/20 overflow-hidden" style={{ fontFamily: "var(--brand-font-body)" }}>
-
-                {/* Main Footer Links */}
                 <div className="max-w-[1600px] mx-auto px-6 py-20 grid grid-cols-1 md:grid-cols-12 gap-12 lg:gap-8">
                     
-                    {/* Brand Column - Entrada desde la izquierda */}
+                    {/* Brand Column */}
                     <div className="md:col-span-12 lg:col-span-5 pr-0 lg:pr-12 text-center lg:text-left">
                         <ScrollReveal direction="left" delay={0.1}>
                             <div className="space-y-6">
@@ -202,7 +203,7 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
                         </ScrollReveal>
                     </div>
 
-                    {/* Links Column - Cascada Up */}
+                    {/* Links Column */}
                     <div className="md:col-span-4 lg:col-span-2">
                         <ScrollReveal direction="up" delay={0.2}>
                             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white mb-8">Descubrir</p>
@@ -219,7 +220,7 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
                         </ScrollReveal>
                     </div>
 
-                    {/* Contact Column - Cascada Up */}
+                    {/* Contact Column */}
                     <div className="md:col-span-4 lg:col-span-3">
                         <ScrollReveal direction="up" delay={0.3}>
                             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white mb-8">Atención al Cliente</p>
@@ -249,7 +250,7 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
                         </ScrollReveal>
                     </div>
 
-                    {/* Social Column - Cascada Up */}
+                    {/* Social Column */}
                     <div className="md:col-span-4 lg:col-span-2 lg:flex lg:justify-end">
                         <ScrollReveal direction="up" delay={0.4}>
                             <div>
@@ -279,20 +280,16 @@ export default async function CatalogoLayout({ children }: { children: React.Rea
                     </div>
                 </div>
 
-                {/* Bottom Bar - Simple Fade-in sin desplazamiento */}
+                {/* Bottom Bar */}
                 <div className="border-t border-[#e6dad1]/10 bg-[#352727]">
                     <ScrollReveal direction="none" delay={0.5}>
                         <div className="max-w-[1600px] mx-auto px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-4">
                             <p className="text-[10px] text-[#e6dad1]/40 tracking-widest uppercase">
                                 © {new Date().getFullYear()} {storeName}. Todos los derechos reservados.
                             </p>
-                            <div className="flex flex-wrap justify-center gap-6 text-[10px] text-[#e6dad1]/40 uppercase tracking-[0.2em] font-medium">
-                                <span className="text-[#864d2d]">Diseñado en Ica, Perú</span>
-                            </div>
                         </div>
                     </ScrollReveal>
                 </div>
-
             </footer>
         </div>
     );

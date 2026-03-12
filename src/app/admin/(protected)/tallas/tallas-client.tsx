@@ -21,7 +21,7 @@ export default function TallasClient({ initialRows }: { initialRows: Row[] }) {
 
   const [nombre, setNombre] = useState("");
   const [orden, setOrden] = useState("0");
-  const [busqueda, setBusqueda] = useState(""); // Nuevo filtro
+  const [busqueda, setBusqueda] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

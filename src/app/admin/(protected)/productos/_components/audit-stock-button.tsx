@@ -32,7 +32,7 @@ export function AuditStockButton({ currentCategoryId, currentCategoryName }: Aud
             const pageWidth = doc.internal.pageSize.getWidth();
 
             // Header
-            doc.setFillColor(30, 41, 59); // slate-800
+            doc.setFillColor(30, 41, 59);
             doc.rect(0, 0, pageWidth, 35, 'F');
 
             doc.setTextColor(255);

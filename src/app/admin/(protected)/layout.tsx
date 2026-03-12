@@ -7,7 +7,6 @@ export default async function ProtectedAdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // ✅ Usamos sesionAdmin en lugar de obtenerSesion
   const admin = await sesionAdmin();
 
   if (!admin) {

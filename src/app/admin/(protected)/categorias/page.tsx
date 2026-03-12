@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { sesionAdmin } from "@/lib/sesion";
 import CategoriasClient from "./categorias-client";
-import { FolderTree } from "lucide-react"; // Opcional: Icono decorativo si deseas usarlo en el header
+import { FolderTree } from "lucide-react";
 
 export const metadata = {
     title: "Categorías | Admin",
@@ -16,7 +16,6 @@ export default async function Page() {
   const sesion = await sesionAdmin();
   if (!sesion) redirect("/admin/login");
 
-  // Obtener categorías con el conteo de productos
   const categorias = await prisma.categoria.findMany({
     orderBy: { nombre: "asc" },
     include: {

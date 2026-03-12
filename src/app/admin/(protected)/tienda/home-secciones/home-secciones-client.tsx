@@ -356,9 +356,9 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
             manualProductIds: []
         };
         if (type === "PROMO_CAMPAIGN") base.content = { selectedCampaignId: null, title: "", subtitle: "" };
-        if (type === "VIDEO_BANNER") base.content = { title: "Nueva Colección", subtitle: "Editorial", ctaText: "Descubrir", ctaHref: "/tienda/catalogo", videoUrl: "", overlayOpacity: 0.3, categorySlug: "" }; // NUEVO categorySlug
+        if (type === "VIDEO_BANNER") base.content = { title: "Nueva Colección", subtitle: "Editorial", ctaText: "Descubrir", ctaHref: "/tienda/catalogo", videoUrl: "", overlayOpacity: 0.3, categorySlug: "" };
         if (type === "CATEGORY_SPOTLIGHT") base.content = { title: "Vestidos de Noche", subtitle: "Elegancia Atemporal", categorySlug: "", ctaText: "Ver Colección", ctaHref: "/tienda/catalogo", imageUrl: null };
-        if (type === "SHOP_THE_LOOK") base.content = { title: "Get The Look", subtitle: "Inspiración", categorySlug: "", imageUrl: null, manualProductIds: [] }; // NUEVO categorySlug
+        if (type === "SHOP_THE_LOOK") base.content = { title: "Get The Look", subtitle: "Inspiración", categorySlug: "", imageUrl: null, manualProductIds: [] };
 
         setSections((prev) => normalizeOrders([...prev, base]));
         setSelectedId(id);
@@ -839,60 +839,46 @@ export default function HomeSeccionesClient({ initial, categorias = [] }: { init
                                             {renderSectionHeader(<ShoppingBag className="w-4 h-4 text-slate-400" />, "Vincular Descuento Activo")}
                                             
                                             <div className="bg-amber-50 border border-amber-200/60 p-4 rounded-xl">
-                                                <p className="text-xs text-amber-800 font-medium">
-                                                    💡 La fecha, porcentaje de descuento y portada se tomarán automáticamente de la campaña que elijas.
+                                                <p className="text-xs text-amber-800 font-medium leading-relaxed">
+                                                    💡 <strong>Sincronización Automática:</strong> Al seleccionar una campaña, esta sección tomará automáticamente el Nombre, la Descripción, la Imagen de Portada, el Valor del descuento y el Reloj de Cuenta Regresiva directamente desde la Base de Datos.
                                                 </p>
                                             </div>
 
                                             <div className="pt-2">
-                                                <label className="text-xs font-bold text-slate-600 ml-1 block mb-3">Selecciona la campaña de la base de datos</label>
+                                                <label className="text-xs font-bold text-slate-600 ml-1 block mb-3">Campaña a mostrar en el Home</label>
                                                 <CampaignPicker
                                                     selectedId={selected.content?.selectedCampaignId || null}
                                                     onSelect={(c) => {
                                                         if (c) {
                                                             updateSelectedContent({
                                                                 selectedCampaignId: c.id,
-                                                                title: c.nombre,
-                                                                subtitle: c.descripcion || ""
+                                                                nombreCampaña: c.nombre,
+                                                                descripcionCampaña: c.descripcion || "",
+                                                                tipo: c.tipo,
+                                                                valor: c.valor,
+                                                                startsAt: c.startsAt,
+                                                                endsAt: c.endsAt,
+                                                                imagenUrl: c.imagenUrl
                                                             });
                                                         } else {
                                                             updateSelectedContent({
                                                                 selectedCampaignId: null,
-                                                                title: "",
-                                                                subtitle: ""
+                                                                nombreCampaña: "",
+                                                                descripcionCampaña: "",
+                                                                tipo: null,
+                                                                valor: null,
+                                                                startsAt: null,
+                                                                endsAt: null,
+                                                                imagenUrl: null
                                                             });
                                                         }
                                                     }}
                                                 />
                                             </div>
                                         </div>
-
-                                        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
-                                            {renderSectionHeader(<Type className="w-4 h-4 text-slate-400" />, "Textos Promocionales (Opcional)")}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                <div className="space-y-2">
-                                                    <label className="text-xs font-bold text-slate-600 ml-1">Título Visual (Reemplaza al original)</label>
-                                                    <input
-                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
-                                                        value={selected.content?.title ?? ""}
-                                                        onChange={(e) => updateSelectedContent({ title: e.target.value })}
-                                                        placeholder="Ej: Gran Oportunidad!"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-xs font-bold text-slate-600 ml-1">Mensaje de Urgencia</label>
-                                                    <input
-                                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:border-slate-900 transition-all"
-                                                        value={selected.content?.subtitle ?? ""}
-                                                        onChange={(e) => updateSelectedContent({ subtitle: e.target.value })}
-                                                        placeholder="Ej: Solo por este fin de semana"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
                                     </>
                                 )}
-
+                                
                                 {/* === VIDEO BANNER === */}
                                 {selected.type === "VIDEO_BANNER" && (
                                     <>

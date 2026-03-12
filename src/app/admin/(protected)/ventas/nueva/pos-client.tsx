@@ -33,17 +33,17 @@ type ProductoPOS = {
 };
 
 type ItemCarrito = {
-    uid: string; // ID único para el carrito (por si agrega el mismo prod 2 veces separado)
+    uid: string;
     tipo: "PRODUCTO" | "EMPAQUE";
-    idRef: string; // ID de Variante o Empaque
+    idRef: string;
     titulo: string;
     detalle: string;
     precioUnitario: number;
-    precioFinal: number; // Con descuento aplicado
+    precioFinal: number;
     cantidad: number;
     stockMax: number;
     imagen?: string | null;
-    descuentoAplicado?: number; // Monto descontado unitario
+    descuentoAplicado?: number;
     descuentoRazon?: string;
 };
 
@@ -51,8 +51,6 @@ type ClientePOS = { id: string; nombre: string; dni: string | null };
 type EmpaquePOS = { id: string; nombre: string; stock: number; costo: number; imagenUrl: string | null };
 
 // --- HELPERS ---
-// Usando formatMoney de @/lib/precios
-
 export default function PosClient({
     productosIniciales,
     clientesIniciales,
@@ -71,7 +69,6 @@ export default function PosClient({
         const codes = hex.split(",").map(c => c.trim()).filter(Boolean);
         if (codes.length <= 1) return { backgroundColor: codes[0] || '#eee' };
 
-        // Generar gradiente para bicolor/multicolor
         const percentage = 100 / codes.length;
         const stops = codes.map((c, i) => `${c} ${i * percentage}% ${(i + 1) * percentage}%`).join(", ");
         return { background: `linear-gradient(135deg, ${stops})` };
@@ -85,11 +82,10 @@ export default function PosClient({
     // UI Estados
     const [busqueda, setBusqueda] = useState("");
     const [catFiltro, setCatFiltro] = useState("");
-    const [productoSeleccionado, setProductoSeleccionado] = useState<ProductoPOS | null>(null); // Para modal variantes
+    const [productoSeleccionado, setProductoSeleccionado] = useState<ProductoPOS | null>(null);
     const [loading, setLoading] = useState(false);
-    const [modoEmpaque, setModoEmpaque] = useState(false); // Toggle ver empaques en grid
+    const [modoEmpaque, setModoEmpaque] = useState(false);
     
-    // NUEVO ESTADO MÓVIL: Controla si el carrito lateral está visible en pantallas pequeñas
     const [mostrarCarritoMovil, setMostrarCarritoMovil] = useState(false);
 
     // --- LÓGICA DE FILTRADO ---
@@ -108,7 +104,6 @@ export default function PosClient({
     // --- LÓGICA CARRITO ---
     const agregarAlCarrito = (item: Omit<ItemCarrito, "uid">) => {
         setCarrito(prev => {
-            // Buscar si ya existe exactamente el mismo ítem (misma variante/empaque)
             const existe = prev.find(i => i.idRef === item.idRef && i.tipo === item.tipo);
             if (existe) {
                 if (existe.cantidad + item.cantidad > existe.stockMax) {
@@ -119,7 +114,7 @@ export default function PosClient({
             }
             return [...prev, { ...item, uid: Math.random().toString(36) }];
         });
-        setProductoSeleccionado(null); // Cerrar modal si estaba abierto
+        setProductoSeleccionado(null);
         toast.success("Agregado al carrito");
     };
 
@@ -143,11 +138,8 @@ export default function PosClient({
     // --- TOTALES ---
     const subtotal = carrito.reduce((acc, i) => acc + (i.precioUnitario * i.cantidad), 0);
     const descuentoTotal = carrito.reduce((acc, i) => acc + ((i.descuentoAplicado || 0) * i.cantidad), 0);
-    const totalPagar = subtotal - descuentoTotal; // Ojo: item.precioFinal ya podría tener descuento, hay que cuadrar lógica.
-    // Ajuste: precioFinal es el precio que paga el cliente. precioUnitario es el base.
-    // Total real = sum(precioFinal * cantidad).
+    const totalPagar = subtotal - descuentoTotal;
     const totalReal = carrito.reduce((acc, i) => acc + (i.precioFinal * i.cantidad), 0);
-    // El descuento visual es la diferencia
     const ahorroTotal = subtotal - totalReal;
     const cantidadItems = carrito.reduce((acc, i) => acc + i.cantidad, 0);
 
@@ -156,7 +148,6 @@ export default function PosClient({
         if (carrito.length === 0) return toast.error("Carrito vacío");
         setLoading(true);
 
-        // Separar Productos de Empaques para la API
         const itemsProducto = carrito.filter(i => i.tipo === "PRODUCTO").map(i => ({
             varianteId: i.idRef,
             cantidad: i.cantidad,
@@ -188,7 +179,7 @@ export default function PosClient({
             if (!res.ok) throw new Error(data.error || "Error al procesar venta");
 
             toast.success("¡Venta registrada con éxito!");
-            router.push(`/admin/ventas/${data.id}`); // Ir al detalle/ticket
+            router.push(`/admin/ventas/${data.id}`);
         } catch (error: any) {
             toast.error(error.message);
         } finally {

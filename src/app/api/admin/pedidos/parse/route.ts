@@ -17,7 +17,6 @@ export async function POST(req: Request) {
         const results = [];
 
         for (const parsed of parsedItems) {
-            // 1. Buscar el producto por nombre
             const producto = await prisma.producto.findFirst({
                 where: {
                     nombre: {
@@ -48,7 +47,6 @@ export async function POST(req: Request) {
                 continue;
             }
 
-            // 2. Buscar variante
             let varianteEncontrada = null;
             if (parsed.talla && parsed.color) {
                 const cleanTalla = parsed.talla.replace(/\s/g, '').toLowerCase();

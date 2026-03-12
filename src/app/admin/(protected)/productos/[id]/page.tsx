@@ -28,12 +28,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         imagenes: { orderBy: { orden: 'asc' } },
         imagenesColor: { include: { color: true } },
         variantes: { include: { talla: true, color: true } },
-
-        // ✅ CORRECCIÓN: Usamos la relación correcta 'participacionesCampana'
-        // para obtener el historial de campañas donde participó este producto.
         participacionesCampana: {
           include: {
-            campana: true // Traemos los datos de la campaña padre
+            campana: true
           },
           orderBy: {
             campana: { startsAt: 'desc' }
@@ -44,7 +41,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
     if (!producto) return notFound();
 
-    // Referencias para selectores
     const [categorias, tallas, colores] = await Promise.all([
       prisma.categoria.findMany({ orderBy: { nombre: "asc" } }),
       prisma.talla.findMany({ orderBy: { orden: "asc" } }),
@@ -71,7 +67,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         nuevoHasta: producto.nuevoHasta?.toISOString() ?? null,
       },
 
-      // ✅ MAPEO CORREGIDO: Transformamos Campaña -> DescuentoItem
       descuentosHistorial: producto.participacionesCampana.map((p) => ({
         id: p.campana.id,
         tipo: p.campana.tipo,

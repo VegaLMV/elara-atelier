@@ -93,9 +93,9 @@ function NavRow({
   );
 }
 
-// ============================================================
-// NavSection - también fuera del componente principal
-// ============================================================
+// ================
+// NavSection 
+// ================
 function NavSection({
   title,
   location,

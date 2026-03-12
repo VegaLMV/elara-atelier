@@ -145,15 +145,15 @@ export function ExportButtons({
                         const [hexRaw] = rawValue.split('|');
                         const colors = hexRaw.split(',').map(c => c.trim()).filter(Boolean);
 
-                        const cx = cellData.cell.x + 5; // Ajustado un poco más a la derecha
+                        const cx = cellData.cell.x + 5;
                         const cy = cellData.cell.y + (cellData.cell.height / 2);
-                        const r = 3; // Radio ligeramente más grande para legibilidad
-                        const k = 0.5522847498; // Constante para círculos perfectos con Bezier
+                        const r = 3;
+                        const k = 0.5522847498;
 
                         try {
                             doc.saveGraphicsState();
-                            doc.setLineWidth(0.05); // Línea de división ultra fina
-                            doc.setDrawColor(220); // Gris muy suave para el borde
+                            doc.setLineWidth(0.05);
+                            doc.setDrawColor(220);
 
                             if (colors.length >= 2) {
                                 // MITAD IZQUIERDA (Color 1)
@@ -214,7 +214,6 @@ export function ExportButtons({
         listToExport.forEach((table, i) => {
             const cleanedData = table.data.map(row => row.map(cleanCellData));
             const ws = XLSX.utils.aoa_to_sheet([table.headers, ...cleanedData]);
-            // El nombre de la hoja no puede exceder los 31 caracteres
             const sheetName = (table.title || `Datos ${i + 1}`).substring(0, 31);
             XLSX.utils.book_append_sheet(wb, ws, sheetName);
         });

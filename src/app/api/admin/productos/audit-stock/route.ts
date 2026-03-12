@@ -42,7 +42,6 @@ export async function GET(request: Request) {
             ]
         });
 
-        // Group by category for easier PDF generation
         const grouped = productos.reduce((acc: any, prod) => {
             const catName = prod.categoria?.nombre || "Sin Categoría";
             if (!acc[catName]) {

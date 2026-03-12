@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     // Buscamos la campaña y sus detalles para saber qué productos están involucrados
     const campana = await prisma.campana.findUnique({
         where: { id },
-        include: { detalles: true } // Importante: Traer la lista de productos vinculados
+        include: { detalles: true }
     });
 
     if (!campana) {

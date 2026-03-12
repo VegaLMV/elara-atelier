@@ -12,7 +12,6 @@ export default async function Page() {
   const sesion = await sesionAdmin();
   if (!sesion) redirect("/admin/login");
 
-  // Traemos datos maestros para el selector
   const [productosDb, categorias] = await Promise.all([
     prisma.producto.findMany({
       where: { estado: "ACTIVO" },
@@ -32,7 +31,6 @@ export default async function Page() {
     }),
   ]);
 
-  // Mapear al formato simple que usa el cliente
   const productos = productosDb.map(p => ({
     id: p.id,
     nombre: p.nombre,

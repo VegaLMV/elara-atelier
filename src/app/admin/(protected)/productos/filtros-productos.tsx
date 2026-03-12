@@ -25,7 +25,6 @@ export default function FiltrosProductos({
   const pathname = usePathname();
   const sp = useSearchParams();
 
-  // Estados locales
   const [q, setQ] = useState(initial.q);
   const [categoria, setCategoria] = useState(initial.categoria);
   const [estado, setEstado] = useState(initial.estado);
@@ -34,7 +33,6 @@ export default function FiltrosProductos({
   const [orden, setOrden] = useState(initial.orden);
   const [vista, setVista] = useState(initial.vista);
 
-  // Sincronizar con URL si cambia externamente
   useEffect(() => {
     setQ(sp.get("q") ?? "");
     setCategoria(sp.get("categoria") ?? "");

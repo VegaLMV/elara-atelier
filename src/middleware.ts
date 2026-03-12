@@ -8,12 +8,10 @@ const secret = new TextEncoder().encode(secretStr);
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ✅ Permitir SIEMPRE login (incluye /admin/login/ y posibles subrutas)
   if (pathname.startsWith("/admin/login")) {
     return NextResponse.next();
   }
 
-  // ✅ Permitir auth pública
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
@@ -24,7 +22,6 @@ export async function middleware(req: NextRequest) {
 
   const token = req.cookies.get(cookieName)?.value;
 
-  // Sin cookie => fuera
   if (!token) {
     if (esApiAdmin) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
@@ -32,7 +29,6 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/admin/login", req.url));
   }
 
-  // Si no hay secret, no se puede verificar (mejor fallar seguro)
   if (!secretStr) {
     if (esApiAdmin) {
       return NextResponse.json({ error: "AUTH_SECRET no configurado" }, { status: 500 });

@@ -121,7 +121,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     // Lógica Centralizada
     const calculo = calcularPrecioProducto(p);
     const stockTotal = p.variantes.reduce((acc, v) => acc + (v.activa ? v.stockActual : 0), 0);
-    const precioDisplay = formatMoney(calculo.precioFinal); // Siempre mostramos el final
+    const precioDisplay = formatMoney(calculo.precioFinal);
 
     return {
       id: p.id,

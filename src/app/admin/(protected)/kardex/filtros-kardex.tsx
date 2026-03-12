@@ -37,7 +37,7 @@ export default function FiltrosKardex({
     if (from) sp.set("from", from);
     if (to) sp.set("to", to);
 
-    sp.set("page", "1"); // Resetear a página 1 al filtrar
+    sp.set("page", "1");
 
     const qs = sp.toString();
     router.push(qs ? `/admin/kardex?${qs}` : "/admin/kardex");

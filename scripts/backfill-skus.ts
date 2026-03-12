@@ -5,7 +5,6 @@ const prisma = new PrismaClient();
 async function backfill() {
     console.log("Iniciando backfill de SKUs...");
 
-    // 1. Obtener todas las variantes sin SKU
     const variantsWithoutSku = await prisma.variante.findMany({
         where: {
             sku: null,
@@ -22,7 +21,6 @@ async function backfill() {
 
     console.log(`Encontradas ${variantsWithoutSku.length} variantes sin SKU.`);
 
-    // 2. Buscar el SKU más alto actual para empezar desde ahí
     const lastVariant = await prisma.variante.findFirst({
         where: {
             sku: { not: null },
@@ -40,7 +38,6 @@ async function backfill() {
         }
     }
 
-    // 3. Actualizar una por una para asegurar correlación (podría hacerse en lote pero para asegurar secuencia es mejor así)
     for (const variant of variantsWithoutSku) {
         nextNumber++;
         const newSku = nextNumber.toString().padStart(5, "0");

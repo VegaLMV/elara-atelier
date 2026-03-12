@@ -3,7 +3,7 @@
 import { useState } from "react";
 import LookbookItem from "./lookbook-item";
 import ShopTheLookDrawer, { Producto } from "./shop-the-look-drawer";
-import ScrollReveal from "@/components/ui/scroll-reveal"; // Importamos ScrollReveal
+import ScrollReveal from "@/components/ui/scroll-reveal";
 
 interface LookSection {
     id: string;
